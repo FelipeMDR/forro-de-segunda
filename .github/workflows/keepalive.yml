@@ -1,0 +1,28 @@
+# Impede que o projeto Supabase (free tier) seja pausado após 7 dias
+# sem atividade: faz um "ping" no banco toda quinta-feira.
+#
+# Configure nos Secrets do repositório (Settings > Secrets > Actions):
+#   SUPABASE_URL       — ex.: https://xyzabc.supabase.co
+#   SUPABASE_ANON_KEY  — a anon/public key do projeto
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '0 12 * * 4' # quinta-feira, 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping no banco
+        run: |
+          curl --fail -s -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
