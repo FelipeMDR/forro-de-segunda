@@ -176,6 +176,28 @@ create table if not exists public.profile_cargos (
   primary key (user_id, cargo)
 );
 
+-- Catálogo de distintivos personalizados: a organização cria (emoji +
+-- título + descrição) e concede manualmente a quem quiser — não só a
+-- quem venceu um desafio. Dá pra entregar a um aluno específico ou ao
+-- topo do ranking de um desafio (top 1, top 3, top 5…), calculado no
+-- app a partir de getRanking() e concedido em lote.
+create table if not exists public.distintivos (
+  id uuid primary key default gen_random_uuid(),
+  emoji text not null,
+  titulo text not null,
+  descricao text not null default '',
+  criado_por uuid references public.profiles(id) on delete set null,
+  criado_em timestamptz not null default now()
+);
+
+-- Quem recebeu cada distintivo (uma pessoa não recebe o mesmo duas vezes)
+create table if not exists public.distintivos_concedidos (
+  distintivo_id uuid not null references public.distintivos(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  concedido_em timestamptz not null default now(),
+  primary key (distintivo_id, user_id)
+);
+
 -- Assinaturas de push (Fase 4)
 create table if not exists public.push_subscriptions (
   endpoint text primary key,
@@ -341,6 +363,8 @@ alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
 alter table public.cargos enable row level security;
 alter table public.profile_cargos enable row level security;
+alter table public.distintivos enable row level security;
+alter table public.distintivos_concedidos enable row level security;
 alter table public.push_subscriptions enable row level security;
 
 -- profiles: todos os logados leem; dono ou organizador editam
@@ -478,6 +502,24 @@ create policy "cargos_write" on public.cargos
 create policy "profile_cargos_select" on public.profile_cargos
   for select to authenticated using (true);
 create policy "profile_cargos_write" on public.profile_cargos
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- distintivos: todos leem (aparecem no perfil de quem recebeu);
+-- só organizador cria/edita/remove do catálogo
+create policy "distintivos_select" on public.distintivos
+  for select to authenticated using (true);
+create policy "distintivos_write" on public.distintivos
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- distintivos_concedidos: todos leem; só organizador concede/revoga —
+-- é o que impede alguém de se autoconceder um distintivo
+create policy "distintivos_concedidos_select" on public.distintivos_concedidos
+  for select to authenticated using (true);
+create policy "distintivos_concedidos_write" on public.distintivos_concedidos
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());

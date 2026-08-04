@@ -1,17 +1,13 @@
-import { challengePhase, diasDistintos, toISODate } from './dates'
+import { diasDistintos, toISODate } from './dates'
 import { emojiCargo } from './types'
-import type {
-  AgendaEvent,
-  Badge,
-  Challenge,
-  RankingEntry,
-  TurmaMembro,
-} from './types'
+import type { AgendaEvent, Badge, TurmaMembro } from './types'
 
 /**
- * Sistema de distintivos: tudo é DERIVADO dos dados existentes
- * (turmas, check-ins, desafios encerrados e eventos) — nada precisa
- * ser armazenado nem concedido manualmente.
+ * Distintivos do perfil vêm de duas fontes: os DERIVADOS automaticamente
+ * dos dados (turma, cargo, presença, eventos) e os PERSONALIZADOS, que a
+ * organização cria e concede manualmente (ver DistintivoDef) — inclusive
+ * pra reconhecer o topo do ranking de um desafio, já que não existe mais
+ * um distintivo automático de "campeão".
  */
 
 const MARCOS_PRESENCA: Array<[number, string, string]> = [
@@ -26,11 +22,9 @@ export function computeBadges(input: {
   userId: string
   turmas: TurmaMembro[]
   cargos?: string[]
+  /** Distintivos personalizados já concedidos a essa pessoa. */
+  distintivosCustom?: Badge[]
   checkinDates: Date[]
-  /** Desafios já carregados (qualquer fase). */
-  challenges: Challenge[]
-  /** Rankings dos desafios ENCERRADOS (id do desafio → ranking). */
-  rankings: Map<string, RankingEntry[]>
   events: AgendaEvent[]
 }): Badge[] {
   const badges: Badge[] = []
@@ -43,6 +37,12 @@ export function computeBadges(input: {
       titulo: cargo,
       descricao: 'Cargo no Forró de Segunda',
     })
+  }
+
+  // 0.5 Distintivos personalizados — concedidos manualmente pela
+  // organização, por qualquer motivo (não só vencer um desafio)
+  for (const b of input.distintivosCustom ?? []) {
+    badges.push(b)
   }
 
   // 1. Turma e função na dança (ex.: "Condutor(a) · Avançado")
@@ -85,26 +85,6 @@ export function computeBadges(input: {
         emoji: '🎉',
         titulo: e.titulo,
         descricao: 'Presença confirmada no evento',
-      })
-    }
-  }
-
-  // 4. Campeão(ã) de desafios encerrados (empates no topo também contam)
-  for (const c of input.challenges) {
-    if (challengePhase(c) !== 'encerrado') continue
-    const ranking = input.rankings.get(c.id)
-    if (!ranking || ranking.length === 0) continue
-    const topo = ranking[0].pontos
-    if (topo <= 0) continue
-    const venci = ranking.some(
-      (r) => r.user_id === input.userId && r.pontos === topo,
-    )
-    if (venci) {
-      badges.push({
-        id: `campeao-${c.id}`,
-        emoji: '🏆',
-        titulo: `Campeão(ã) — ${c.titulo}`,
-        descricao: `Venceu com ${topo} ${topo === 1 ? 'presença' : 'presenças'}`,
       })
     }
   }

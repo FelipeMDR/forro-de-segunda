@@ -8,11 +8,15 @@ import type {
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Badge,
   Cargo,
   Challenge,
   ChallengeInput,
   ChallengeJanela,
   Comment,
+  DistintivoDef,
+  DistintivoDefInput,
+  DistintivoRecebedor,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -77,9 +81,15 @@ interface DB {
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
+  distintivos: DistintivoDef[]
+  distintivosConcedidos: {
+    distintivo_id: string
+    user_id: string
+    concedido_em: string
+  }[]
 }
 
-const DB_KEY = 'fds-demo-db-v7'
+const DB_KEY = 'fds-demo-db-v8'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -213,6 +223,29 @@ function seed(): DB {
 
   const cargos: Cargo[] = CARGOS_PADRAO.map((nome) => ({ id: uuid(), nome }))
 
+  // Distintivos personalizados de exemplo: um já concedido, outro
+  // ainda sem ninguém (pra mostrar o fluxo de entregar pelo painel)
+  const distintivoAlma: DistintivoDef = {
+    id: uuid(),
+    emoji: '🌟',
+    titulo: 'Alma do Forró',
+    descricao: 'Contagia a turma com energia boa toda aula',
+  }
+  const distintivoPadrinho: DistintivoDef = {
+    id: uuid(),
+    emoji: '🤝',
+    titulo: 'Padrinho(a) de calouro',
+    descricao: 'Ajudou alguém novo a se sentir em casa',
+  }
+  const distintivos: DistintivoDef[] = [distintivoAlma, distintivoPadrinho]
+  const distintivosConcedidos = [
+    {
+      distintivo_id: distintivoAlma.id,
+      user_id: maria.id,
+      concedido_em: addDays(now, -5).toISOString(),
+    },
+  ]
+
   const eventos: AgendaEvent[] = [
     {
       id: uuid(),
@@ -322,6 +355,8 @@ function seed(): DB {
     alunos,
     turmas,
     cargos,
+    distintivos,
+    distintivosConcedidos,
   }
 }
 
@@ -344,6 +379,7 @@ export class DemoApi implements ForroApi {
         'fds-demo-db-v4',
         'fds-demo-db-v5',
         'fds-demo-db-v6',
+        'fds-demo-db-v7',
       ]) {
         localStorage.removeItem(k)
       }
@@ -955,6 +991,91 @@ export class DemoApi implements ForroApi {
     p.cargos = p.cargos.filter((c) => c !== cargo)
     this.persist()
     this.notifyFeed()
+  }
+
+  // ---- Distintivos personalizados ----
+
+  async listDistintivos(): Promise<DistintivoDef[]> {
+    return [...this.db.distintivos]
+  }
+
+  async saveDistintivo(d: DistintivoDefInput) {
+    const titulo = d.titulo.trim()
+    if (!titulo) throw new Error('Título do distintivo vazio')
+    if (!d.emoji.trim()) throw new Error('Escolha um emoji para o distintivo')
+    this.db.distintivos.push({
+      id: uuid(),
+      emoji: d.emoji.trim(),
+      titulo,
+      descricao: d.descricao.trim(),
+    })
+    this.persist()
+  }
+
+  async deleteDistintivo(id: string) {
+    this.db.distintivos = this.db.distintivos.filter((d) => d.id !== id)
+    this.db.distintivosConcedidos = this.db.distintivosConcedidos.filter(
+      (c) => c.distintivo_id !== id,
+    )
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async listRecebedores(distintivoId: string): Promise<DistintivoRecebedor[]> {
+    return this.db.distintivosConcedidos
+      .filter((c) => c.distintivo_id === distintivoId)
+      .map((c) => {
+        const p = this.db.profiles.find((x) => x.id === c.user_id)
+        return {
+          user_id: c.user_id,
+          nome: p?.nome ?? 'Alguém',
+          concedido_em: c.concedido_em,
+        }
+      })
+      .sort((a, b) => b.concedido_em.localeCompare(a.concedido_em))
+  }
+
+  async concederDistintivo(distintivoId: string, userIds: string[]) {
+    const agora = new Date().toISOString()
+    for (const userId of userIds) {
+      const jaTem = this.db.distintivosConcedidos.some(
+        (c) => c.distintivo_id === distintivoId && c.user_id === userId,
+      )
+      if (!jaTem) {
+        this.db.distintivosConcedidos.push({
+          distintivo_id: distintivoId,
+          user_id: userId,
+          concedido_em: agora,
+        })
+      }
+    }
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async revogarDistintivo(distintivoId: string, userId: string) {
+    this.db.distintivosConcedidos = this.db.distintivosConcedidos.filter(
+      (c) => !(c.distintivo_id === distintivoId && c.user_id === userId),
+    )
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async distintivosDe(userId: string): Promise<Badge[]> {
+    return this.db.distintivosConcedidos
+      .filter((c) => c.user_id === userId)
+      .map((c) => {
+        const def = this.db.distintivos.find((d) => d.id === c.distintivo_id)
+        return def
+          ? {
+              id: `custom-${def.id}`,
+              emoji: def.emoji,
+              titulo: def.titulo,
+              descricao: def.descricao,
+            }
+          : null
+      })
+      .filter((b): b is Badge => b !== null)
   }
 
   // ---- Push ----

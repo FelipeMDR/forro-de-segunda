@@ -29,6 +29,9 @@ import {
   type AttendanceRow,
   type Cargo,
   type Challenge,
+  type DistintivoDef,
+  type DistintivoDefInput,
+  type DistintivoRecebedor,
   type Feriado,
   type FeriadoInput,
   type PapelDanca,
@@ -45,6 +48,7 @@ import {
 const ABAS_PAINEL = [
   { id: 'pessoas', emoji: '👥', label: 'Pessoas' },
   { id: 'agenda', emoji: '📅', label: 'Agenda' },
+  { id: 'distintivos', emoji: '🎖️', label: 'Distintivos' },
   { id: 'frequencia', emoji: '📋', label: 'Frequência' },
   { id: 'denuncias', emoji: '🚩', label: 'Denúncias' },
 ] as const
@@ -547,6 +551,405 @@ function SecaoCargos({
         <button className="btn-ghost shrink-0">+ Criar</button>
       </form>
     </section>
+  )
+}
+
+const DISTINTIVO_VAZIO: DistintivoDefInput = {
+  emoji: '🎖️',
+  titulo: '',
+  descricao: '',
+}
+
+const OPCOES_TOP_N = [1, 3, 5, 10] as const
+
+/**
+ * Distintivos personalizados: a organização cria (emoji + título +
+ * descrição) e entrega manualmente a quem quiser — por qualquer
+ * motivo, não só vencer um desafio. Toque num distintivo do catálogo
+ * pra abrir o painel de entrega dele.
+ */
+function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [distintivos, setDistintivos] = useState<DistintivoDef[] | null>(null)
+  const [perfis, setPerfis] = useState<Profile[]>([])
+  const [aberto, setAberto] = useState(false)
+  const [form, setForm] = useState<DistintivoDefInput>({ ...DISTINTIVO_VAZIO })
+  const [salvando, setSalvando] = useState(false)
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
+
+  const carregar = useCallback(async () => {
+    setDistintivos(await api.listDistintivos())
+  }, [api])
+
+  useEffect(() => {
+    void carregar()
+    void api.listProfiles().then(setPerfis)
+  }, [api, carregar])
+
+  const criar = async (e: FormEvent) => {
+    e.preventDefault()
+    setSalvando(true)
+    try {
+      await api.saveDistintivo(form)
+      setForm({ ...DISTINTIVO_VAZIO })
+      setAberto(false)
+      await carregar()
+      toast('Distintivo criado! 🎖️')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const remover = async (id: string) => {
+    try {
+      await api.deleteDistintivo(id)
+      if (selecionadoId === id) setSelecionadoId(null)
+      await carregar()
+      toast('Distintivo removido')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const selecionado = distintivos?.find((d) => d.id === selecionadoId) ?? null
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        🎖️ Distintivos personalizados
+      </h2>
+      <p className="text-xs text-stone-500">
+        Crie reconhecimentos e entregue pra quem você quiser, por qualquer
+        motivo — não só vencer um desafio. Toque num distintivo pra ver quem
+        já recebeu ou entregar pra mais gente.
+      </p>
+
+      {distintivos === null ? (
+        <Spinner />
+      ) : distintivos.length === 0 ? (
+        <p className="text-sm text-stone-500">Nenhum distintivo criado ainda.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {distintivos.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() =>
+                setSelecionadoId(selecionadoId === d.id ? null : d.id)
+              }
+              aria-pressed={selecionadoId === d.id}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                selecionadoId === d.id
+                  ? 'bg-gradient-to-r from-brasa-400 to-brasa-600 text-white'
+                  : 'bg-white/5 text-stone-300'
+              }`}
+            >
+              {d.emoji} {d.titulo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="btn-ghost w-full"
+        onClick={() => setAberto((v) => !v)}
+      >
+        {aberto ? 'Fechar' : '+ Criar novo distintivo'}
+      </button>
+
+      {aberto && (
+        <form onSubmit={criar} className="space-y-3 rounded-xl bg-noite-950 p-4">
+          <div className="flex gap-2">
+            <input
+              className="input w-20 text-center text-lg"
+              placeholder="🎖️"
+              value={form.emoji}
+              maxLength={4}
+              onChange={(e) => setForm({ ...form, emoji: e.target.value })}
+              required
+            />
+            <input
+              className="input"
+              placeholder='Título (ex.: "Alma do Forró")'
+              value={form.titulo}
+              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              required
+            />
+          </div>
+          <textarea
+            className="input resize-none"
+            rows={2}
+            placeholder="Descrição — por que esse distintivo existe?"
+            value={form.descricao}
+            onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+          />
+          <button className="btn-primary w-full" disabled={salvando}>
+            {salvando ? 'Salvando…' : 'Criar distintivo'}
+          </button>
+        </form>
+      )}
+
+      {selecionado && (
+        <PainelEntrega
+          distintivo={selecionado}
+          perfis={perfis}
+          desafios={desafios}
+          onFechar={() => setSelecionadoId(null)}
+          onRemoverDefinicao={() => void remover(selecionado.id)}
+        />
+      )}
+    </section>
+  )
+}
+
+function PainelEntrega({
+  distintivo,
+  perfis,
+  desafios,
+  onFechar,
+  onRemoverDefinicao,
+}: {
+  distintivo: DistintivoDef
+  perfis: Profile[]
+  desafios: Challenge[]
+  onFechar: () => void
+  onRemoverDefinicao: () => void
+}) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [recebedores, setRecebedores] = useState<DistintivoRecebedor[] | null>(
+    null,
+  )
+  const [busca, setBusca] = useState('')
+  const [desafioId, setDesafioId] = useState('')
+  const [topN, setTopN] = useState<number>(3)
+  const [entregando, setEntregando] = useState(false)
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
+
+  const carregarRecebedores = useCallback(async () => {
+    setRecebedores(await api.listRecebedores(distintivo.id))
+  }, [api, distintivo.id])
+
+  useEffect(() => {
+    setRecebedores(null)
+    setConfirmandoExclusao(false)
+    void carregarRecebedores()
+  }, [carregarRecebedores])
+
+  const jaTem = (userId: string) =>
+    recebedores?.some((r) => r.user_id === userId) ?? false
+
+  const entregarPara = async (userIds: string[], msgSucesso: string) => {
+    setEntregando(true)
+    try {
+      await api.concederDistintivo(distintivo.id, userIds)
+      await carregarRecebedores()
+      toast(msgSucesso)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setEntregando(false)
+    }
+  }
+
+  const revogar = async (userId: string) => {
+    try {
+      await api.revogarDistintivo(distintivo.id, userId)
+      await carregarRecebedores()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const entregarTopN = async () => {
+    const desafio = desafios.find((c) => c.id === desafioId)
+    if (!desafio) {
+      toast('Escolha um desafio', 'erro')
+      return
+    }
+    setEntregando(true)
+    try {
+      const ranking = await api.getRanking(desafio)
+      const topUserIds = ranking.slice(0, topN).map((r) => r.user_id)
+      if (topUserIds.length === 0) {
+        toast('Esse desafio ainda não tem ninguém no ranking', 'erro')
+        return
+      }
+      await api.concederDistintivo(distintivo.id, topUserIds)
+      await carregarRecebedores()
+      toast(
+        `Entregue para o top ${topUserIds.length} de "${desafio.titulo}"! 🏆`,
+      )
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setEntregando(false)
+    }
+  }
+
+  const alunosFiltrados = busca
+    ? perfis
+        .filter((p) => !jaTem(p.id) && combinaBusca(busca, [p.nome, p.telefone]))
+        .slice(0, 8)
+    : []
+
+  return (
+    <div className="space-y-4 rounded-xl border border-brasa-500/20 bg-noite-950 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold">
+            {distintivo.emoji} {distintivo.titulo}
+          </p>
+          {distintivo.descricao && (
+            <p className="text-xs text-stone-500">{distintivo.descricao}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onFechar}
+          className="shrink-0 text-stone-500 hover:text-white"
+          aria-label="Fechar painel de entrega"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Entregar pro topo de um desafio */}
+      <div className="space-y-2">
+        <span className="label">Entregar pro topo de um desafio</span>
+        <div className="flex gap-2">
+          <select
+            className="input"
+            value={desafioId}
+            onChange={(e) => setDesafioId(e.target.value)}
+          >
+            <option value="">Escolha o desafio…</option>
+            {desafios.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.titulo}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-24"
+            value={topN}
+            onChange={(e) => setTopN(Number(e.target.value))}
+          >
+            {OPCOES_TOP_N.map((n) => (
+              <option key={n} value={n}>
+                Top {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          className="btn-ghost w-full"
+          disabled={!desafioId || entregando}
+          onClick={() => void entregarTopN()}
+        >
+          Entregar para o Top {topN} 🏆
+        </button>
+      </div>
+
+      {/* Entregar pra um aluno específico */}
+      <div className="space-y-2">
+        <span className="label">Entregar pra um aluno específico</span>
+        <input
+          type="search"
+          className="input"
+          placeholder="🔎 Buscar por nome ou telefone…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        {busca && (
+          <div className="max-h-40 divide-y divide-white/5 overflow-y-auto rounded-lg bg-noite-900">
+            {alunosFiltrados.length === 0 ? (
+              <p className="p-2 text-xs text-stone-500">
+                Ninguém encontrado (ou já recebeu esse distintivo).
+              </p>
+            ) : (
+              alunosFiltrados.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={entregando}
+                  onClick={() => {
+                    void entregarPara(
+                      [p.id],
+                      `${p.nome} recebeu o distintivo! 🎉`,
+                    )
+                    setBusca('')
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/5"
+                >
+                  {p.nome}
+                  <span className="shrink-0 text-xs text-brasa-400">
+                    + entregar
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quem já recebeu */}
+      <div className="space-y-1">
+        <span className="label">
+          Quem já recebeu{' '}
+          {recebedores && recebedores.length > 0 && `(${recebedores.length})`}
+        </span>
+        {recebedores === null ? (
+          <Spinner />
+        ) : recebedores.length === 0 ? (
+          <p className="text-xs text-stone-500">Ninguém ainda.</p>
+        ) : (
+          <div className="divide-y divide-white/5">
+            {recebedores.map((r) => (
+              <div
+                key={r.user_id}
+                className="flex items-center justify-between py-1.5 text-sm"
+              >
+                <span className="truncate">{r.nome}</span>
+                <button
+                  type="button"
+                  onClick={() => void revogar(r.user_id)}
+                  className="shrink-0 text-xs font-bold text-stone-500 hover:text-red-400"
+                >
+                  revogar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Apagar o distintivo do catálogo */}
+      <div className="border-t border-white/5 pt-3">
+        {confirmandoExclusao ? (
+          <button
+            type="button"
+            className="btn-danger w-full"
+            onClick={onRemoverDefinicao}
+          >
+            ⚠️ Apagar distintivo e tirar de todo mundo?
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="text-xs font-bold text-stone-500 hover:text-red-400"
+            onClick={() => setConfirmandoExclusao(true)}
+          >
+            🗑️ Apagar este distintivo do catálogo
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1229,7 +1632,7 @@ export function AdminPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-extrabold">Painel do organizador 🛠️</h1>
 
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-noite-950 p-1">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-noite-950 p-1">
         {ABAS_PAINEL.map((t) => (
           <button
             key={t.id}
@@ -1274,6 +1677,8 @@ export function AdminPage() {
           />
         </>
       )}
+
+      {aba === 'distintivos' && <SecaoDistintivos desafios={desafios} />}
 
       {aba === 'frequencia' && (
       <section className="card space-y-4 p-5">

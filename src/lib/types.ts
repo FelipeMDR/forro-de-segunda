@@ -168,12 +168,42 @@ export interface AlunoCadastrado {
   papel_danca: PapelDanca | null
 }
 
-/** Distintivo exibido no perfil (derivado dos dados, nada é armazenado). */
+/**
+ * Distintivo exibido no perfil. Alguns são derivados automaticamente
+ * (turma, presença, cargo…); outros são personalizados, criados e
+ * concedidos manualmente pela organização (ver DistintivoDef).
+ */
 export interface Badge {
   id: string
   emoji: string
   titulo: string
   descricao: string
+}
+
+/**
+ * Catálogo de distintivos personalizados que a organização pode criar
+ * e entregar pra quem quiser — não só quem venceu um desafio. Dá pra
+ * entregar a um aluno específico ou ao topo do ranking de um desafio
+ * (top 1, top 3, top 5…).
+ */
+export interface DistintivoDef {
+  id: string
+  emoji: string
+  titulo: string
+  descricao: string
+}
+
+export interface DistintivoDefInput {
+  emoji: string
+  titulo: string
+  descricao: string
+}
+
+/** Quem recebeu um distintivo personalizado — pro painel gerenciar. */
+export interface DistintivoRecebedor {
+  user_id: string
+  nome: string
+  concedido_em: string
 }
 
 export interface AttendanceRow {

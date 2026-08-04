@@ -30,10 +30,12 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
 - **Perfil público** — tocar em alguém no feed, nos comentários ou no
   ranking abre o perfil da pessoa (cargos, turmas, estatísticas e
   distintivos), sem expor o telefone
-- **Distintivos 🎖️** — colecionáveis no perfil, todos derivados dos dados
-  (nada é concedido à mão): cargos, função e turma, marcos de presença
-  (1, 10, 25, 50, 100 dias), presença em eventos da agenda e campeão(ã) de
-  desafios encerrados
+- **Distintivos 🎖️** — colecionáveis no perfil. Uns são derivados dos dados
+  (cargo, função e turma, marcos de presença — 1, 10, 25, 50, 100 dias —,
+  presença em eventos da agenda); outros são **personalizados**: a
+  organização cria um distintivo (emoji + título + descrição) e entrega pra
+  quem quiser, por qualquer motivo — inclusive em lote pro topo do ranking
+  de um desafio (top 1, top 3, top 5…)
 - **Check-in só com foto na hora** — a câmera abre dentro do app (sem
   galeria, nada de foto antiga); a imagem é comprimida no celular
   (WebP ~120 KB) antes de subir
@@ -211,9 +213,14 @@ supabase/
   se colocar no Avançado. Na lista de chamada, o mesmo telefone aparece uma
   vez por turma. O vínculo usa o telefone normalizado (últimos 10 dígitos),
   então `+55 (11) 91234-5678` e `11912345678` casam.
-- **Distintivos são derivados, não armazenados:** `src/lib/badges.ts`
-  calcula tudo a partir de turmas, check-ins, eventos e rankings. Não há
-  tabela de badges nem concessão manual — mudou o dado, mudou o distintivo.
+- **Distintivos são híbridos:** os automáticos (`src/lib/badges.ts`) são
+  puramente derivados de turmas/check-ins/eventos, sem armazenar nada. Os
+  **personalizados** são o oposto — um catálogo (`distintivos`) que a
+  organização cria e concede manualmente (`distintivos_concedidos`), sem
+  autoconcessão possível (RLS só deixa organizador escrever). Existiu um
+  distintivo automático de "Campeão(ã) de desafio"; foi substituído pelo
+  sistema personalizado, que dá mais controle (top 3, top 5, qualquer
+  motivo) sem exigir 1º lugar exato.
 - **Streak:** semanas-calendário consecutivas (seg–dom) com pelo menos um
   check-in; a semana atual em andamento não quebra a sequência.
 

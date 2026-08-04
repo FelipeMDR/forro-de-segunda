@@ -3,10 +3,14 @@ import type {
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Badge,
   Cargo,
   Challenge,
   ChallengeInput,
   Comment,
+  DistintivoDef,
+  DistintivoDefInput,
+  DistintivoRecebedor,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -137,6 +141,20 @@ export interface ForroApi {
   /** Dá um cargo a um aluno (organizador). */
   addCargoAluno(userId: string, cargo: string): Promise<void>
   removeCargoAluno(userId: string, cargo: string): Promise<void>
+
+  // ---- Distintivos personalizados ----
+  /** Catálogo de distintivos que a organização pode conceder. */
+  listDistintivos(): Promise<DistintivoDef[]>
+  saveDistintivo(d: DistintivoDefInput): Promise<void>
+  /** Apaga o distintivo do catálogo — remove também de quem já tinha. */
+  deleteDistintivo(id: string): Promise<void>
+  /** Quem já recebeu esse distintivo (pro painel gerenciar/revogar). */
+  listRecebedores(distintivoId: string): Promise<DistintivoRecebedor[]>
+  /** Concede um distintivo a um ou mais alunos de uma vez (ex.: top 3 de um desafio). */
+  concederDistintivo(distintivoId: string, userIds: string[]): Promise<void>
+  revogarDistintivo(distintivoId: string, userId: string): Promise<void>
+  /** Distintivos personalizados que um aluno específico já recebeu. */
+  distintivosDe(userId: string): Promise<Badge[]>
 
   // ---- Push (Fase 4) ----
   savePushSubscription(sub: PushSubscriptionJSON): Promise<void>

@@ -9,10 +9,14 @@ import type {
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Badge,
   Cargo,
   Challenge,
   ChallengeInput,
   Comment,
+  DistintivoDef,
+  DistintivoDefInput,
+  DistintivoRecebedor,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -983,6 +987,93 @@ export class SupabaseApi implements ForroApi {
         .eq('user_id', userId)
         .eq('cargo', cargo),
     )
+  }
+
+  // ---- Distintivos personalizados ----
+
+  async listDistintivos(): Promise<DistintivoDef[]> {
+    const data = ok(
+      await this.sb
+        .from('distintivos')
+        .select('id, emoji, titulo, descricao')
+        .order('criado_em'),
+    )
+    return data as DistintivoDef[]
+  }
+
+  async saveDistintivo(d: DistintivoDefInput) {
+    const titulo = d.titulo.trim()
+    if (!titulo) throw new Error('Título do distintivo vazio')
+    if (!d.emoji.trim()) throw new Error('Escolha um emoji para o distintivo')
+    const uid = await this.requireUid()
+    ok(
+      await this.sb.from('distintivos').insert({
+        emoji: d.emoji.trim(),
+        titulo,
+        descricao: d.descricao.trim(),
+        criado_por: uid,
+      }),
+    )
+  }
+
+  async deleteDistintivo(id: string) {
+    ok(await this.sb.from('distintivos').delete().eq('id', id))
+  }
+
+  async listRecebedores(distintivoId: string): Promise<DistintivoRecebedor[]> {
+    const data = ok(
+      await this.sb
+        .from('distintivos_concedidos')
+        .select('user_id, concedido_em, perfil:profiles(nome)')
+        .eq('distintivo_id', distintivoId)
+        .order('concedido_em', { ascending: false }),
+    ) as unknown as Array<{
+      user_id: string
+      concedido_em: string
+      perfil: { nome: string } | null
+    }>
+    return data.map((r) => ({
+      user_id: r.user_id,
+      nome: r.perfil?.nome ?? 'Alguém',
+      concedido_em: r.concedido_em,
+    }))
+  }
+
+  async concederDistintivo(distintivoId: string, userIds: string[]) {
+    if (userIds.length === 0) return
+    ok(
+      await this.sb.from('distintivos_concedidos').upsert(
+        userIds.map((user_id) => ({ distintivo_id: distintivoId, user_id })),
+        { onConflict: 'distintivo_id,user_id' },
+      ),
+    )
+  }
+
+  async revogarDistintivo(distintivoId: string, userId: string) {
+    ok(
+      await this.sb
+        .from('distintivos_concedidos')
+        .delete()
+        .eq('distintivo_id', distintivoId)
+        .eq('user_id', userId),
+    )
+  }
+
+  async distintivosDe(userId: string): Promise<Badge[]> {
+    const data = ok(
+      await this.sb
+        .from('distintivos_concedidos')
+        .select('distintivo:distintivos(id, emoji, titulo, descricao)')
+        .eq('user_id', userId),
+    ) as unknown as Array<{ distintivo: DistintivoDef | null }>
+    return data
+      .filter((r): r is { distintivo: DistintivoDef } => r.distintivo !== null)
+      .map((r) => ({
+        id: `custom-${r.distintivo.id}`,
+        emoji: r.distintivo.emoji,
+        titulo: r.distintivo.titulo,
+        descricao: r.distintivo.descricao,
+      }))
   }
 
   // ---- Push ----
