@@ -1,5 +1,5 @@
 import type { ForroApi } from './api'
-import { addDays, contaParaDesafio, toISODate } from './dates'
+import { addDays, pontosNoDesafio, toISODate } from './dates'
 import { blobToDataURL } from './image'
 import { normalizeTelefone, telefonesIguais } from './phone'
 import { turmaLabel } from './types'
@@ -662,11 +662,13 @@ export class DemoApi implements ForroApi {
     return memberIds
       .map((uid) => {
         const p = this.db.profiles.find((x) => x.id === uid)
-        const pontos = this.db.checkins.filter(
-          (c) =>
-            c.user_id === uid &&
-            contaParaDesafio(new Date(c.criado_em), challenge),
-        ).length
+        // Máximo de 1 ponto por dia, mesmo com várias fotos
+        const pontos = pontosNoDesafio(
+          this.db.checkins
+            .filter((c) => c.user_id === uid)
+            .map((c) => new Date(c.criado_em)),
+          challenge,
+        )
         return {
           user_id: uid,
           nome: p?.nome ?? 'Alguém',

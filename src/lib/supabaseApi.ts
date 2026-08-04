@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ForroApi } from './api'
-import { contaParaDesafio } from './dates'
+import { pontosNoDesafio } from './dates'
 import { extensionFor } from './image'
 import { synthEmail, telefonesIguais } from './phone'
 import { turmaLabel } from './types'
@@ -603,12 +603,17 @@ export class SupabaseApi implements ForroApi {
         ),
     ) as Array<{ user_id: string; criado_em: string }>
 
-    // A janela (dias + horário) é avaliada no fuso local do usuário
-    const pontos = new Map<string, number>()
+    // A janela (dias + horário) é avaliada no fuso local do usuário e
+    // cada dia vale no máximo 1 ponto, mesmo com várias fotos
+    const datasPor = new Map<string, Date[]>()
     for (const c of checkins) {
-      if (contaParaDesafio(new Date(c.criado_em), challenge)) {
-        pontos.set(c.user_id, (pontos.get(c.user_id) ?? 0) + 1)
-      }
+      const lista = datasPor.get(c.user_id) ?? []
+      lista.push(new Date(c.criado_em))
+      datasPor.set(c.user_id, lista)
+    }
+    const pontos = new Map<string, number>()
+    for (const [uid, datas] of datasPor) {
+      pontos.set(uid, pontosNoDesafio(datas, challenge))
     }
 
     return membros

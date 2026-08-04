@@ -775,8 +775,19 @@ export function AdminPage() {
     }
   }
 
-  const contaPonto = (data: string) =>
-    desafiosQueContam(data, desafios).length > 0
+  // Só o primeiro check-in do dia de cada aluno marca ponto (1 por dia).
+  // `presencas` vem do mais novo para o mais antigo, então percorre ao
+  // contrário para marcar o mais antigo do dia.
+  const pontuados = new Set<string>()
+  const diasVistos = new Set<string>()
+  for (const p of [...(presencas ?? [])].reverse()) {
+    if (desafiosQueContam(p.data, desafios).length === 0) continue
+    const chave = `${p.nome}|${toISODate(new Date(p.data))}`
+    if (diasVistos.has(chave)) continue
+    diasVistos.add(chave)
+    pontuados.add(p.data)
+  }
+  const contaPonto = (data: string) => pontuados.has(data)
 
   const exportarPresencas = () => {
     if (!presencas) return
@@ -810,6 +821,10 @@ export function AdminPage() {
         <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
           📋 Frequência
         </h2>
+        <p className="text-xs text-stone-500">
+          A coluna <strong>Ponto</strong> marca ✅ só no primeiro check-in
+          válido de cada dia — vale 1 ponto por dia, mesmo com várias fotos.
+        </p>
         <div className="flex gap-2">
           <input
             type="month"

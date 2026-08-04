@@ -60,6 +60,24 @@ export function desafiosQueContam(
   return desafios.filter((c) => contaParaDesafio(d, c))
 }
 
+/**
+ * Pontos de um aluno num desafio: **no máximo 1 por dia**. Postar
+ * várias fotos na mesma noite rende só um ponto — o feed aceita todas,
+ * o ranking conta o dia.
+ */
+export function pontosNoDesafio(datas: Date[], c: Challenge): number {
+  const dias = new Set<string>()
+  for (const d of datas) {
+    if (contaParaDesafio(d, c)) dias.add(toISODate(d))
+  }
+  return dias.size
+}
+
+/** Dias distintos com pelo menos um check-in (usado nos distintivos). */
+export function diasDistintos(datas: Date[]): number {
+  return new Set(datas.map((d) => toISODate(d))).size
+}
+
 /** Próxima ocorrência de um evento da agenda; null se já passou. */
 export function proximaOcorrencia(
   e: AgendaEvent,

@@ -3,23 +3,35 @@ import { useNavigate } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { challengePhase, desafiosQueContam } from '../lib/dates'
+import {
+  challengePhase,
+  contaParaDesafio,
+  desafiosQueContam,
+  toISODate,
+} from '../lib/dates'
 import { compressImage } from '../lib/image'
 import type { Challenge } from '../lib/types'
 
 export function CheckinPage() {
-  const { api } = useAuth()
+  const { api, userId } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [desafios, setDesafios] = useState<Challenge[]>([])
+  const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
   const [foto, setFoto] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [legenda, setLegenda] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
-    void api.listChallenges().then(setDesafios)
-  }, [api])
+    void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
+    if (userId) {
+      void api
+        .myCheckins(userId)
+        .then((cs) => setMeusCheckins(cs.map((c) => new Date(c.criado_em))))
+        .catch(() => setMeusCheckins([]))
+    }
+  }, [api, userId])
 
   useEffect(() => {
     return () => {
@@ -36,6 +48,20 @@ export function CheckinPage() {
       ),
     [desafios],
   )
+
+  // Cada dia vale 1 ponto por desafio: separa os que ainda vão pontuar
+  // hoje dos que já pontuaram
+  const { aindaPontuam, jaPontuaram } = useMemo(() => {
+    const hoje = toISODate(new Date())
+    const doDia = meusCheckins.filter((d) => toISODate(d) === hoje)
+    const aindaPontuam: Challenge[] = []
+    const jaPontuaram: Challenge[] = []
+    for (const c of valendoAgora) {
+      if (doDia.some((d) => contaParaDesafio(d, c))) jaPontuaram.push(c)
+      else aindaPontuam.push(c)
+    }
+    return { aindaPontuam, jaPontuaram }
+  }, [valendoAgora, meusCheckins])
 
   const aoCapturar = async (blob: Blob) => {
     try {
@@ -56,11 +82,13 @@ export function CheckinPage() {
     try {
       await api.createCheckin(foto, legenda)
       toast(
-        valendoAgora.length > 0
-          ? `Check-in confirmado! Valeu ponto em ${valendoAgora.length} ${
-              valendoAgora.length === 1 ? 'desafio' : 'desafios'
+        aindaPontuam.length > 0
+          ? `Check-in confirmado! Valeu ponto em ${aindaPontuam.length} ${
+              aindaPontuam.length === 1 ? 'desafio' : 'desafios'
             } 🎉`
-          : 'Foto publicada! (nenhum desafio com janela aberta agora)',
+          : jaPontuaram.length > 0
+            ? 'Foto publicada! O ponto de hoje já tinha sido contado 😉'
+            : 'Foto publicada! (nenhum desafio com janela aberta agora)',
       )
       navigate('/')
     } catch (e) {
@@ -74,12 +102,23 @@ export function CheckinPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
 
-      {valendoAgora.length > 0 ? (
+      {aindaPontuam.length > 0 && (
         <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
           ✅ Valendo ponto agora:{' '}
-          <strong>{valendoAgora.map((c) => c.titulo).join(', ')}</strong>
+          <strong>{aindaPontuam.map((c) => c.titulo).join(', ')}</strong>
         </div>
-      ) : (
+      )}
+
+      {jaPontuaram.length > 0 && (
+        <div className="rounded-2xl bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
+          👍 Você já pontuou hoje em{' '}
+          <strong>{jaPontuaram.map((c) => c.titulo).join(', ')}</strong>. Vale
+          1 ponto por dia, então esta foto entra no feed mas{' '}
+          <strong>não conta ponto de novo</strong>.
+        </div>
+      )}
+
+      {aindaPontuam.length === 0 && jaPontuaram.length === 0 && (
         <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
           ⚠️ Nenhum desafio seu está com janela de check-in aberta agora. Você
           pode postar mesmo assim, mas a foto <strong>não marcará ponto</strong>.

@@ -1,4 +1,4 @@
-import { challengePhase, toISODate } from './dates'
+import { challengePhase, diasDistintos, toISODate } from './dates'
 import type {
   AgendaEvent,
   Badge,
@@ -49,15 +49,18 @@ export function computeBadges(input: {
     })
   }
 
-  // 2. Marcos de presença
-  const total = input.checkinDates.length
+  // 2. Marcos de presença — contam DIAS, não fotos (várias fotos no
+  // mesmo dia valem uma presença, igual ao ranking)
+  const total = diasDistintos(input.checkinDates)
   for (const [minimo, emoji, titulo] of MARCOS_PRESENCA) {
     if (total >= minimo) {
       badges.push({
         id: `presenca-${minimo}`,
         emoji,
         titulo,
-        descricao: `Você já registrou ${total} check-ins`,
+        descricao: `Você já esteve presente em ${total} ${
+          total === 1 ? 'dia' : 'dias'
+        }`,
       })
     }
   }

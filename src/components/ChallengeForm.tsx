@@ -79,8 +79,9 @@ export function ChallengeForm({
           {desafio ? 'Editar desafio' : 'Novo desafio'}
         </h2>
         <p className="text-xs text-stone-500">
-          Desafio é competição: cada check-in dentro da janela vale 1 ponto —
-          quem somar mais pontos vence. 🏆
+          Desafio é competição: cada dia com check-in dentro da janela vale 1
+          ponto (várias fotos no mesmo dia contam uma vez) — quem somar mais
+          pontos vence. 🏆
         </p>
         <div>
           <label className="label" htmlFor="titulo">
