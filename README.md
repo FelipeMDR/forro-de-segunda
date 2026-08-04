@@ -166,7 +166,7 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 
 | Limite | Estratégia já implementada |
 |---|---|
-| 1 GB de storage | Compressão no cliente com **teto de bytes** — 90 KB por foto, 20 KB por avatar ([`src/lib/image.ts`](src/lib/image.ts)), o que dá ~12 mil fotos. Avatar antigo e foto de check-in excluído são apagados do bucket na hora. A cada 2 meses, rode [`supabase/retencao.sql`](supabase/retencao.sql): arquiva fotos de +4 meses (mantém a presença, pula os favoritos) e recolhe órfãos. A 60 check-ins/dia isso segura o acervo em ~550 MB |
+| 1 GB de storage | Compressão no cliente com **teto de bytes** — 90 KB por foto, 20 KB por avatar ([`src/lib/image.ts`](src/lib/image.ts)), o que dá ~12 mil fotos. Avatar antigo e foto de check-in excluído são apagados do bucket na hora. Limpeza **automática** toda semana (Edge Function `limpar-fotos` + pg_cron): arquiva fotos de +4 meses (mantém a presença, pula os favoritos) e recolhe órfãos. A 60 check-ins/dia isso segura o acervo em ~550 MB. Conferir: [`supabase/retencao.sql`](supabase/retencao.sql) |
 | 5 GB egress/mês | Fotos cacheadas no service worker (CacheFirst, 30 dias) |
 | 500 MB de banco | Check-ins são linhas pequenas — irrelevante nessa escala |
 | Pausa por inatividade | Workflow de keep-alive semanal |
