@@ -265,7 +265,7 @@ export class SupabaseApi implements ForroApi {
       // é preciso apontar a chave estrangeira explicitamente.
       .select(
         `id, user_id, foto_url, legenda, criado_em,
-           autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca)),
+           autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)),
            reacoes:reactions(tipo, user_id),
            comentarios:comments(count)`,
       )
@@ -286,6 +286,7 @@ export class SupabaseApi implements ForroApi {
         nome: string
         avatar_url: string | null
         turmas: TurmaMembro[] | null
+        cargos: Array<{ cargo: string }> | null
       } | null
       return {
         id: c.id as string,
@@ -297,6 +298,7 @@ export class SupabaseApi implements ForroApi {
           nome: autor?.nome ?? 'Alguém',
           avatar_url: autor?.avatar_url ?? null,
           turma: turmaLabel(autor?.turmas ?? []),
+          cargos: (autor?.cargos ?? []).map((x) => x.cargo),
         },
         reacoes: (c.reacoes as FeedItem['reacoes']) ?? [],
         comentarios:
@@ -325,7 +327,7 @@ export class SupabaseApi implements ForroApi {
     const userIds = [...new Set(checkins.map((c) => c.user_id))]
     const checkinIds = checkins.map((c) => c.id)
 
-    const [perfis, turmasRows, reacoes, comentarios] = await Promise.all([
+    const [perfis, turmasRows, cargosRows, reacoes, comentarios] = await Promise.all([
       this.sb
         .from('profiles')
         .select('id, nome, avatar_url')
@@ -340,6 +342,13 @@ export class SupabaseApi implements ForroApi {
             (r.data ?? []) as Array<
               { user_id: string } & TurmaMembro
             >,
+        ),
+      this.sb
+        .from('profile_cargos')
+        .select('user_id, cargo')
+        .in('user_id', userIds)
+        .then(
+          (r) => (r.data ?? []) as Array<{ user_id: string; cargo: string }>,
         ),
       this.sb
         .from('reactions')
@@ -360,6 +369,10 @@ export class SupabaseApi implements ForroApi {
       lista.push({ turma: t.turma, papel_danca: t.papel_danca })
       turmasPor.set(t.user_id, lista)
     }
+    const cargosPor = new Map<string, string[]>()
+    for (const c of cargosRows) {
+      cargosPor.set(c.user_id, [...(cargosPor.get(c.user_id) ?? []), c.cargo])
+    }
     const nComentarios = new Map<string, number>()
     for (const c of comentarios) {
       nComentarios.set(c.checkin_id, (nComentarios.get(c.checkin_id) ?? 0) + 1)
@@ -373,6 +386,7 @@ export class SupabaseApi implements ForroApi {
           nome: p?.nome ?? 'Alguém',
           avatar_url: p?.avatar_url ?? null,
           turma: turmaLabel(turmasPor.get(c.user_id) ?? []),
+          cargos: cargosPor.get(c.user_id) ?? [],
         },
         reacoes: reacoes
           .filter((r) => r.checkin_id === c.id)

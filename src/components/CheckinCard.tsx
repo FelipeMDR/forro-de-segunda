@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
-import { REACTION_TYPES, type FeedItem } from '../lib/types'
+import {
+  REACTION_TYPES,
+  cargoPrincipal,
+  emojiCargo,
+  type FeedItem,
+} from '../lib/types'
 import { Avatar } from './Avatar'
 import { CommentsSheet } from './CommentsSheet'
 
@@ -23,6 +28,8 @@ export function CheckinCard({
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
 
+  // Só o cargo mais alto vai para o feed — a lista completa fica no perfil
+  const cargo = cargoPrincipal(item.autor.cargos)
   const minhaReacao = item.reacoes.find((r) => r.user_id === userId)?.tipo
   const contagem = (tipo: string) =>
     item.reacoes.filter((r) => r.tipo === tipo).length
@@ -72,7 +79,17 @@ export function CheckinCard({
             tamanho={38}
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-extrabold">{item.autor.nome}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-sm font-extrabold">
+                {item.autor.nome}
+              </p>
+              {cargo && (
+                // Cargo em destaque: é o reconhecimento mais visível do app
+                <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-300 ring-1 ring-brasa-500/30">
+                  {emojiCargo(cargo)} {cargo}
+                </span>
+              )}
+            </div>
             <p className="truncate text-xs text-stone-500">
               {item.autor.turma ? `${item.autor.turma} · ` : ''}
               {formatRelative(item.criado_em)}

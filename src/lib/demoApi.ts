@@ -487,6 +487,7 @@ export class DemoApi implements ForroApi {
         nome: autor?.nome ?? 'Alguém',
         avatar_url: autor?.avatar_url ?? null,
         turma: autor ? turmaLabel(autor.turmas) : null,
+        cargos: autor?.cargos ?? [],
       },
       reacoes: this.db.reactions
         .filter((r) => r.checkin_id === c.id)

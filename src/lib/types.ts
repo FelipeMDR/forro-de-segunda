@@ -44,7 +44,12 @@ export interface FeedItem {
   foto_url: string
   legenda: string | null
   criado_em: string
-  autor: { nome: string; avatar_url: string | null; turma: string | null }
+  autor: {
+    nome: string
+    avatar_url: string | null
+    turma: string | null
+    cargos: string[]
+  }
   reacoes: { tipo: string; user_id: string }[]
   comentarios: number
 }
@@ -184,6 +189,23 @@ export const CARGOS_PADRAO = [
   'Membro de Comunicação',
   'Membro de Recursos',
 ] as const
+
+/** Peso hierárquico do cargo (menor = mais alto). Usado para destacar. */
+export function pesoCargo(nome: string): number {
+  const n = nome.toLowerCase()
+  if (n.includes('presid')) return n.includes('vice') ? 2 : 1
+  if (n.includes('diretor')) return 3
+  if (n.includes('professor')) return 4
+  if (n.includes('monitor')) return 5
+  if (n.includes('membro')) return 6
+  return 7
+}
+
+/** Cargo mais alto de alguém — é o que aparece em destaque no feed. */
+export function cargoPrincipal(cargos: string[]): string | null {
+  if (cargos.length === 0) return null
+  return [...cargos].sort((a, b) => pesoCargo(a) - pesoCargo(b))[0]
+}
 
 /** Emoji do cargo — por palavra-chave, para cargos novos também terem um. */
 export function emojiCargo(nome: string): string {

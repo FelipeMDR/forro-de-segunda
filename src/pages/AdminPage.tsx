@@ -9,6 +9,7 @@ import { Navigate } from 'react-router-dom'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { combinaBusca } from '../lib/busca'
 import { downloadCSV } from '../lib/csv'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
 import {
@@ -374,6 +375,8 @@ function SecaoTurmas({
   const [aberto, setAberto] = useState(false)
   const [importacao, setImportacao] = useState<ResultadoParse | null>(null)
   const [importando, setImportando] = useState(false)
+  const [buscaLista, setBuscaLista] = useState('')
+  const [buscaApp, setBuscaApp] = useState('')
 
   const carregar = useCallback(async () => {
     const [a, p] = await Promise.all([
@@ -488,6 +491,18 @@ function SecaoTurmas({
       toast((err as Error).message, 'erro')
     }
   }
+
+  const alunosFiltrados = (alunos ?? []).filter((a) =>
+    combinaBusca(buscaLista, [a.nome, a.telefone, a.turma]),
+  )
+  const perfisFiltrados = perfis.filter((p) =>
+    combinaBusca(buscaApp, [
+      p.nome,
+      p.telefone,
+      ...p.cargos,
+      ...p.turmas.map((t) => t.turma),
+    ]),
+  )
 
   const darCargo = async (userId: string, cargo: string) => {
     if (!cargo) return
@@ -675,13 +690,27 @@ function SecaoTurmas({
           </form>
         )}
 
+        {alunos && alunos.length > 6 && (
+          <input
+            className="input"
+            type="search"
+            placeholder="🔎 Buscar por nome ou telefone…"
+            value={buscaLista}
+            onChange={(e) => setBuscaLista(e.target.value)}
+          />
+        )}
+
         {alunos === null ? (
           <Spinner />
         ) : alunos.length === 0 ? (
           <p className="text-sm text-stone-500">Lista vazia.</p>
+        ) : alunosFiltrados.length === 0 ? (
+          <p className="py-3 text-center text-sm text-stone-500">
+            Ninguém encontrado com "{buscaLista}".
+          </p>
         ) : (
           <div className="max-h-56 divide-y divide-white/5 overflow-y-auto">
-            {alunos.map((a) => (
+            {alunosFiltrados.map((a) => (
               <div key={a.id} className="flex items-center gap-2 py-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{a.nome ?? '—'}</p>
@@ -705,14 +734,33 @@ function SecaoTurmas({
 
       {/* Alunos com conta */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold text-stone-400">Alunos no app</h3>
+        <h3 className="text-xs font-bold text-stone-400">
+          Alunos no app{' '}
+          <span className="font-normal text-stone-600">
+            ({perfis.length})
+          </span>
+        </h3>
         <p className="text-xs text-stone-500">
           Um aluno pode estar em várias turmas com papéis diferentes (ex.:
           Condutor no Avançado e Conduzido no Intermediário). O aluno não
           consegue mudar as próprias turmas.
         </p>
+
+        <input
+          className="input"
+          type="search"
+          placeholder="🔎 Buscar por nome ou telefone…"
+          value={buscaApp}
+          onChange={(e) => setBuscaApp(e.target.value)}
+        />
+
+        {perfisFiltrados.length === 0 ? (
+          <p className="py-3 text-center text-sm text-stone-500">
+            Ninguém encontrado com "{buscaApp}".
+          </p>
+        ) : (
         <div className="max-h-80 divide-y divide-white/5 overflow-y-auto">
-          {perfis.map((p) => (
+          {perfisFiltrados.map((p) => (
             <LinhaAlunoApp
               key={p.id}
               perfil={p}
@@ -727,6 +775,7 @@ function SecaoTurmas({
             />
           ))}
         </div>
+        )}
       </div>
     </section>
   )
