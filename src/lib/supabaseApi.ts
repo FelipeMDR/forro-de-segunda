@@ -51,6 +51,20 @@ function traduz(msg: string): string {
   return msg
 }
 
+/**
+ * Caminho do arquivo dentro do bucket a partir da URL pública
+ * (…/object/public/fotos/<uid>/<arquivo>). Devolve null para URL vazia,
+ * de outro domínio ou de foto já arquivada pela retenção.
+ */
+export function caminhoNoBucket(url: string | null | undefined): string | null {
+  if (!url) return null
+  const marca = '/object/public/fotos/'
+  const i = url.indexOf(marca)
+  if (i === -1) return null
+  const caminho = url.slice(i + marca.length).split('?')[0]
+  return caminho ? decodeURIComponent(caminho) : null
+}
+
 function ok<T>(res: { data: T; error: { message: string } | null }): T {
   if (res.error) throw new Error(traduz(res.error.message))
   return res.data
@@ -246,11 +260,37 @@ export class SupabaseApi implements ForroApi {
     return uid
   }
 
+  /**
+   * Apaga arquivos do bucket sem derrubar a operação principal: o registro
+   * no banco já foi gravado, e uma sobra no storage é problema de limpeza
+   * (a retencao.sql varre órfãos), não motivo para mostrar erro ao aluno.
+   */
+  private async apagarDoBucket(urls: (string | null | undefined)[]) {
+    const caminhos = urls
+      .map((u) => caminhoNoBucket(u))
+      .filter((c): c is string => c !== null)
+    if (caminhos.length === 0) return
+    try {
+      await this.sb.storage.from('fotos').remove(caminhos)
+    } catch (e) {
+      console.warn('[storage] não deu para apagar', caminhos, e)
+    }
+  }
+
   async updateProfile(patch: { nome?: string; avatarBlob?: Blob }) {
     const uid = await this.requireUid()
     const valores: Record<string, unknown> = {}
     if (patch.nome !== undefined) valores.nome = patch.nome
+
+    let avatarAntigo: string | null = null
     if (patch.avatarBlob) {
+      const { data: atual } = await this.sb
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', uid)
+        .maybeSingle()
+      avatarAntigo = (atual?.avatar_url as string | null) ?? null
+
       const path = `${uid}/avatar-${Date.now()}.${extensionFor(patch.avatarBlob)}`
       ok(
         await this.sb.storage.from('fotos').upload(path, patch.avatarBlob, {
@@ -263,6 +303,10 @@ export class SupabaseApi implements ForroApi {
     }
     if (Object.keys(valores).length === 0) return
     ok(await this.sb.from('profiles').update(valores).eq('id', uid))
+
+    // Só depois de o perfil já apontar para a foto nova — se apagasse
+    // antes e o update falhasse, o aluno ficaria sem avatar nenhum.
+    if (avatarAntigo) await this.apagarDoBucket([avatarAntigo])
   }
 
   // ---- Feed / check-ins ----
@@ -452,7 +496,15 @@ export class SupabaseApi implements ForroApi {
   }
 
   async deleteCheckin(id: string) {
+    // Guarda a URL antes: depois do delete não há como descobrir o arquivo,
+    // e ele ficaria ocupando o bucket para sempre.
+    const { data } = await this.sb
+      .from('checkins')
+      .select('foto_url')
+      .eq('id', id)
+      .maybeSingle()
     ok(await this.sb.from('checkins').delete().eq('id', id))
+    await this.apagarDoBucket([data?.foto_url as string | undefined])
   }
 
   async toggleReaction(checkinId: string, tipo: string) {

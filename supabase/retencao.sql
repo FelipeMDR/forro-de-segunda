@@ -38,3 +38,39 @@ update public.checkins
 set foto_url = ''
 where criado_em < now() - interval '6 months'
   and not favorito;
+
+-- ============================================================
+-- Faxina de órfãos: arquivos no bucket que ninguém mais aponta.
+--
+-- O app já apaga o avatar antigo ao trocar a foto de perfil e a foto
+-- do check-in ao excluí-lo. Isto aqui recolhe o que ficou para trás
+-- antes dessa correção, e o que escapar de um upload interrompido no
+-- meio (arquivo sobe, a linha no banco não chega a ser criada).
+--
+-- O corte de 1 dia é proteção: sem ele, um arquivo recém-enviado
+-- poderia ser apagado na janela entre o upload e o insert da linha.
+-- ============================================================
+
+-- 4) Conferir antes de apagar (rode e olhe a lista):
+select o.name, o.created_at, round((o.metadata->>'size')::numeric / 1024, 1) as kb
+from storage.objects o
+where o.bucket_id = 'fotos'
+  and o.created_at < now() - interval '1 day'
+  and not exists (
+    select 1 from public.checkins c where c.foto_url like '%' || o.name
+  )
+  and not exists (
+    select 1 from public.profiles p where p.avatar_url like '%' || o.name
+  )
+order by o.created_at;
+
+-- 5) Apagar os órfãos (mesma condição do passo 4):
+delete from storage.objects o
+where o.bucket_id = 'fotos'
+  and o.created_at < now() - interval '1 day'
+  and not exists (
+    select 1 from public.checkins c where c.foto_url like '%' || o.name
+  )
+  and not exists (
+    select 1 from public.profiles p where p.avatar_url like '%' || o.name
+  );

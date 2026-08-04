@@ -11,7 +11,7 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeBadges } from '../lib/badges'
-import { compressImage } from '../lib/image'
+import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
 import type { Badge, CheckinFavorito } from '../lib/types'
@@ -100,7 +100,7 @@ export function ProfilePage() {
   const trocarAvatar = async (file: File | undefined) => {
     if (!file) return
     try {
-      const blob = await compressImage(file, 256, 0.8)
+      const blob = await compressImage(file, 256, 0.8, LIMITE_AVATAR)
       await api.updateProfile({ avatarBlob: blob })
       await refreshProfile()
       toast('Foto de perfil atualizada!')

@@ -41,7 +41,7 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   de retenção**, que arquiva as demais fotos depois de 6 meses
 - **Check-in só com foto na hora** — a câmera abre dentro do app (sem
   galeria, nada de foto antiga); a imagem é comprimida no celular
-  (WebP ~120 KB) antes de subir
+  no celular com **teto de 90 KB** (WebP ~1080px) antes de subir
 - **Feed da comunidade** — fotos, reações (❤️ 🔥 👏 💃) e comentários, em tempo real
 - **Desafios = competição de presença** — cada check-in dentro da janela vale
   1 ponto e **quem somar mais pontos vence** (sem meta fixa); a organização
@@ -166,7 +166,7 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 
 | Limite | Estratégia já implementada |
 |---|---|
-| 1 GB de storage | Compressão no cliente (WebP ~1080px). ~8.000 fotos ≈ 2 anos. Depois, rode [`supabase/retencao.sql`](supabase/retencao.sql) (apaga fotos de +6 meses, mantém a presença e pula os favoritos) |
+| 1 GB de storage | Compressão no cliente com **teto de bytes** — 90 KB por foto, 20 KB por avatar ([`src/lib/image.ts`](src/lib/image.ts)), o que dá ~12 mil fotos. Avatar antigo e foto de check-in excluído são apagados do bucket na hora. Semestralmente, rode [`supabase/retencao.sql`](supabase/retencao.sql): arquiva fotos de +6 meses (mantém a presença, pula os favoritos) e recolhe órfãos |
 | 5 GB egress/mês | Fotos cacheadas no service worker (CacheFirst, 30 dias) |
 | 500 MB de banco | Check-ins são linhas pequenas — irrelevante nessa escala |
 | Pausa por inatividade | Workflow de keep-alive semanal |
