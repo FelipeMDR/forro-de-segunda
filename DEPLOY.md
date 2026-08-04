@@ -179,6 +179,9 @@ Se a mudança mexer no banco, rode o SQL no Supabase **antes** do push.
   [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) — no
   GitHub, vá em **Settings → Secrets and variables → Actions** e crie
   `SUPABASE_URL` e `SUPABASE_ANON_KEY` com os mesmos valores do Passo 3.
-- **Fotos:** cabem ~8.000 (≈2 anos). Quando encher, rode
-  [`supabase/retencao.sql`](supabase/retencao.sql), que apaga as fotos com
-  mais de 6 meses **mantendo** as presenças e o ranking.
+- **Fotos:** cabem ~11.600 no 1 GB gratuito (teto de 90 KB por foto).
+  **Rode [`supabase/retencao.sql`](supabase/retencao.sql) a cada 2 meses** —
+  ele arquiva as fotos com mais de 4 meses **mantendo** as presenças e o
+  ranking, pula os favoritos e recolhe arquivos órfãos. Com 60 check-ins
+  por dia o acervo cresce ~140 MB/mês, então esse é o passo de manutenção
+  que não pode ser esquecido.

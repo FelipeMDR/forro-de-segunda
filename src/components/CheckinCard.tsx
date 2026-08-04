@@ -165,7 +165,7 @@ export function CheckinCard({
           className="aspect-[4/5] w-full bg-noite-950 object-cover"
         />
       ) : (
-        // Fotos antigas são apagadas pela política de retenção (6 meses);
+        // Fotos antigas são apagadas pela política de retenção (4 meses);
         // o registro da presença continua valendo.
         <div className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 bg-noite-950 text-stone-600">
           <span className="text-4xl">🎞️</span>

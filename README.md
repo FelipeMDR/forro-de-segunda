@@ -38,7 +38,7 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   de um desafio (top 1, top 3, top 5…)
 - **Favoritos ⭐** — o aluno marca os próprios check-ins que quer guardar
   (até 12). Eles viram uma galeria no perfil e ficam **de fora da política
-  de retenção**, que arquiva as demais fotos depois de 6 meses
+  de retenção**, que arquiva as demais fotos depois de 4 meses
 - **Check-in só com foto na hora** — a câmera abre dentro do app (sem
   galeria, nada de foto antiga); a imagem é comprimida no celular
   no celular com **teto de 90 KB** (WebP ~1080px) antes de subir
@@ -166,7 +166,7 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 
 | Limite | Estratégia já implementada |
 |---|---|
-| 1 GB de storage | Compressão no cliente com **teto de bytes** — 90 KB por foto, 20 KB por avatar ([`src/lib/image.ts`](src/lib/image.ts)), o que dá ~12 mil fotos. Avatar antigo e foto de check-in excluído são apagados do bucket na hora. Semestralmente, rode [`supabase/retencao.sql`](supabase/retencao.sql): arquiva fotos de +6 meses (mantém a presença, pula os favoritos) e recolhe órfãos |
+| 1 GB de storage | Compressão no cliente com **teto de bytes** — 90 KB por foto, 20 KB por avatar ([`src/lib/image.ts`](src/lib/image.ts)), o que dá ~12 mil fotos. Avatar antigo e foto de check-in excluído são apagados do bucket na hora. A cada 2 meses, rode [`supabase/retencao.sql`](supabase/retencao.sql): arquiva fotos de +4 meses (mantém a presença, pula os favoritos) e recolhe órfãos. A 60 check-ins/dia isso segura o acervo em ~550 MB |
 | 5 GB egress/mês | Fotos cacheadas no service worker (CacheFirst, 30 dias) |
 | 500 MB de banco | Check-ins são linhas pequenas — irrelevante nessa escala |
 | Pausa por inatividade | Workflow de keep-alive semanal |

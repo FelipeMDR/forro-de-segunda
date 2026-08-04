@@ -163,7 +163,7 @@ export function ProfilePage() {
       <FavoritosGrid
         favoritos={favoritos}
         mostrarLimite
-        vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 6 meses."
+        vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
       />
 
       <div className="card space-y-4 p-5">

@@ -58,7 +58,7 @@ export interface FeedItem {
 
 /**
  * Check-in favoritado, como aparece na galeria do perfil. As fotos dos
- * check-ins comuns são apagadas pela política de retenção (6 meses);
+ * check-ins comuns são apagadas pela política de retenção (4 meses);
  * as favoritas ficam guardadas.
  */
 export interface CheckinFavorito {

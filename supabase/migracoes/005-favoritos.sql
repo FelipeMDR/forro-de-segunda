@@ -3,7 +3,7 @@
 --
 -- O aluno pode marcar os próprios check-ins como favoritos. Eles
 -- ganham uma galeria no perfil e ficam DE FORA da política de
--- retenção (retencao.sql), que apaga as fotos com mais de 6 meses.
+-- retenção (retencao.sql), que apaga as fotos com mais de 4 meses.
 --
 -- Como favorito = foto guardada pra sempre, existe um teto por
 -- pessoa (LIMITE_FAVORITOS = 12, igual ao src/lib/types.ts). Se
