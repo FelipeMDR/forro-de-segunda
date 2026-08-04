@@ -11,6 +11,7 @@ import type {
   Cargo,
   Challenge,
   ChallengeInput,
+  ChallengeJanela,
   Comment,
   FeedItem,
   Feriado,
@@ -43,9 +44,7 @@ interface ChallengeRow {
   descricao: string | null
   data_inicio: string
   data_fim: string
-  dias_semana: number[]
-  hora_inicio: string
-  hora_fim: string
+  janelas: ChallengeJanela[]
   criado_por: string | null
 }
 
@@ -80,7 +79,7 @@ interface DB {
   cargos: Cargo[]
 }
 
-const DB_KEY = 'fds-demo-db-v6'
+const DB_KEY = 'fds-demo-db-v7'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -195,10 +194,13 @@ function seed(): DB {
       'Competição de presença: cada check-in na janela das aulas vale 1 ponto. Quem somar mais pontos até o fim do mês leva o destaque no Instagram! 🏆',
     data_inicio: inicio,
     data_fim: fim,
-    // Janela ampla no demo para facilitar o teste em qualquer dia/hora
-    dias_semana: [0, 1, 2, 3, 4, 5, 6],
-    hora_inicio: '00:00',
-    hora_fim: '23:59',
+    // Janela ampla em todos os dias no demo, pra facilitar o teste em
+    // qualquer dia/hora
+    janelas: Array.from({ length: 7 }, (_, dia_semana) => ({
+      dia_semana,
+      hora_inicio: '00:00',
+      hora_fim: '23:59',
+    })),
     criado_por: ana.id,
   }
 
@@ -341,6 +343,7 @@ export class DemoApi implements ForroApi {
         'fds-demo-db-v3',
         'fds-demo-db-v4',
         'fds-demo-db-v5',
+        'fds-demo-db-v6',
       ]) {
         localStorage.removeItem(k)
       }
@@ -644,9 +647,7 @@ export class DemoApi implements ForroApi {
         descricao: data.descricao || null,
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
-        dias_semana: data.dias_semana,
-        hora_inicio: data.hora_inicio,
-        hora_fim: data.hora_fim,
+        janelas: data.janelas,
       })
     } else {
       this.db.challenges.push({
@@ -655,9 +656,7 @@ export class DemoApi implements ForroApi {
         descricao: data.descricao || null,
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
-        dias_semana: data.dias_semana,
-        hora_inicio: data.hora_inicio,
-        hora_fim: data.hora_fim,
+        janelas: data.janelas,
         criado_por: this.uid(),
       })
     }

@@ -61,10 +61,6 @@ export function ChallengeDetailPage() {
   const restantes = daysLeft(desafio.data_fim)
   const lider = ranking[0]
   const minhaEntrada = ranking.find((r) => r.user_id === userId)
-  const dias =
-    desafio.dias_semana.length === 7
-      ? 'todos os dias'
-      : desafio.dias_semana.map((d) => DIAS_ABREV[d]).join(' · ')
 
   const entrarOuSair = async () => {
     setOcupado(true)
@@ -138,17 +134,26 @@ export function ChallengeDetailPage() {
         {desafio.descricao && (
           <p className="text-sm text-stone-300">{desafio.descricao}</p>
         )}
-        <div className="space-y-1 text-xs text-stone-500">
+        <div className="space-y-2 text-xs text-stone-500">
           <p>
             📆 {formatDate(desafio.data_inicio)} –{' '}
             {formatDate(desafio.data_fim)} · 👥 {desafio.participantes}{' '}
             {desafio.participantes === 1 ? 'participante' : 'participantes'}
           </p>
-          <p>
-            ⏰ Check-in vale ponto: <strong>{dias}</strong>, das{' '}
-            {desafio.hora_inicio} às {desafio.hora_fim}
-            {desafio.hora_fim < desafio.hora_inicio && ' (do dia seguinte)'}
-          </p>
+          <div>
+            <p className="mb-1">⏰ Check-in vale ponto:</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pl-1">
+              {desafio.janelas.map((j) => (
+                <p key={j.dia_semana}>
+                  <strong className="text-stone-300">
+                    {DIAS_ABREV[j.dia_semana]}
+                  </strong>{' '}
+                  {j.hora_inicio}–{j.hora_fim}
+                  {j.hora_fim < j.hora_inicio && ' 🌙'}
+                </p>
+              ))}
+            </div>
+          </div>
           <p>
             🎯 <strong>1 ponto por janela</strong> — postar mais de uma foto
             na mesma janela não pontua de novo

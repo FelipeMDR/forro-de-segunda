@@ -46,43 +46,47 @@ function parseTime(hhmm: string): number {
  * Dia (ISO) em que começou a janela do desafio que contém o instante
  * `d`, ou null se `d` não cai em nenhuma janela.
  *
+ * Cada dia da semana pode ter sua própria janela (espaços diferentes
+ * têm horários diferentes de aula), então percorre `c.janelas` até
+ * achar a que corresponde ao dia de `d`.
+ *
  * Suporta janelas que cruzam a meia-noite (ex.: 21:00–02:00, quando
  * hora_fim < hora_inicio): a janela "pertence" ao dia em que começou,
  * mesmo que o check-in tenha sido feito de madrugada no dia seguinte.
  * É essa data — não a do relógio no momento do check-in — que deve ser
- * usada para checar o período do desafio, o dia da semana e o limite de
- * 1 ponto por janela.
+ * usada para checar o período do desafio e o limite de 1 ponto por janela.
  */
 export function janelaDoCheckin(d: Date, c: Challenge): string | null {
   const minutos = d.getHours() * 60 + d.getMinutes()
-  const inicio = parseTime(c.hora_inicio)
-  const fim = parseTime(c.hora_fim)
-  const overnight = fim < inicio
   const dentroDoPeriodo = (dia: string) =>
     dia >= c.data_inicio && dia <= c.data_fim
 
-  if (!overnight) {
-    if (minutos < inicio || minutos > fim) return null
-    const dia = toISODate(d)
-    if (!dentroDoPeriodo(dia)) return null
-    if (!c.dias_semana.includes(d.getDay())) return null
-    return dia
-  }
+  for (const j of c.janelas) {
+    const inicio = parseTime(j.hora_inicio)
+    const fim = parseTime(j.hora_fim)
+    const overnight = fim < inicio
 
-  // Ponta da noite: check-in no próprio dia em que a janela abre
-  if (minutos >= inicio) {
-    const dia = toISODate(d)
-    if (!dentroDoPeriodo(dia)) return null
-    if (!c.dias_semana.includes(d.getDay())) return null
-    return dia
-  }
-  // Ponta da manhã seguinte: ainda conta para o dia anterior
-  if (minutos <= fim) {
-    const anterior = addDays(d, -1)
-    const dia = toISODate(anterior)
-    if (!dentroDoPeriodo(dia)) return null
-    if (!c.dias_semana.includes(anterior.getDay())) return null
-    return dia
+    if (!overnight) {
+      if (minutos < inicio || minutos > fim) continue
+      if (d.getDay() !== j.dia_semana) continue
+      const dia = toISODate(d)
+      if (dentroDoPeriodo(dia)) return dia
+      continue
+    }
+
+    // Ponta da noite: check-in no próprio dia em que a janela abre
+    if (minutos >= inicio && d.getDay() === j.dia_semana) {
+      const dia = toISODate(d)
+      if (dentroDoPeriodo(dia)) return dia
+    }
+    // Ponta da manhã seguinte: ainda conta para o dia anterior
+    if (minutos <= fim) {
+      const anterior = addDays(d, -1)
+      if (anterior.getDay() === j.dia_semana) {
+        const dia = toISODate(anterior)
+        if (dentroDoPeriodo(dia)) return dia
+      }
+    }
   }
   return null
 }

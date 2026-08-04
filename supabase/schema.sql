@@ -29,20 +29,27 @@ create table if not exists public.roles (
 );
 
 -- Desafio = competição: cada check-in dentro da janela vale 1 ponto.
--- A janela é POR DESAFIO: dias da semana + faixa de horário.
 create table if not exists public.challenges (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,
   descricao text,
   data_inicio date not null,
   data_fim date not null,
-  dias_semana int[] not null default '{1}', -- 0=domingo … 6=sábado
-  hora_inicio time not null default '18:00',
-  hora_fim time not null default '23:00',
   criado_por uuid references public.profiles(id) on delete set null,
   criado_em timestamptz not null default now(),
-  check (data_fim >= data_inicio),
-  check (array_length(dias_semana, 1) >= 1)
+  check (data_fim >= data_inicio)
+);
+
+-- Janela de check-in por dia da semana: cada espaço tem seu próprio
+-- horário de aula, então cada dia do desafio pode ter uma janela
+-- diferente (ex.: segunda 18h–23h, quarta 20h–22h). No máximo uma
+-- janela por dia em cada desafio.
+create table if not exists public.challenge_janelas (
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  dia_semana int not null check (dia_semana between 0 and 6), -- 0=domingo … 6=sábado
+  hora_inicio time not null,
+  hora_fim time not null,
+  primary key (challenge_id, dia_semana)
 );
 
 create table if not exists public.challenge_members (
@@ -322,6 +329,7 @@ alter table public.profiles enable row level security;
 alter table public.profile_turmas enable row level security;
 alter table public.roles enable row level security;
 alter table public.challenges enable row level security;
+alter table public.challenge_janelas enable row level security;
 alter table public.challenge_members enable row level security;
 alter table public.checkins enable row level security;
 alter table public.reactions enable row level security;
@@ -367,6 +375,14 @@ create policy "roles_write" on public.roles
 create policy "challenges_select" on public.challenges
   for select to authenticated using (true);
 create policy "challenges_write" on public.challenges
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- challenge_janelas: todos leem; organizador gerencia
+create policy "challenge_janelas_select" on public.challenge_janelas
+  for select to authenticated using (true);
+create policy "challenge_janelas_write" on public.challenge_janelas
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());

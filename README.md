@@ -39,8 +39,10 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   (WebP ~120 KB) antes de subir
 - **Feed da comunidade** — fotos, reações (❤️ 🔥 👏 💃) e comentários, em tempo real
 - **Desafios = competição de presença** — cada check-in dentro da janela vale
-  1 ponto e **quem somar mais pontos vence** (sem meta fixa); a janela
-  (dias da semana + horário) é definida **por desafio** pela organização
+  1 ponto e **quem somar mais pontos vence** (sem meta fixa); a organização
+  define os dias e horários válidos **por desafio**, e cada dia da semana
+  pode ter seu próprio horário (útil quando os espaços livres têm horários
+  de início diferentes em dias diferentes)
 - **Agenda** — a organização cadastra eventos (ex.: Forró na Rep) e as aulas
   semanais de cada turma; o aluno vê na tela inicial só o que é da turma dele
 - **Feriados e cancelamentos** — a organização cancela a aula recorrente de
@@ -195,8 +197,11 @@ supabase/
   *todos* os desafios em que o aluno está inscrito cuja janela (período +
   dia da semana + horário) bate com o momento da foto. Uma foto por aula,
   sem burocracia.
-- **Janela por desafio:** cada desafio define seus dias e horários válidos —
-  o projeto funciona a semana toda, com turmas em dias diferentes.
+- **Janela por dia da semana:** cada desafio tem uma `challenge_janelas` —
+  no máximo uma janela por dia (`dia_semana`, `hora_inicio`, `hora_fim`).
+  O projeto funciona a semana toda, com espaços diferentes tendo horários
+  de início diferentes, então segunda pode abrir às 18h e quarta às 20h
+  dentro do mesmo desafio.
 - **Ponto = presença; ranking = competição.** Sem meta fixa: vence quem
   somar mais presenças no período. O horário do check-in usado na conta é o
   do servidor (`criado_em`), o aluno não consegue burlar pelo relógio.

@@ -22,18 +22,50 @@ export function ChallengeForm({
     descricao: desafio?.descricao ?? '',
     data_inicio: desafio?.data_inicio ?? hoje,
     data_fim: desafio?.data_fim ?? hoje,
-    dias_semana: desafio?.dias_semana ?? [1],
-    hora_inicio: desafio?.hora_inicio ?? '18:00',
-    hora_fim: desafio?.hora_fim ?? '23:00',
+    janelas: desafio?.janelas ?? [],
   })
   const [salvando, setSalvando] = useState(false)
 
-  const toggleDia = (dia: number) => {
+  // Controle auxiliar pra montar/editar as janelas: escolhe os dias,
+  // define um horário e aplica — cada espaço tem seu próprio horário,
+  // então dias diferentes podem receber horários diferentes.
+  const [diasEscolhidos, setDiasEscolhidos] = useState<number[]>([])
+  const [horaInicio, setHoraInicio] = useState('18:00')
+  const [horaFim, setHoraFim] = useState('23:00')
+
+  const toggleDiaEscolhido = (dia: number) => {
+    setDiasEscolhidos((dias) =>
+      dias.includes(dia) ? dias.filter((d) => d !== dia) : [...dias, dia].sort(),
+    )
+  }
+
+  const aplicarHorario = () => {
+    if (diasEscolhidos.length === 0) {
+      toast('Marque pelo menos um dia para aplicar esse horário', 'erro')
+      return
+    }
+    if (horaFim === horaInicio) {
+      toast('O horário final precisa ser diferente do inicial', 'erro')
+      return
+    }
     setForm((f) => ({
       ...f,
-      dias_semana: f.dias_semana.includes(dia)
-        ? f.dias_semana.filter((d) => d !== dia)
-        : [...f.dias_semana, dia].sort(),
+      janelas: [
+        ...f.janelas.filter((j) => !diasEscolhidos.includes(j.dia_semana)),
+        ...diasEscolhidos.map((dia_semana) => ({
+          dia_semana,
+          hora_inicio: horaInicio,
+          hora_fim: horaFim,
+        })),
+      ].sort((a, b) => a.dia_semana - b.dia_semana),
+    }))
+    setDiasEscolhidos([])
+  }
+
+  const removerJanela = (dia_semana: number) => {
+    setForm((f) => ({
+      ...f,
+      janelas: f.janelas.filter((j) => j.dia_semana !== dia_semana),
     }))
   }
 
@@ -43,12 +75,11 @@ export function ChallengeForm({
       toast('A data final precisa ser depois da inicial', 'erro')
       return
     }
-    if (form.dias_semana.length === 0) {
-      toast('Escolha pelo menos um dia de check-in', 'erro')
-      return
-    }
-    if (form.hora_fim === form.hora_inicio) {
-      toast('O horário final precisa ser diferente do inicial', 'erro')
+    if (form.janelas.length === 0) {
+      toast(
+        'Configure pelo menos um dia com horário de check-in',
+        'erro',
+      )
       return
     }
     setSalvando(true)
@@ -81,7 +112,8 @@ export function ChallengeForm({
         <p className="text-xs text-stone-500">
           Desafio é competição: cada janela com check-in vale 1 ponto (várias
           fotos na mesma janela contam uma vez) — quem somar mais pontos
-          vence. A janela pode virar a noite (ex.: 21:00–02:00). 🏆
+          vence. Cada dia da semana pode ter seu próprio horário, útil
+          quando o espaço muda de horário de um dia pro outro. 🏆
         </p>
         <div>
           <label className="label" htmlFor="titulo">
@@ -137,17 +169,56 @@ export function ChallengeForm({
             />
           </div>
         </div>
+
+        {/* Horário configurado por dia */}
         <div>
-          <span className="label">Dias com check-in liberado</span>
+          <span className="label">Horário de check-in por dia</span>
+          {form.janelas.length === 0 ? (
+            <p className="text-xs text-stone-500">
+              Nenhum dia configurado ainda — monte abaixo.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {form.janelas.map((j) => (
+                <div
+                  key={j.dia_semana}
+                  className="flex items-center justify-between rounded-lg bg-noite-950 px-3 py-2 text-sm"
+                >
+                  <span className="font-bold">{DIAS_ABREV[j.dia_semana]}</span>
+                  <span className="text-stone-400">
+                    {j.hora_inicio}–{j.hora_fim}
+                    {j.hora_fim < j.hora_inicio && (
+                      <span className="ml-1 text-sky-400">🌙 +1 dia</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removerJanela(j.dia_semana)}
+                    className="text-stone-500 hover:text-red-400"
+                    aria-label={`Remover ${DIAS_ABREV[j.dia_semana]}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Montagem: escolhe dias + horário e aplica */}
+        <div className="space-y-3 rounded-xl bg-noite-950 p-3">
+          <span className="label">
+            Marque os dias e defina o horário pra eles
+          </span>
           <div className="flex flex-wrap gap-1.5">
             {DIAS_ABREV.map((abrev, dia) => (
               <button
                 key={dia}
                 type="button"
-                onClick={() => toggleDia(dia)}
-                aria-pressed={form.dias_semana.includes(dia)}
+                onClick={() => toggleDiaEscolhido(dia)}
+                aria-pressed={diasEscolhidos.includes(dia)}
                 className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
-                  form.dias_semana.includes(dia)
+                  diasEscolhidos.includes(dia)
                     ? 'bg-gradient-to-r from-brasa-400 to-brasa-600 text-white'
                     : 'bg-white/5 text-stone-400'
                 }`}
@@ -156,42 +227,52 @@ export function ChallengeForm({
               </button>
             ))}
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label" htmlFor="hinicio">
-              Check-in abre às
-            </label>
-            <input
-              id="hinicio"
-              type="time"
-              className="input"
-              value={form.hora_inicio}
-              onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="hinicio">
+                Abre às
+              </label>
+              <input
+                id="hinicio"
+                type="time"
+                className="input"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="hfim">
+                Fecha às
+              </label>
+              <input
+                id="hfim"
+                type="time"
+                className="input"
+                value={horaFim}
+                onChange={(e) => setHoraFim(e.target.value)}
+              />
+            </div>
           </div>
-          <div>
-            <label className="label" htmlFor="hfim">
-              Fecha às
-            </label>
-            <input
-              id="hfim"
-              type="time"
-              className="input"
-              value={form.hora_fim}
-              onChange={(e) => setForm({ ...form, hora_fim: e.target.value })}
-              required
-            />
-          </div>
-        </div>
-        {form.hora_fim < form.hora_inicio && (
-          <p className="text-xs text-sky-400">
-            🌙 Janela vira a noite: abre às {form.hora_inicio} e fecha às{' '}
-            {form.hora_fim} da madrugada seguinte. Um check-in feito de
-            madrugada ainda conta como a mesma janela — só vale 1 ponto.
+          {horaFim < horaInicio && (
+            <p className="text-xs text-sky-400">
+              🌙 Vira a noite: abre às {horaInicio} e fecha às {horaFim} da
+              madrugada seguinte. Mais de um check-in na mesma janela ainda
+              vale só 1 ponto.
+            </p>
+          )}
+          <button
+            type="button"
+            className="btn-ghost w-full"
+            onClick={aplicarHorario}
+          >
+            Aplicar aos dias marcados
+          </button>
+          <p className="text-[11px] text-stone-500">
+            Repita quantas vezes precisar — se um dia já tiver horário, o
+            novo substitui.
           </p>
-        )}
+        </div>
+
         <div className="flex gap-2">
           <button type="button" className="btn-ghost flex-1" onClick={onClose}>
             Cancelar

@@ -533,15 +533,20 @@ export class SupabaseApi implements ForroApi {
     c: Record<string, unknown>,
     meusIds: Set<string>,
   ): Challenge {
+    const janelas = (c.janelas as Array<Record<string, unknown>>) ?? []
     return {
       id: c.id as string,
       titulo: c.titulo as string,
       descricao: c.descricao as string | null,
       data_inicio: c.data_inicio as string,
       data_fim: c.data_fim as string,
-      dias_semana: (c.dias_semana as number[]) ?? [],
-      hora_inicio: horaCurta(c.hora_inicio),
-      hora_fim: horaCurta(c.hora_fim),
+      janelas: janelas
+        .map((j) => ({
+          dia_semana: j.dia_semana as number,
+          hora_inicio: horaCurta(j.hora_inicio),
+          hora_fim: horaCurta(j.hora_fim),
+        }))
+        .sort((a, b) => a.dia_semana - b.dia_semana),
       criado_por: c.criado_por as string | null,
       participantes:
         (c.participantes as Array<{ count: number }>)?.[0]?.count ?? 0,
@@ -554,7 +559,9 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('challenges')
-        .select('*, participantes:challenge_members(count)')
+        .select(
+          '*, participantes:challenge_members(count), janelas:challenge_janelas(dia_semana, hora_inicio, hora_fim)',
+        )
         .order('data_inicio', { ascending: false }),
     ) as unknown as Array<Record<string, unknown>>
     const meus = uid
@@ -580,18 +587,41 @@ export class SupabaseApi implements ForroApi {
       descricao: data.descricao || null,
       data_inicio: data.data_inicio,
       data_fim: data.data_fim,
-      dias_semana: data.dias_semana,
-      hora_inicio: data.hora_inicio,
-      hora_fim: data.hora_fim,
     }
-    if (data.id) {
-      ok(await this.sb.from('challenges').update(valores).eq('id', data.id))
-    } else {
-      const uid = await this.requireUid()
+    let challengeId = data.id
+    if (challengeId) {
+      ok(
+        await this.sb.from('challenges').update(valores).eq('id', challengeId),
+      )
+      // Substitui as janelas por completo — mais simples e seguro que
+      // tentar casar quais dias mudaram, sumiram ou são novos.
       ok(
         await this.sb
+          .from('challenge_janelas')
+          .delete()
+          .eq('challenge_id', challengeId),
+      )
+    } else {
+      const uid = await this.requireUid()
+      const criado = ok(
+        await this.sb
           .from('challenges')
-          .insert({ ...valores, criado_por: uid }),
+          .insert({ ...valores, criado_por: uid })
+          .select('id')
+          .single(),
+      ) as { id: string }
+      challengeId = criado.id
+    }
+    if (data.janelas.length > 0) {
+      ok(
+        await this.sb.from('challenge_janelas').insert(
+          data.janelas.map((j) => ({
+            challenge_id: challengeId,
+            dia_semana: j.dia_semana,
+            hora_inicio: j.hora_inicio,
+            hora_fim: j.hora_fim,
+          })),
+        ),
       )
     }
   }

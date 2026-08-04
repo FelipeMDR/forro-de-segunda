@@ -8,13 +8,28 @@ import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft, formatDate } from '../lib/dates'
 import { DIAS_ABREV, type Challenge } from '../lib/types'
 
+/** Resumo compacto da janela pro cartão: junta os dias se o horário
+ * for igual em todos; se variar por dia, só avisa que varia (o
+ * detalhe completo fica na página do desafio). */
+function resumoJanelas(c: Challenge): string {
+  if (c.janelas.length === 0) return 'sem dias configurados'
+  const [primeira, ...resto] = c.janelas
+  const mesmoHorario = resto.every(
+    (j) =>
+      j.hora_inicio === primeira.hora_inicio && j.hora_fim === primeira.hora_fim,
+  )
+  const dias =
+    c.janelas.length === 7
+      ? 'todo dia'
+      : c.janelas.map((j) => DIAS_ABREV[j.dia_semana]).join('·')
+  return mesmoHorario
+    ? `${dias}, ${primeira.hora_inicio}–${primeira.hora_fim}`
+    : `${dias} · horários variam por dia`
+}
+
 function CartaoDesafio({ c }: { c: Challenge }) {
   const fase = challengePhase(c)
   const restantes = daysLeft(c.data_fim)
-  const dias =
-    c.dias_semana.length === 7
-      ? 'todo dia'
-      : c.dias_semana.map((d) => DIAS_ABREV[d]).join('·')
   return (
     <Link
       to={`/desafios/${c.id}`}
@@ -29,8 +44,8 @@ function CartaoDesafio({ c }: { c: Challenge }) {
         )}
       </div>
       <p className="mt-1 text-xs text-stone-400">
-        {formatDate(c.data_inicio)} – {formatDate(c.data_fim)} · {dias},{' '}
-        {c.hora_inicio}–{c.hora_fim} · 👥 {c.participantes}
+        {formatDate(c.data_inicio)} – {formatDate(c.data_fim)} ·{' '}
+        {resumoJanelas(c)} · 👥 {c.participantes}
       </p>
       {fase === 'ativo' && (
         <p className="mt-2 text-xs font-bold text-brasa-400">

@@ -64,8 +64,24 @@ export interface Comment {
 }
 
 /**
+ * Janela de check-in de um dia específico da semana. Cada espaço tem
+ * seu próprio horário de aula, então cada dia pode ter uma janela
+ * diferente dentro do mesmo desafio (ex.: segunda 18h–23h, quarta
+ * 20h–22h). `hora_fim < hora_inicio` = janela vira a noite.
+ */
+export interface ChallengeJanela {
+  /** 0 = domingo … 6 = sábado. */
+  dia_semana: number
+  /** "HH:MM" */
+  hora_inicio: string
+  /** "HH:MM" */
+  hora_fim: string
+}
+
+/**
  * Desafio = competição de presença: quem somar mais check-ins válidos
- * dentro do período e da janela (dias da semana + horário) vence.
+ * dentro do período e da janela do dia (cada dia da semana pode ter
+ * seu próprio horário) vence.
  */
 export interface Challenge {
   id: string
@@ -73,12 +89,8 @@ export interface Challenge {
   descricao: string | null
   data_inicio: string // "YYYY-MM-DD"
   data_fim: string // "YYYY-MM-DD"
-  /** Dias em que o check-in vale ponto: 0 = domingo … 6 = sábado. */
-  dias_semana: number[]
-  /** "HH:MM" */
-  hora_inicio: string
-  /** "HH:MM" */
-  hora_fim: string
+  /** No máximo uma janela por dia da semana. */
+  janelas: ChallengeJanela[]
   criado_por: string | null
   participantes: number
   sou_membro: boolean
@@ -90,9 +102,7 @@ export interface ChallengeInput {
   descricao: string
   data_inicio: string
   data_fim: string
-  dias_semana: number[]
-  hora_inicio: string
-  hora_fim: string
+  janelas: ChallengeJanela[]
 }
 
 export interface RankingEntry {
