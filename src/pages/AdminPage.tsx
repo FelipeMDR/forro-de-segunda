@@ -37,6 +37,20 @@ import {
   type Turma,
 } from '../lib/types'
 
+/**
+ * O painel virou muitas seções (cargos, turmas, agenda, feriados,
+ * frequência, denúncias) — abas evitam ter que rolar a página inteira
+ * pra achar uma função específica.
+ */
+const ABAS_PAINEL = [
+  { id: 'pessoas', emoji: '👥', label: 'Pessoas' },
+  { id: 'agenda', emoji: '📅', label: 'Agenda' },
+  { id: 'frequencia', emoji: '📋', label: 'Frequência' },
+  { id: 'denuncias', emoji: '🚩', label: 'Denúncias' },
+] as const
+
+type AbaPainel = (typeof ABAS_PAINEL)[number]['id']
+
 function mesAtual(): string {
   return toISODate(new Date()).slice(0, 7)
 }
@@ -1111,6 +1125,7 @@ export function AdminPage() {
   const { api, papel, carregando } = useAuth()
   const toast = useToast()
 
+  const [aba, setAba] = useState<AbaPainel>('pessoas')
   const [turmas, setTurmas] = useState<Turma[]>([])
   const [cargos, setCargos] = useState<Cargo[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
@@ -1214,20 +1229,53 @@ export function AdminPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-extrabold">Painel do organizador 🛠️</h1>
 
-      <SecaoCargos cargos={cargos} onChanged={() => void carregarCargos()} />
-      <SecaoTurmas
-        turmas={turmas}
-        cargos={cargos}
-        onTurmasChanged={() => void carregarTurmas()}
-      />
-      <SecaoAgenda turmas={turmas} feriados={feriados} />
-      <SecaoFeriados
-        feriados={feriados}
-        turmas={turmas}
-        onChanged={() => void carregarFeriados()}
-      />
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-noite-950 p-1">
+        {ABAS_PAINEL.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAba(t.id)}
+            aria-pressed={aba === t.id}
+            className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-[10px] font-bold transition ${
+              aba === t.id ? 'bg-noite-700 text-white' : 'text-stone-500'
+            }`}
+          >
+            <span className="relative text-base leading-none">
+              {t.emoji}
+              {t.id === 'denuncias' && reports.length > 0 && (
+                <span className="absolute -right-2 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-extrabold text-white">
+                  {reports.length}
+                </span>
+              )}
+            </span>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Frequência */}
+      {aba === 'pessoas' && (
+        <>
+          <SecaoCargos cargos={cargos} onChanged={() => void carregarCargos()} />
+          <SecaoTurmas
+            turmas={turmas}
+            cargos={cargos}
+            onTurmasChanged={() => void carregarTurmas()}
+          />
+        </>
+      )}
+
+      {aba === 'agenda' && (
+        <>
+          <SecaoAgenda turmas={turmas} feriados={feriados} />
+          <SecaoFeriados
+            feriados={feriados}
+            turmas={turmas}
+            onChanged={() => void carregarFeriados()}
+          />
+        </>
+      )}
+
+      {aba === 'frequencia' && (
       <section className="card space-y-4 p-5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
           📋 Frequência
@@ -1313,8 +1361,9 @@ export function AdminPage() {
           </>
         )}
       </section>
+      )}
 
-      {/* Denúncias */}
+      {aba === 'denuncias' && (
       <section className="card space-y-3 p-5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
           🚩 Denúncias {reports.length > 0 && `(${reports.length})`}
@@ -1361,6 +1410,7 @@ export function AdminPage() {
           ))
         )}
       </section>
+      )}
     </div>
   )
 }
