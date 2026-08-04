@@ -112,8 +112,7 @@ export function LoginPage() {
           <LogoWordmark largura={250} />
         </div>
         <p className="text-sm text-stone-400">
-          Check-ins, desafios e ranking das aulas do Espaço Livre. Forró de
-          segunda a segunda! 🎶
+          Check-ins, desafios e ranking do Espaço Livre! 🎶
         </p>
       </div>
 
