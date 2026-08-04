@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorState } from '../components/ErrorState'
 import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
@@ -62,17 +63,26 @@ export function FeedPage() {
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
   const [desafios, setDesafios] = useState<Challenge[]>([])
   const [eventos, setEventos] = useState<AgendaEvent[]>([])
+  const [erro, setErro] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>()
 
   const carregar = useCallback(async () => {
-    const [f, d, e] = await Promise.all([
-      api.getFeed(),
-      api.listChallenges(),
-      api.listEvents(),
-    ])
-    setFeed(f)
-    setDesafios(d)
-    setEventos(e)
+    try {
+      // Carregados em separado: se a agenda ou os desafios falharem,
+      // o feed ainda aparece (antes um erro derrubava a tela inteira).
+      setErro(null)
+      const f = await api.getFeed()
+      setFeed(f)
+      const [d, e] = await Promise.all([
+        api.listChallenges().catch(() => [] as Challenge[]),
+        api.listEvents().catch(() => [] as AgendaEvent[]),
+      ])
+      setDesafios(d)
+      setEventos(e)
+    } catch (e) {
+      console.error('[feed] falha ao carregar', e)
+      setErro((e as Error).message || 'Erro desconhecido')
+    }
   }, [api])
 
   useEffect(() => {
@@ -108,7 +118,13 @@ export function FeedPage() {
       <InstallPrompt />
       <AgendaCard eventos={agenda} />
 
-      {feed === null ? (
+      {erro ? (
+        <ErrorState
+          titulo="Não consegui carregar o feed"
+          erro={erro}
+          onRetry={() => void carregar()}
+        />
+      ) : feed === null ? (
         <Spinner texto="Carregando o feed…" />
       ) : feed.length === 0 ? (
         <EmptyState

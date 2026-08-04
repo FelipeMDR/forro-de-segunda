@@ -33,7 +33,12 @@ export function Layout() {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
-      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/5 bg-noite-950/90 px-4 py-3 backdrop-blur">
+      {/* pt = safe area: no iPhone o app roda sob a barra de status
+          (viewport-fit=cover + status bar translúcida) */}
+      <header
+        className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/5 bg-noite-950/90 px-4 pb-3 backdrop-blur"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
+      >
         <Logo tamanho={30} />
         <h1 className="text-lg font-extrabold tracking-tight">
           <span className="text-[#8cc63f]">Forró</span>{' '}

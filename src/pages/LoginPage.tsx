@@ -100,7 +100,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
+    <div
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 40px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 40px)',
+      }}
+    >
       <div className="mb-8 flex flex-col items-center gap-4 text-center">
         <div className="rounded-3xl bg-white px-6 py-5 shadow-xl">
           <LogoWordmark largura={250} />

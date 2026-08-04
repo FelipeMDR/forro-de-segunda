@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChallengeForm } from '../components/ChallengeForm'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft, formatDate } from '../lib/dates'
@@ -48,16 +49,32 @@ function CartaoDesafio({ c }: { c: Challenge }) {
 export function ChallengesPage() {
   const { api, papel } = useAuth()
   const [desafios, setDesafios] = useState<Challenge[] | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
   const [criando, setCriando] = useState(false)
 
   const carregar = useCallback(async () => {
-    setDesafios(await api.listChallenges())
+    try {
+      setErro(null)
+      setDesafios(await api.listChallenges())
+    } catch (e) {
+      console.error('[desafios] falha ao carregar', e)
+      setErro((e as Error).message || 'Erro desconhecido')
+    }
   }, [api])
 
   useEffect(() => {
     void carregar()
   }, [carregar])
 
+  if (erro) {
+    return (
+      <ErrorState
+        titulo="Não consegui carregar os desafios"
+        erro={erro}
+        onRetry={() => void carregar()}
+      />
+    )
+  }
   if (desafios === null) return <Spinner texto="Carregando desafios…" />
 
   const ativos = desafios.filter((c) => challengePhase(c) === 'ativo')

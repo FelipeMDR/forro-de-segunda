@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ChallengeForm } from '../components/ChallengeForm'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -19,21 +20,33 @@ export function ChallengeDetailPage() {
   const navigate = useNavigate()
   const [desafio, setDesafio] = useState<Challenge | null | undefined>()
   const [ranking, setRanking] = useState<RankingEntry[]>([])
+  const [erro, setErro] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [ocupado, setOcupado] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!id) return
-    const c = await api.getChallenge(id)
-    setDesafio(c)
-    if (c) setRanking(await api.getRanking(c))
+    try {
+      setErro(null)
+      const c = await api.getChallenge(id)
+      setDesafio(c)
+      if (c) setRanking(await api.getRanking(c))
+    } catch (e) {
+      console.error('[desafio] falha ao carregar', e)
+      setErro((e as Error).message || 'Erro desconhecido')
+    }
   }, [api, id])
 
   useEffect(() => {
     void carregar()
   }, [carregar])
 
+  if (erro) {
+    return (
+      <ErrorState erro={erro} onRetry={() => void carregar()} />
+    )
+  }
   if (desafio === undefined) return <Spinner texto="Carregando desafio…" />
   if (desafio === null)
     return (

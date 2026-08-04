@@ -136,13 +136,38 @@ export class SupabaseApi implements ForroApi {
     }
   }
 
-  async getProfile(id: string): Promise<Profile | null> {
+  /** Turmas do aluno em consulta separada (plano B do embed). */
+  private async turmasDe(userId: string): Promise<TurmaMembro[]> {
     const { data } = await this.sb
+      .from('profile_turmas')
+      .select('turma, papel_danca')
+      .eq('user_id', userId)
+    return (data ?? []) as TurmaMembro[]
+  }
+
+  async getProfile(id: string): Promise<Profile | null> {
+    const { data, error } = await this.sb
       .from('profiles')
       .select(SupabaseApi.PROFILE_SELECT)
       .eq('id', id)
       .maybeSingle()
     if (data) return this.mapProfile(data as unknown as Record<string, unknown>)
+
+    if (error) {
+      // Embed falhou: busca o perfil e as turmas separadamente
+      console.warn('[perfil] embed falhou, usando consultas simples:', error)
+      const { data: simples } = await this.sb
+        .from('profiles')
+        .select('id, nome, avatar_url, telefone, criado_em')
+        .eq('id', id)
+        .maybeSingle()
+      if (simples) {
+        return {
+          ...(simples as Omit<Profile, 'turmas'>),
+          turmas: await this.turmasDe(id),
+        }
+      }
+    }
 
     // Fallback: se o trigger de criação de perfil ainda não rodou,
     // cria o perfil a partir dos metadados da sessão.
@@ -206,18 +231,26 @@ export class SupabaseApi implements ForroApi {
   // ---- Feed / check-ins ----
 
   async getFeed(): Promise<FeedItem[]> {
-    const data = ok(
-      await this.sb
-        .from('checkins')
-        .select(
-          `id, user_id, foto_url, legenda, criado_em,
+    const res = await this.sb
+      .from('checkins')
+      .select(
+        `id, user_id, foto_url, legenda, criado_em,
            autor:profiles(nome, avatar_url, turmas:profile_turmas(turma, papel_danca)),
            reacoes:reactions(tipo, user_id),
            comentarios:comments(count)`,
-        )
-        .order('criado_em', { ascending: false })
-        .limit(60),
-    ) as unknown as Array<Record<string, unknown>>
+      )
+      .order('criado_em', { ascending: false })
+      .limit(60)
+
+    // O embed aninhado (checkins → profiles → profile_turmas) depende das
+    // FKs estarem no cache do PostgREST. Se falhar, monta o feed com
+    // consultas simples em vez de deixar a tela vazia.
+    if (res.error) {
+      console.warn('[feed] embed falhou, usando consultas simples:', res.error)
+      return this.getFeedSimples()
+    }
+
+    const data = res.data as unknown as Array<Record<string, unknown>>
     return data.map((c) => {
       const autor = c.autor as {
         nome: string
@@ -238,6 +271,83 @@ export class SupabaseApi implements ForroApi {
         reacoes: (c.reacoes as FeedItem['reacoes']) ?? [],
         comentarios:
           (c.comentarios as Array<{ count: number }>)?.[0]?.count ?? 0,
+      }
+    })
+  }
+
+  /** Plano B do feed: sem embeds, só consultas diretas + junção no cliente. */
+  private async getFeedSimples(): Promise<FeedItem[]> {
+    const checkins = ok(
+      await this.sb
+        .from('checkins')
+        .select('id, user_id, foto_url, legenda, criado_em')
+        .order('criado_em', { ascending: false })
+        .limit(60),
+    ) as Array<{
+      id: string
+      user_id: string
+      foto_url: string
+      legenda: string | null
+      criado_em: string
+    }>
+    if (checkins.length === 0) return []
+
+    const userIds = [...new Set(checkins.map((c) => c.user_id))]
+    const checkinIds = checkins.map((c) => c.id)
+
+    const [perfis, turmasRows, reacoes, comentarios] = await Promise.all([
+      this.sb
+        .from('profiles')
+        .select('id, nome, avatar_url')
+        .in('id', userIds)
+        .then((r) => (r.data ?? []) as Array<{ id: string; nome: string; avatar_url: string | null }>),
+      this.sb
+        .from('profile_turmas')
+        .select('user_id, turma, papel_danca')
+        .in('user_id', userIds)
+        .then(
+          (r) =>
+            (r.data ?? []) as Array<
+              { user_id: string } & TurmaMembro
+            >,
+        ),
+      this.sb
+        .from('reactions')
+        .select('checkin_id, tipo, user_id')
+        .in('checkin_id', checkinIds)
+        .then((r) => (r.data ?? []) as Array<{ checkin_id: string; tipo: string; user_id: string }>),
+      this.sb
+        .from('comments')
+        .select('checkin_id')
+        .in('checkin_id', checkinIds)
+        .then((r) => (r.data ?? []) as Array<{ checkin_id: string }>),
+    ])
+
+    const perfilPor = new Map(perfis.map((p) => [p.id, p]))
+    const turmasPor = new Map<string, TurmaMembro[]>()
+    for (const t of turmasRows) {
+      const lista = turmasPor.get(t.user_id) ?? []
+      lista.push({ turma: t.turma, papel_danca: t.papel_danca })
+      turmasPor.set(t.user_id, lista)
+    }
+    const nComentarios = new Map<string, number>()
+    for (const c of comentarios) {
+      nComentarios.set(c.checkin_id, (nComentarios.get(c.checkin_id) ?? 0) + 1)
+    }
+
+    return checkins.map((c) => {
+      const p = perfilPor.get(c.user_id)
+      return {
+        ...c,
+        autor: {
+          nome: p?.nome ?? 'Alguém',
+          avatar_url: p?.avatar_url ?? null,
+          turma: turmaLabel(turmasPor.get(c.user_id) ?? []),
+        },
+        reacoes: reacoes
+          .filter((r) => r.checkin_id === c.id)
+          .map((r) => ({ tipo: r.tipo, user_id: r.user_id })),
+        comentarios: nComentarios.get(c.id) ?? 0,
       }
     })
   }

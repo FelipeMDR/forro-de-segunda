@@ -64,7 +64,21 @@ export function ProfilePage() {
           events: eventos,
         }),
       )
-    })()
+    })().catch((e) => {
+      console.error('[perfil] falha ao carregar estatísticas', e)
+      // Sem estatísticas, mostra ao menos os distintivos de turma
+      setStats({ streak: 0, presencas: 0, desafios: 0 })
+      setBadges(
+        computeBadges({
+          userId,
+          turmas: profile.turmas,
+          checkinDates: [],
+          challenges: [],
+          rankings: new Map(),
+          events: [],
+        }),
+      )
+    })
     void isPushEnabled().then(setPushAtivo)
   }, [api, userId, profile])
 

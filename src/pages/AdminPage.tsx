@@ -751,10 +751,14 @@ export function AdminPage() {
 
   useEffect(() => {
     if (papel !== 'organizador') return
-    void carregarTurmas()
-    void api.listChallenges().then(setDesafios)
-    void api.listReports().then(setReports)
-    void carregarPresencas(mes)
+    const falhou = (o: string) => (e: unknown) => {
+      console.error(`[painel] falha em ${o}`, e)
+      toast(`Falha ao carregar ${o}: ${(e as Error).message}`, 'erro')
+    }
+    void carregarTurmas().catch(falhou('turmas'))
+    void api.listChallenges().then(setDesafios).catch(falhou('desafios'))
+    void api.listReports().then(setReports).catch(falhou('denúncias'))
+    void carregarPresencas(mes).catch(falhou('frequência'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, papel])
 
