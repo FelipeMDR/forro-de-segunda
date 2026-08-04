@@ -147,10 +147,11 @@ export function ChallengeDetailPage() {
           <p>
             ⏰ Check-in vale ponto: <strong>{dias}</strong>, das{' '}
             {desafio.hora_inicio} às {desafio.hora_fim}
+            {desafio.hora_fim < desafio.hora_inicio && ' (do dia seguinte)'}
           </p>
           <p>
-            🎯 <strong>1 ponto por dia</strong> — postar mais de uma foto no
-            mesmo dia não pontua de novo
+            🎯 <strong>1 ponto por janela</strong> — postar mais de uma foto
+            na mesma janela não pontua de novo
           </p>
         </div>
 

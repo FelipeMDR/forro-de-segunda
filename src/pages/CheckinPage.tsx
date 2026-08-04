@@ -5,9 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
   challengePhase,
-  contaParaDesafio,
   desafiosQueContam,
-  toISODate,
+  janelaDoCheckin,
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
 import type { Challenge } from '../lib/types'
@@ -49,15 +48,20 @@ export function CheckinPage() {
     [desafios],
   )
 
-  // Cada dia vale 1 ponto por desafio: separa os que ainda vão pontuar
-  // hoje dos que já pontuaram
+  // Cada janela vale 1 ponto por desafio: separa os que ainda vão pontuar
+  // agora dos que já pontuaram nesta janela. Usa a janela (não a data do
+  // calendário) para não se perder em desafios que cruzam a meia-noite
+  // (ex.: 21:00–02:00) — check-in às 23h e outro à 01h são a MESMA janela.
   const { aindaPontuam, jaPontuaram } = useMemo(() => {
-    const hoje = toISODate(new Date())
-    const doDia = meusCheckins.filter((d) => toISODate(d) === hoje)
+    const agora = new Date()
     const aindaPontuam: Challenge[] = []
     const jaPontuaram: Challenge[] = []
     for (const c of valendoAgora) {
-      if (doDia.some((d) => contaParaDesafio(d, c))) jaPontuaram.push(c)
+      const janelaAtual = janelaDoCheckin(agora, c)
+      const jaContou =
+        janelaAtual !== null &&
+        meusCheckins.some((d) => janelaDoCheckin(d, c) === janelaAtual)
+      if (jaContou) jaPontuaram.push(c)
       else aindaPontuam.push(c)
     }
     return { aindaPontuam, jaPontuaram }
@@ -111,9 +115,9 @@ export function CheckinPage() {
 
       {jaPontuaram.length > 0 && (
         <div className="rounded-2xl bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
-          👍 Você já pontuou hoje em{' '}
+          👍 Você já pontuou nesta janela em{' '}
           <strong>{jaPontuaram.map((c) => c.titulo).join(', ')}</strong>. Vale
-          1 ponto por dia, então esta foto entra no feed mas{' '}
+          1 ponto por janela, então esta foto entra no feed mas{' '}
           <strong>não conta ponto de novo</strong>.
         </div>
       )}
@@ -153,7 +157,7 @@ export function CheckinPage() {
           />
           <p className="px-2 text-center text-xs text-stone-500">
             A foto é tirada na hora, dentro do app — nada de foto antiga da
-            galeria 😉 Ela é comprimida no seu celular antes de subir.
+            galeria 😉
           </p>
         </>
       )}

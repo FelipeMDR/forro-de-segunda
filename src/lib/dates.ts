@@ -42,13 +42,54 @@ function parseTime(hhmm: string): number {
   return (h || 0) * 60 + (m || 0)
 }
 
+/**
+ * Dia (ISO) em que começou a janela do desafio que contém o instante
+ * `d`, ou null se `d` não cai em nenhuma janela.
+ *
+ * Suporta janelas que cruzam a meia-noite (ex.: 21:00–02:00, quando
+ * hora_fim < hora_inicio): a janela "pertence" ao dia em que começou,
+ * mesmo que o check-in tenha sido feito de madrugada no dia seguinte.
+ * É essa data — não a do relógio no momento do check-in — que deve ser
+ * usada para checar o período do desafio, o dia da semana e o limite de
+ * 1 ponto por janela.
+ */
+export function janelaDoCheckin(d: Date, c: Challenge): string | null {
+  const minutos = d.getHours() * 60 + d.getMinutes()
+  const inicio = parseTime(c.hora_inicio)
+  const fim = parseTime(c.hora_fim)
+  const overnight = fim < inicio
+  const dentroDoPeriodo = (dia: string) =>
+    dia >= c.data_inicio && dia <= c.data_fim
+
+  if (!overnight) {
+    if (minutos < inicio || minutos > fim) return null
+    const dia = toISODate(d)
+    if (!dentroDoPeriodo(dia)) return null
+    if (!c.dias_semana.includes(d.getDay())) return null
+    return dia
+  }
+
+  // Ponta da noite: check-in no próprio dia em que a janela abre
+  if (minutos >= inicio) {
+    const dia = toISODate(d)
+    if (!dentroDoPeriodo(dia)) return null
+    if (!c.dias_semana.includes(d.getDay())) return null
+    return dia
+  }
+  // Ponta da manhã seguinte: ainda conta para o dia anterior
+  if (minutos <= fim) {
+    const anterior = addDays(d, -1)
+    const dia = toISODate(anterior)
+    if (!dentroDoPeriodo(dia)) return null
+    if (!c.dias_semana.includes(anterior.getDay())) return null
+    return dia
+  }
+  return null
+}
+
 /** True se o instante `d` cai na janela do desafio (período + dia + horário). */
 export function contaParaDesafio(d: Date, c: Challenge): boolean {
-  const dia = toISODate(d)
-  if (dia < c.data_inicio || dia > c.data_fim) return false
-  if (!c.dias_semana.includes(d.getDay())) return false
-  const minutos = d.getHours() * 60 + d.getMinutes()
-  return minutos >= parseTime(c.hora_inicio) && minutos <= parseTime(c.hora_fim)
+  return janelaDoCheckin(d, c) !== null
 }
 
 /** Desafios para os quais um check-in feito em `criadoEm` marca ponto. */
@@ -61,16 +102,17 @@ export function desafiosQueContam(
 }
 
 /**
- * Pontos de um aluno num desafio: **no máximo 1 por dia**. Postar
- * várias fotos na mesma noite rende só um ponto — o feed aceita todas,
- * o ranking conta o dia.
+ * Pontos de um aluno num desafio: **no máximo 1 por janela**. Postar
+ * várias fotos na mesma janela (mesmo se ela cruzar a meia-noite) rende
+ * só um ponto — o feed aceita todas, o ranking conta a janela.
  */
 export function pontosNoDesafio(datas: Date[], c: Challenge): number {
-  const dias = new Set<string>()
+  const janelas = new Set<string>()
   for (const d of datas) {
-    if (contaParaDesafio(d, c)) dias.add(toISODate(d))
+    const j = janelaDoCheckin(d, c)
+    if (j) janelas.add(j)
   }
-  return dias.size
+  return janelas.size
 }
 
 /** Dias distintos com pelo menos um check-in (usado nos distintivos). */

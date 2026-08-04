@@ -13,9 +13,9 @@ import { combinaBusca } from '../lib/busca'
 import { downloadCSV } from '../lib/csv'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
 import {
-  desafiosQueContam,
   formatDate,
   formatRelative,
+  janelaDoCheckin,
   toISODate,
 } from '../lib/dates'
 import {
@@ -976,16 +976,25 @@ export function AdminPage() {
     }
   }
 
-  // Só o primeiro check-in do dia de cada aluno marca ponto (1 por dia).
+  // Só o primeiro check-in de cada janela marca ponto (1 por janela).
+  // Usa a janela do desafio, não a data do calendário, para não
+  // duplicar em desafios que cruzam a meia-noite (ex.: 21:00–02:00) —
+  // um check-in às 23h e outro à 01h contam como a MESMA janela.
   // `presencas` vem do mais novo para o mais antigo, então percorre ao
-  // contrário para marcar o mais antigo do dia.
+  // contrário para marcar o mais antigo de cada janela.
+  const chavesVistas = new Set<string>()
   const pontuados = new Set<string>()
-  const diasVistos = new Set<string>()
   for (const p of [...(presencas ?? [])].reverse()) {
-    if (desafiosQueContam(p.data, desafios).length === 0) continue
-    const chave = `${p.nome}|${toISODate(new Date(p.data))}`
-    if (diasVistos.has(chave)) continue
-    diasVistos.add(chave)
+    const d = new Date(p.data)
+    const chaves = desafios
+      .map((c) => {
+        const janela = janelaDoCheckin(d, c)
+        return janela ? `${p.nome}|${c.id}|${janela}` : null
+      })
+      .filter((k): k is string => k !== null)
+    if (chaves.length === 0) continue
+    if (!chaves.some((k) => !chavesVistas.has(k))) continue
+    chaves.forEach((k) => chavesVistas.add(k))
     pontuados.add(p.data)
   }
   const contaPonto = (data: string) => pontuados.has(data)
@@ -1029,7 +1038,8 @@ export function AdminPage() {
         </h2>
         <p className="text-xs text-stone-500">
           A coluna <strong>Ponto</strong> marca ✅ só no primeiro check-in
-          válido de cada dia — vale 1 ponto por dia, mesmo com várias fotos.
+          válido de cada janela — vale 1 ponto por janela, mesmo com várias
+          fotos ou se a janela virar a noite.
         </p>
         <div className="flex gap-2">
           <input

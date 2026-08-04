@@ -47,8 +47,8 @@ export function ChallengeForm({
       toast('Escolha pelo menos um dia de check-in', 'erro')
       return
     }
-    if (form.hora_fim <= form.hora_inicio) {
-      toast('O horário final precisa ser depois do inicial', 'erro')
+    if (form.hora_fim === form.hora_inicio) {
+      toast('O horário final precisa ser diferente do inicial', 'erro')
       return
     }
     setSalvando(true)
@@ -79,9 +79,9 @@ export function ChallengeForm({
           {desafio ? 'Editar desafio' : 'Novo desafio'}
         </h2>
         <p className="text-xs text-stone-500">
-          Desafio é competição: cada dia com check-in dentro da janela vale 1
-          ponto (várias fotos no mesmo dia contam uma vez) — quem somar mais
-          pontos vence. 🏆
+          Desafio é competição: cada janela com check-in vale 1 ponto (várias
+          fotos na mesma janela contam uma vez) — quem somar mais pontos
+          vence. A janela pode virar a noite (ex.: 21:00–02:00). 🏆
         </p>
         <div>
           <label className="label" htmlFor="titulo">
@@ -185,6 +185,13 @@ export function ChallengeForm({
             />
           </div>
         </div>
+        {form.hora_fim < form.hora_inicio && (
+          <p className="text-xs text-sky-400">
+            🌙 Janela vira a noite: abre às {form.hora_inicio} e fecha às{' '}
+            {form.hora_fim} da madrugada seguinte. Um check-in feito de
+            madrugada ainda conta como a mesma janela — só vale 1 ponto.
+          </p>
+        )}
         <div className="flex gap-2">
           <button type="button" className="btn-ghost flex-1" onClick={onClose}>
             Cancelar
