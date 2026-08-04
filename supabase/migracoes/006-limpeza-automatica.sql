@@ -103,9 +103,22 @@ grant execute on function public.fotos_orfas() to service_role;
 --   npx supabase link --project-ref SEU-PROJECT-REF
 --   npx supabase functions deploy limpar-fotos
 --
--- Teste manual (deve responder {"apagados":N,...}):
+-- Teste manual — simule ANTES de agendar (?simular=1 não apaga nada,
+-- só devolve a lista do que sairia).
 --
---   curl -X POST https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos \
+-- No PowerShell (Windows), use Invoke-RestMethod: ali `curl` é apelido
+-- de Invoke-WebRequest e não aceita as flags -X/-H.
+--
+--   $h = @{ Authorization = "Bearer SUA_SERVICE_ROLE_KEY" }
+--   $u = "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos"
+--   Invoke-RestMethod -Method Post -Uri "$($u)?simular=1" -Headers $h
+--   Invoke-RestMethod -Method Post -Uri $u -Headers $h
+--
+-- No Linux/Mac (ou Git Bash), deve responder {"apagados":N,...}:
+--
+--   curl -X POST "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos?simular=1" \
+--        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"
+--   curl -X POST "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos" \
 --        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"
 --
 -- ============================================================

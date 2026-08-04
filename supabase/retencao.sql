@@ -50,13 +50,20 @@ order by start_time desc
 limit 10;
 
 -- ============================================================
--- Para rodar a limpeza na hora, sem esperar a terça:
+-- Para rodar a limpeza na hora, sem esperar a terça.
 --
---   curl -X POST https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos \
---        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"
+-- No PowerShell (Windows) — `curl` ali é apelido de Invoke-WebRequest e
+-- NÃO aceita -X/-H, por isso o Invoke-RestMethod:
 --
--- Só simular (não apaga nada, devolve a lista):
+--   $h = @{ Authorization = "Bearer SUA_SERVICE_ROLE_KEY" }
+--   $u = "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos"
+--   Invoke-RestMethod -Method Post -Uri "$($u)?simular=1" -Headers $h  # só simula
+--   Invoke-RestMethod -Method Post -Uri $u -Headers $h               # apaga
+--
+-- No Linux/Mac (ou no Git Bash):
 --
 --   curl -X POST "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos?simular=1" \
---        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"
+--        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"   # só simula
+--   curl -X POST "https://SEU-PROJETO.supabase.co/functions/v1/limpar-fotos" \
+--        -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"   # apaga
 -- ============================================================
