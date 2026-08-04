@@ -233,9 +233,12 @@ export class SupabaseApi implements ForroApi {
   async getFeed(): Promise<FeedItem[]> {
     const res = await this.sb
       .from('checkins')
+      // `profiles!user_id`: há mais de um caminho entre checkins e profiles
+      // (a FK direta e o M2M que o PostgREST deduz via `reactions`), então
+      // é preciso apontar a chave estrangeira explicitamente.
       .select(
         `id, user_id, foto_url, legenda, criado_em,
-           autor:profiles(nome, avatar_url, turmas:profile_turmas(turma, papel_danca)),
+           autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca)),
            reacoes:reactions(tipo, user_id),
            comentarios:comments(count)`,
       )
@@ -430,7 +433,7 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('comments')
         .select(
-          'id, checkin_id, user_id, texto, criado_em, autor:profiles(nome, avatar_url)',
+          'id, checkin_id, user_id, texto, criado_em, autor:profiles!user_id(nome, avatar_url)',
         )
         .eq('checkin_id', checkinId)
         .order('criado_em', { ascending: true }),
@@ -665,7 +668,7 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('checkins')
         .select(
-          'criado_em, autor:profiles(nome, turmas:profile_turmas(turma, papel_danca))',
+          'criado_em, autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
         )
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
@@ -687,8 +690,8 @@ export class SupabaseApi implements ForroApi {
         .from('reports')
         .select(
           `id, checkin_id, motivo, criado_em,
-           denunciante:profiles(nome),
-           checkin:checkins(foto_url, autor:profiles(nome))`,
+           denunciante:profiles!user_id(nome),
+           checkin:checkins(foto_url, autor:profiles!user_id(nome))`,
         )
         .eq('resolvido', false)
         .order('criado_em', { ascending: false }),
