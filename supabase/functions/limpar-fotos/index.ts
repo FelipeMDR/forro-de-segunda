@@ -21,11 +21,29 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const LOTE = 100
 
 Deno.serve(async (req) => {
-  // Só aceita chamadas autenticadas com a service role key
-  const auth = req.headers.get('Authorization') ?? ''
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (auth !== `Bearer ${serviceKey}`) {
-    return new Response('Não autorizado', { status: 401 })
+  // Escape para projetos com o formato novo de chave (sb_secret_...), em
+  // que a chave do painel não é a mesma que a plataforma injeta aqui:
+  //   npx supabase secrets set LIMPEZA_TOKEN=algum-segredo-seu
+  const tokenProprio = Deno.env.get('LIMPEZA_TOKEN')
+
+  // Mensagens distintas de propósito: um 401 mudo não diz se faltou o
+  // cabeçalho ou se a chave está errada, e vira caça ao tesouro.
+  const auth = req.headers.get('Authorization')
+  if (!auth) {
+    return new Response(
+      'Falta o cabeçalho Authorization: Bearer <service_role_key>',
+      { status: 401 },
+    )
+  }
+  const token = auth.replace(/^Bearer\s+/i, '').trim()
+  if (token !== serviceKey && (!tokenProprio || token !== tokenProprio)) {
+    return new Response(
+      'Chave não confere. Use a service_role (Settings > API Keys, a ' +
+        'marcada como secret) — não a anon/publishable. Se o seu projeto ' +
+        'usa chaves sb_secret_..., defina o secret LIMPEZA_TOKEN e use ele.',
+      { status: 401 },
+    )
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey)
