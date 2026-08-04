@@ -62,7 +62,8 @@ export interface ForroApi {
   addComment(checkinId: string, texto: string): Promise<void>
   deleteComment(id: string): Promise<void>
   reportCheckin(checkinId: string, motivo: string): Promise<void>
-  myCheckins(userId: string): Promise<{ criado_em: string }[]>
+  /** Check-ins de qualquer aluno (usado no próprio perfil e no público). */
+  checkinsDe(userId: string): Promise<{ criado_em: string }[]>
 
   // ---- Desafios (competição de presença) ----
   listChallenges(): Promise<Challenge[]>
@@ -72,6 +73,8 @@ export interface ForroApi {
   joinChallenge(id: string): Promise<void>
   leaveChallenge(id: string): Promise<void>
   getRanking(challenge: Challenge): Promise<RankingEntry[]>
+  /** Em quantos desafios um aluno entrou (estatística do perfil). */
+  contarDesafios(userId: string): Promise<number>
 
   // ---- Agenda ----
   listEvents(): Promise<AgendaEvent[]>

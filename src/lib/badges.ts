@@ -58,9 +58,8 @@ export function computeBadges(input: {
         id: `presenca-${minimo}`,
         emoji,
         titulo,
-        descricao: `Você já esteve presente em ${total} ${
-          total === 1 ? 'dia' : 'dias'
-        }`,
+        // Texto neutro: o mesmo distintivo aparece no perfil dos outros
+        descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
       })
     }
   }

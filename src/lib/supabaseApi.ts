@@ -465,7 +465,7 @@ export class SupabaseApi implements ForroApi {
     )
   }
 
-  async myCheckins(userId: string) {
+  async checkinsDe(userId: string) {
     const data = ok(
       await this.sb
         .from('checkins')
@@ -473,6 +473,15 @@ export class SupabaseApi implements ForroApi {
         .eq('user_id', userId),
     )
     return data as { criado_em: string }[]
+  }
+
+  async contarDesafios(userId: string) {
+    const { count, error } = await this.sb
+      .from('challenge_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+    if (error) throw new Error(traduz(error.message))
+    return count ?? 0
   }
 
   // ---- Desafios ----

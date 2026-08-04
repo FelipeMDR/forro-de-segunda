@@ -11,6 +11,7 @@ import { CheckinPage } from './pages/CheckinPage'
 import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { UserProfilePage } from './pages/UserProfilePage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { userId, carregando } = useAuth()
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/desafios" element={<ChallengesPage />} />
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
+              <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

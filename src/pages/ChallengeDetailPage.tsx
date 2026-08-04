@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ChallengeForm } from '../components/ChallengeForm'
 import { EmptyState } from '../components/EmptyState'
@@ -208,30 +208,35 @@ export function ChallengeDetailPage() {
             {ranking.map((r, i) => (
               <li
                 key={r.user_id}
-                className={`flex items-center gap-3 px-4 py-3 ${
-                  r.user_id === userId ? 'bg-brasa-500/5' : ''
-                }`}
+                className={r.user_id === userId ? 'bg-brasa-500/5' : ''}
               >
-                <span className="w-7 text-center text-lg font-extrabold">
-                  {MEDALHAS[i] ?? (
-                    <span className="text-sm text-stone-500">{i + 1}º</span>
-                  )}
-                </span>
-                <Avatar nome={r.nome} url={r.avatar_url} tamanho={36} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">
-                    {r.nome}
-                    {r.user_id === userId && (
-                      <span className="text-brasa-400"> (você)</span>
+                <Link
+                  to={`/perfil/${r.user_id}`}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <span className="w-7 text-center text-lg font-extrabold">
+                    {MEDALHAS[i] ?? (
+                      <span className="text-sm text-stone-500">{i + 1}º</span>
                     )}
-                  </p>
-                  {r.turma && (
-                    <p className="text-xs text-stone-500">{r.turma}</p>
-                  )}
-                </div>
-                <span className="text-sm font-extrabold text-brasa-400">
-                  {r.pontos} {r.pontos === 1 ? 'pt' : 'pts'}
-                </span>
+                  </span>
+                  <Avatar nome={r.nome} url={r.avatar_url} tamanho={36} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">
+                      {r.nome}
+                      {r.user_id === userId && (
+                        <span className="text-brasa-400"> (você)</span>
+                      )}
+                    </p>
+                    {r.turma && (
+                      <p className="truncate text-xs text-stone-500">
+                        {r.turma}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-sm font-extrabold text-brasa-400">
+                    {r.pontos} {r.pontos === 1 ? 'pt' : 'pts'}
+                  </span>
+                </Link>
               </li>
             ))}
           </ol>

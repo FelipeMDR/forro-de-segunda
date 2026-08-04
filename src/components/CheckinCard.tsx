@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
@@ -61,14 +62,23 @@ export function CheckinCard({
   return (
     <article className="card overflow-hidden">
       <header className="flex items-center gap-2.5 px-4 py-3">
-        <Avatar nome={item.autor.nome} url={item.autor.avatar_url} tamanho={38} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-extrabold">{item.autor.nome}</p>
-          <p className="text-xs text-stone-500">
-            {item.autor.turma ? `${item.autor.turma} · ` : ''}
-            {formatRelative(item.criado_em)}
-          </p>
-        </div>
+        <Link
+          to={`/perfil/${item.user_id}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5"
+        >
+          <Avatar
+            nome={item.autor.nome}
+            url={item.autor.avatar_url}
+            tamanho={38}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-extrabold">{item.autor.nome}</p>
+            <p className="truncate text-xs text-stone-500">
+              {item.autor.turma ? `${item.autor.turma} · ` : ''}
+              {formatRelative(item.criado_em)}
+            </p>
+          </div>
+        </Link>
         {!contaPontos && (
           <span className="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] font-bold text-stone-500">
             fora da janela

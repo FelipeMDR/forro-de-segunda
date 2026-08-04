@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
@@ -77,10 +78,22 @@ export function CommentsSheet({
           ) : (
             comments.map((c) => (
               <div key={c.id} className="flex items-start gap-2.5">
-                <Avatar nome={c.autor.nome} url={c.autor.avatar_url} tamanho={32} />
+                <Link to={`/perfil/${c.user_id}`} onClick={onClose}>
+                  <Avatar
+                    nome={c.autor.nome}
+                    url={c.autor.avatar_url}
+                    tamanho={32}
+                  />
+                </Link>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm">
-                    <span className="font-bold">{c.autor.nome}</span>{' '}
+                    <Link
+                      to={`/perfil/${c.user_id}`}
+                      onClick={onClose}
+                      className="font-bold"
+                    >
+                      {c.autor.nome}
+                    </Link>{' '}
                     <span className="text-stone-500 text-xs">
                       {formatRelative(c.criado_em)}
                     </span>

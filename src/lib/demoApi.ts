@@ -567,7 +567,7 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
-  async myCheckins(userId: string) {
+  async checkinsDe(userId: string) {
     return this.db.checkins
       .filter((c) => c.user_id === userId)
       .map((c) => ({ criado_em: c.criado_em }))
@@ -678,6 +678,10 @@ export class DemoApi implements ForroApi {
         }
       })
       .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome))
+  }
+
+  async contarDesafios(userId: string) {
+    return this.db.members.filter((m) => m.user_id === userId).length
   }
 
   // ---- Agenda ----

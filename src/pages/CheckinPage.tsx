@@ -27,7 +27,7 @@ export function CheckinPage() {
     void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
     if (userId) {
       void api
-        .myCheckins(userId)
+        .checkinsDe(userId)
         .then((cs) => setMeusCheckins(cs.map((c) => new Date(c.criado_em))))
         .catch(() => setMeusCheckins([]))
     }
