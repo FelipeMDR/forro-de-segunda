@@ -30,6 +30,14 @@ export function ProfilePage() {
     setNome(profile?.nome ?? '')
   }, [profile])
 
+  // O perfil da sessão é carregado no login e fica em cache. Se a
+  // organização mudar sua turma ou seus cargos depois disso, a tela
+  // mostraria dados velhos — então recarrega ao abrir o perfil.
+  useEffect(() => {
+    void refreshProfile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (!userId || !profile) return
     void carregarPerfilStats(api, userId, profile.turmas, profile.cargos)

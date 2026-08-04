@@ -32,7 +32,16 @@ function traduz(msg: string): string {
     'Password should be at least 6 characters':
       'A senha precisa ter pelo menos 6 caracteres',
   }
-  return mapa[msg] ?? msg
+  if (mapa[msg]) return mapa[msg]
+  // Tabela nova que ainda não foi criada no banco em produção
+  if (msg.includes('schema cache')) {
+    return (
+      'Falta rodar a migração do banco. No Supabase: SQL Editor → cole o ' +
+      'arquivo mais recente de supabase/migracoes → Run, e depois ' +
+      'Project Settings → API → Reload schema cache.'
+    )
+  }
+  return msg
 }
 
 function ok<T>(res: { data: T; error: { message: string } | null }): T {
