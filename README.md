@@ -24,9 +24,15 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   agenda mostra as aulas de todas as turmas dele
 - **Turmas controladas pela organização** — o aluno não escolhe nem muda as
   próprias turmas; a organização ajusta pelo painel
+- **Cargos do projeto 👑** — Presidência, Diretorias, Professor(a),
+  Monitor(a), Membros… aparecem em destaque no perfil como reconhecimento.
+  A lista é editável no painel e só a organização atribui
+- **Perfil público** — tocar em alguém no feed, nos comentários ou no
+  ranking abre o perfil da pessoa (cargos, turmas, estatísticas e
+  distintivos), sem expor o telefone
 - **Distintivos 🎖️** — colecionáveis no perfil, todos derivados dos dados
-  (nada é concedido à mão): função e turma, marcos de presença (1, 10, 25,
-  50, 100 check-ins), presença em eventos da agenda e campeão(ã) de
+  (nada é concedido à mão): cargos, função e turma, marcos de presença
+  (1, 10, 25, 50, 100 dias), presença em eventos da agenda e campeão(ã) de
   desafios encerrados
 - **Check-in só com foto na hora** — a câmera abre dentro do app (sem
   galeria, nada de foto antiga); a imagem é comprimida no celular
@@ -170,9 +176,14 @@ src/
   sw.ts           service worker (precache, cache de fotos, push)
 supabase/
   schema.sql      esquema completo: tabelas + RLS + triggers + storage
+  migracoes/      mudanças para bancos JÁ no ar (rodar em ordem)
   retencao.sql    limpeza de fotos antigas (rodar semestralmente)
   functions/send-push  edge function do lembrete
 ```
+
+> **Banco já em produção?** Não rode o `schema.sql` de novo — ele recria
+> políticas que já existem e dá erro. Use os arquivos de
+> [`supabase/migracoes/`](supabase/migracoes) na ordem numérica.
 
 ### Decisões de modelagem
 

@@ -20,6 +20,8 @@ export interface Profile {
   avatar_url: string | null
   /** Turmas definidas pela organização — aluno não edita. */
   turmas: TurmaMembro[]
+  /** Cargos no projeto (Presidência, Professor(a)…) — só a organização define. */
+  cargos: string[]
   telefone: string | null
   criado_em: string
 }
@@ -160,6 +162,40 @@ export interface Report {
 export interface Turma {
   id: string
   nome: string
+}
+
+/** Cargo no projeto (Presidência, Diretor(a) de Ensino, Monitor(a)…). */
+export interface Cargo {
+  id: string
+  nome: string
+}
+
+/** Cargos padrão do Forró de Segunda (editáveis no painel). */
+export const CARGOS_PADRAO = [
+  'Presidência',
+  'Vice-Presidência',
+  'Diretor(a) de Ensino',
+  'Diretor(a) de RH',
+  'Diretor(a) de Comunicação',
+  'Diretor(a) de Recursos',
+  'Professor(a)',
+  'Monitor(a)',
+  'Membro de RH',
+  'Membro de Comunicação',
+  'Membro de Recursos',
+] as const
+
+/** Emoji do cargo — por palavra-chave, para cargos novos também terem um. */
+export function emojiCargo(nome: string): string {
+  const n = nome.toLowerCase()
+  if (n.includes('presid')) return n.includes('vice') ? '⭐' : '👑'
+  if (n.includes('ensino')) return '📚'
+  if (n.includes('professor')) return '🪗'
+  if (n.includes('monitor')) return '🙋'
+  if (n.includes('comunica')) return '📣'
+  if (n.includes('recurso')) return '💰'
+  if (n.includes('rh') || n.includes('humanos')) return '🤝'
+  return '🎖️'
 }
 
 export const REACTION_TYPES = ['❤️', '🔥', '👏', '💃'] as const

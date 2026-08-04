@@ -1,6 +1,6 @@
 import { Spinner } from './Spinner'
 import type { PerfilStats } from '../lib/perfilStats'
-import type { Badge, TurmaMembro } from '../lib/types'
+import { emojiCargo, type Badge, type TurmaMembro } from '../lib/types'
 
 /** Turmas + papel na dança, em chips. */
 export function TurmaChips({ turmas }: { turmas: TurmaMembro[] }) {
@@ -18,6 +18,23 @@ export function TurmaChips({ turmas }: { turmas: TurmaMembro[] }) {
           {m.papel_danca === 'Conduzido(a)' && '💃 '}
           {m.papel_danca ? `${m.papel_danca} ` : ''}
           {m.turma}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Cargos no projeto — destaque em laranja, acima das turmas. */
+export function CargoChips({ cargos }: { cargos: string[] }) {
+  if (cargos.length === 0) return null
+  return (
+    <div className="mt-1.5 flex flex-wrap justify-center gap-1.5">
+      {cargos.map((c) => (
+        <span
+          key={c}
+          className="inline-block rounded-full bg-brasa-500/20 px-3 py-1 text-xs font-extrabold text-brasa-300 ring-1 ring-brasa-500/30"
+        >
+          {emojiCargo(c)} {c}
         </span>
       ))}
     </div>

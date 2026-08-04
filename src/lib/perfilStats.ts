@@ -17,6 +17,7 @@ export async function carregarPerfilStats(
   api: ForroApi,
   userId: string,
   turmas: TurmaMembro[],
+  cargos: string[] = [],
 ): Promise<{ stats: PerfilStats; badges: Badge[] }> {
   const [checkins, desafios, eventos, nDesafios] = await Promise.all([
     api.checkinsDe(userId),
@@ -47,6 +48,7 @@ export async function carregarPerfilStats(
     badges: computeBadges({
       userId,
       turmas,
+      cargos,
       checkinDates: datas,
       challenges: desafios,
       rankings,

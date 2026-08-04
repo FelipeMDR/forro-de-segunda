@@ -2,12 +2,13 @@ import type { ForroApi } from './api'
 import { addDays, pontosNoDesafio, toISODate } from './dates'
 import { blobToDataURL } from './image'
 import { normalizeTelefone, telefonesIguais } from './phone'
-import { turmaLabel } from './types'
+import { CARGOS_PADRAO, turmaLabel } from './types'
 import type {
   AgendaEvent,
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Cargo,
   Challenge,
   ChallengeInput,
   Comment,
@@ -73,9 +74,10 @@ interface DB {
   events: AgendaEvent[]
   alunos: AlunoCadastrado[]
   turmas: Turma[]
+  cargos: Cargo[]
 }
 
-const DB_KEY = 'fds-demo-db-v4'
+const DB_KEY = 'fds-demo-db-v5'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -111,11 +113,13 @@ function seed(): DB {
     turmas: Profile['turmas'],
     telefone: string | null,
     semanas: number,
+    cargos: string[] = [],
   ): Profile => ({
     id: uuid(),
     nome,
     avatar_url: null,
     turmas,
+    cargos,
     telefone,
     criado_em: addDays(now, -7 * semanas).toISOString(),
   })
@@ -125,14 +129,16 @@ function seed(): DB {
     [{ turma: 'Intermediário', papel_danca: 'Conduzido(a)' }],
     '11 98888-0001',
     12,
+    ['Monitor(a)'],
   )
   const joao = mkProfile(
     'João do Acordeon',
     [{ turma: 'Iniciante 01', papel_danca: 'Condutor(a)' }],
     '11 98888-0002',
     8,
+    ['Membro de Comunicação'],
   )
-  // Ana dança em duas turmas com papéis diferentes
+  // Ana dança em duas turmas com papéis diferentes e acumula cargos
   const ana = mkProfile(
     'Ana Xote',
     [
@@ -141,6 +147,7 @@ function seed(): DB {
     ],
     '11 98888-0003',
     20,
+    ['Presidência', 'Professor(a)'],
   )
   const pedro = mkProfile(
     'Pedro Baião',
@@ -198,6 +205,8 @@ function seed(): DB {
     { id: uuid(), nome: 'Intermediário' },
     { id: uuid(), nome: 'Avançado' },
   ]
+
+  const cargos: Cargo[] = CARGOS_PADRAO.map((nome) => ({ id: uuid(), nome }))
 
   const eventos: AgendaEvent[] = [
     {
@@ -292,6 +301,7 @@ function seed(): DB {
     events: eventos,
     alunos,
     turmas,
+    cargos,
   }
 }
 
@@ -307,7 +317,12 @@ export class DemoApi implements ForroApi {
       this.db = JSON.parse(raw) as DB
     } else {
       // Versões antigas do banco demo são descartadas
-      for (const k of ['fds-demo-db-v1', 'fds-demo-db-v2', 'fds-demo-db-v3']) {
+      for (const k of [
+        'fds-demo-db-v1',
+        'fds-demo-db-v2',
+        'fds-demo-db-v3',
+        'fds-demo-db-v4',
+      ]) {
         localStorage.removeItem(k)
       }
       this.db = seed()
@@ -397,6 +412,7 @@ export class DemoApi implements ForroApi {
         turma: m.turma,
         papel_danca: m.papel_danca,
       })),
+      cargos: [],
       telefone: telefone.trim(),
       criado_em: new Date().toISOString(),
     }
@@ -417,6 +433,7 @@ export class DemoApi implements ForroApi {
         turma: m.turma,
         papel_danca: m.papel_danca,
       })),
+      cargos: [],
       telefone: telefone.trim() || null,
       criado_em: new Date().toISOString(),
     }
@@ -863,6 +880,43 @@ export class DemoApi implements ForroApi {
   async deleteTurma(id: string) {
     this.db.turmas = this.db.turmas.filter((t) => t.id !== id)
     this.persist()
+  }
+
+  // ---- Cargos do projeto ----
+
+  async listCargos(): Promise<Cargo[]> {
+    return [...this.db.cargos]
+  }
+
+  async saveCargo(nome: string) {
+    const limpo = nome.trim()
+    if (!limpo) throw new Error('Nome do cargo vazio')
+    if (this.db.cargos.some((c) => c.nome.toLowerCase() === limpo.toLowerCase())) {
+      throw new Error('Esse cargo já existe')
+    }
+    this.db.cargos.push({ id: uuid(), nome: limpo })
+    this.persist()
+  }
+
+  async deleteCargo(id: string) {
+    this.db.cargos = this.db.cargos.filter((c) => c.id !== id)
+    this.persist()
+  }
+
+  async addCargoAluno(userId: string, cargo: string) {
+    const p = this.db.profiles.find((x) => x.id === userId)
+    if (!p) throw new Error('Aluno não encontrado')
+    if (!p.cargos.includes(cargo)) p.cargos = [...p.cargos, cargo]
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async removeCargoAluno(userId: string, cargo: string) {
+    const p = this.db.profiles.find((x) => x.id === userId)
+    if (!p) throw new Error('Aluno não encontrado')
+    p.cargos = p.cargos.filter((c) => c !== cargo)
+    this.persist()
+    this.notifyFeed()
   }
 
   // ---- Push ----

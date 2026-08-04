@@ -3,6 +3,7 @@ import type {
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Cargo,
   Challenge,
   ChallengeInput,
   Comment,
@@ -119,6 +120,14 @@ export interface ForroApi {
   listTurmas(): Promise<Turma[]>
   saveTurma(nome: string): Promise<void>
   deleteTurma(id: string): Promise<void>
+
+  // ---- Cargos do projeto ----
+  listCargos(): Promise<Cargo[]>
+  saveCargo(nome: string): Promise<void>
+  deleteCargo(id: string): Promise<void>
+  /** Dá um cargo a um aluno (organizador). */
+  addCargoAluno(userId: string, cargo: string): Promise<void>
+  removeCargoAluno(userId: string, cargo: string): Promise<void>
 
   // ---- Push (Fase 4) ----
   savePushSubscription(sub: PushSubscriptionJSON): Promise<void>

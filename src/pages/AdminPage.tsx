@@ -20,10 +20,12 @@ import {
 import {
   DIAS_SEMANA,
   PAPEIS_DANCA,
+  emojiCargo,
   type AgendaEvent,
   type AgendaEventInput,
   type AlunoCadastrado,
   type AttendanceRow,
+  type Cargo,
   type Challenge,
   type PapelDanca,
   type Profile,
@@ -275,11 +277,86 @@ function SecaoAgenda({ turmas }: { turmas: Turma[] }) {
   )
 }
 
+/** CRUD dos cargos do projeto (Presidência, Professor(a)…). */
+function SecaoCargos({
+  cargos,
+  onChanged,
+}: {
+  cargos: Cargo[]
+  onChanged: () => void
+}) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [novo, setNovo] = useState('')
+
+  const adicionar = async (e: FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.saveCargo(novo)
+      setNovo('')
+      onChanged()
+      toast('Cargo criado! 🎖️')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const remover = async (id: string) => {
+    try {
+      await api.deleteCargo(id)
+      onChanged()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        🎖️ Cargos do projeto
+      </h2>
+      <p className="text-xs text-stone-500">
+        Aparecem em destaque no perfil de quem ocupa. Ao trocar a gestão,
+        basta remover o cargo de uma pessoa e dar para outra.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {cargos.map((c) => (
+          <span
+            key={c.id}
+            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/15 px-3 py-1.5 text-xs font-bold text-brasa-300"
+          >
+            {emojiCargo(c.nome)} {c.nome}
+            <button
+              onClick={() => void remover(c.id)}
+              className="text-brasa-300/60 hover:text-red-400"
+              aria-label={`Remover cargo ${c.nome}`}
+            >
+              ✕
+            </button>
+          </span>
+        ))}
+      </div>
+      <form onSubmit={adicionar} className="flex gap-2">
+        <input
+          className="input"
+          placeholder='Novo cargo (ex.: "Diretor(a) de Eventos")'
+          value={novo}
+          onChange={(e) => setNovo(e.target.value)}
+          required
+        />
+        <button className="btn-ghost shrink-0">+ Criar</button>
+      </form>
+    </section>
+  )
+}
+
 function SecaoTurmas({
   turmas,
+  cargos,
   onTurmasChanged,
 }: {
   turmas: Turma[]
+  cargos: Cargo[]
   onTurmasChanged: () => void
 }) {
   const { api } = useAuth()
@@ -406,6 +483,26 @@ function SecaoTurmas({
   const removerTurmaAluno = async (userId: string, turma: string) => {
     try {
       await api.removeTurmaAluno(userId, turma)
+      await carregar()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const darCargo = async (userId: string, cargo: string) => {
+    if (!cargo) return
+    try {
+      await api.addCargoAluno(userId, cargo)
+      await carregar()
+      toast('Cargo atribuído! 🎖️')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const tirarCargo = async (userId: string, cargo: string) => {
+    try {
+      await api.removeCargoAluno(userId, cargo)
       await carregar()
     } catch (err) {
       toast((err as Error).message, 'erro')
@@ -620,10 +717,13 @@ function SecaoTurmas({
               key={p.id}
               perfil={p}
               turmas={turmas}
+              cargos={cargos}
               onAdd={(turma, papel) =>
                 void adicionarTurmaAluno(p.id, turma, papel)
               }
               onRemove={(turma) => void removerTurmaAluno(p.id, turma)}
+              onAddCargo={(cargo) => void darCargo(p.id, cargo)}
+              onRemoveCargo={(cargo) => void tirarCargo(p.id, cargo)}
             />
           ))}
         </div>
@@ -635,19 +735,28 @@ function SecaoTurmas({
 function LinhaAlunoApp({
   perfil,
   turmas,
+  cargos,
   onAdd,
   onRemove,
+  onAddCargo,
+  onRemoveCargo,
 }: {
   perfil: Profile
   turmas: Turma[]
+  cargos: Cargo[]
   onAdd: (turma: string, papel: PapelDanca | null) => void
   onRemove: (turma: string) => void
+  onAddCargo: (cargo: string) => void
+  onRemoveCargo: (cargo: string) => void
 }) {
   const [turma, setTurma] = useState('')
   const [papel, setPapel] = useState<PapelDanca | null>(null)
 
   const disponiveis = turmas.filter(
     (t) => !perfil.turmas.some((m) => m.turma === t.nome),
+  )
+  const cargosDisponiveis = cargos.filter(
+    (c) => !perfil.cargos.includes(c.nome),
   )
 
   return (
@@ -658,6 +767,43 @@ function LinhaAlunoApp({
           <p className="text-xs text-stone-500">{perfil.telefone}</p>
         )}
       </div>
+
+      {/* Cargos no projeto */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {perfil.cargos.map((c) => (
+          <span
+            key={c}
+            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/20 px-2.5 py-1 text-[11px] font-bold text-brasa-300"
+          >
+            {emojiCargo(c)} {c}
+            <button
+              onClick={() => onRemoveCargo(c)}
+              className="text-brasa-300/60 hover:text-red-400"
+              aria-label={`Tirar o cargo ${c} de ${perfil.nome}`}
+            >
+              ✕
+            </button>
+          </span>
+        ))}
+        {cargosDisponiveis.length > 0 && (
+          <select
+            className="input w-40 py-1 text-[11px]"
+            value=""
+            aria-label={`Dar cargo para ${perfil.nome}`}
+            onChange={(e) => {
+              if (e.target.value) onAddCargo(e.target.value)
+            }}
+          >
+            <option value="">+ Cargo…</option>
+            {cargosDisponiveis.map((c) => (
+              <option key={c.id} value={c.nome}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-1.5">
         {perfil.turmas.length === 0 && (
           <span className="text-xs text-stone-600">Sem turma</span>
@@ -732,6 +878,7 @@ export function AdminPage() {
   const toast = useToast()
 
   const [turmas, setTurmas] = useState<Turma[]>([])
+  const [cargos, setCargos] = useState<Cargo[]>([])
   const [mes, setMes] = useState(mesAtual())
   const [presencas, setPresencas] = useState<AttendanceRow[] | null>(null)
   const [desafios, setDesafios] = useState<Challenge[]>([])
@@ -739,6 +886,10 @@ export function AdminPage() {
 
   const carregarTurmas = useCallback(async () => {
     setTurmas(await api.listTurmas())
+  }, [api])
+
+  const carregarCargos = useCallback(async () => {
+    setCargos(await api.listCargos())
   }, [api])
 
   const carregarPresencas = useCallback(
@@ -756,6 +907,7 @@ export function AdminPage() {
       toast(`Falha ao carregar ${o}: ${(e as Error).message}`, 'erro')
     }
     void carregarTurmas().catch(falhou('turmas'))
+    void carregarCargos().catch(falhou('cargos'))
     void api.listChallenges().then(setDesafios).catch(falhou('desafios'))
     void api.listReports().then(setReports).catch(falhou('denúncias'))
     void carregarPresencas(mes).catch(falhou('frequência'))
@@ -813,7 +965,12 @@ export function AdminPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-extrabold">Painel do organizador 🛠️</h1>
 
-      <SecaoTurmas turmas={turmas} onTurmasChanged={() => void carregarTurmas()} />
+      <SecaoCargos cargos={cargos} onChanged={() => void carregarCargos()} />
+      <SecaoTurmas
+        turmas={turmas}
+        cargos={cargos}
+        onTurmasChanged={() => void carregarTurmas()}
+      />
       <SecaoAgenda turmas={turmas} />
 
       {/* Frequência */}

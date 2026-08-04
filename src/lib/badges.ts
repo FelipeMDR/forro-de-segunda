@@ -1,4 +1,5 @@
 import { challengePhase, diasDistintos, toISODate } from './dates'
+import { emojiCargo } from './types'
 import type {
   AgendaEvent,
   Badge,
@@ -24,6 +25,7 @@ const MARCOS_PRESENCA: Array<[number, string, string]> = [
 export function computeBadges(input: {
   userId: string
   turmas: TurmaMembro[]
+  cargos?: string[]
   checkinDates: Date[]
   /** Desafios já carregados (qualquer fase). */
   challenges: Challenge[]
@@ -32,6 +34,16 @@ export function computeBadges(input: {
   events: AgendaEvent[]
 }): Badge[] {
   const badges: Badge[] = []
+
+  // 0. Cargos no projeto — vêm primeiro, é o reconhecimento mais forte
+  for (const cargo of input.cargos ?? []) {
+    badges.push({
+      id: `cargo-${cargo}`,
+      emoji: emojiCargo(cargo),
+      titulo: cargo,
+      descricao: 'Cargo no Forró de Segunda',
+    })
+  }
 
   // 1. Turma e função na dança (ex.: "Condutor(a) · Avançado")
   for (const m of input.turmas) {

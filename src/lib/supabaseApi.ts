@@ -9,6 +9,7 @@ import type {
   AgendaEventInput,
   AlunoCadastrado,
   AttendanceRow,
+  Cargo,
   Challenge,
   ChallengeInput,
   Comment,
@@ -123,7 +124,7 @@ export class SupabaseApi implements ForroApi {
   // ---- Perfil ----
 
   private static PROFILE_SELECT =
-    '*, turmas:profile_turmas(turma, papel_danca)'
+    '*, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)'
 
   private mapProfile(data: Record<string, unknown>): Profile {
     return {
@@ -133,6 +134,9 @@ export class SupabaseApi implements ForroApi {
       telefone: (data.telefone as string) ?? null,
       criado_em: data.criado_em as string,
       turmas: (data.turmas as TurmaMembro[]) ?? [],
+      cargos: ((data.cargos as Array<{ cargo: string }>) ?? []).map(
+        (c) => c.cargo,
+      ),
     }
   }
 
@@ -143,6 +147,15 @@ export class SupabaseApi implements ForroApi {
       .select('turma, papel_danca')
       .eq('user_id', userId)
     return (data ?? []) as TurmaMembro[]
+  }
+
+  /** Cargos do aluno em consulta separada (plano B do embed). */
+  private async cargosDe(userId: string): Promise<string[]> {
+    const { data } = await this.sb
+      .from('profile_cargos')
+      .select('cargo')
+      .eq('user_id', userId)
+    return ((data ?? []) as Array<{ cargo: string }>).map((c) => c.cargo)
   }
 
   async getProfile(id: string): Promise<Profile | null> {
@@ -162,9 +175,14 @@ export class SupabaseApi implements ForroApi {
         .eq('id', id)
         .maybeSingle()
       if (simples) {
+        const [turmas, cargos] = await Promise.all([
+          this.turmasDe(id),
+          this.cargosDe(id),
+        ])
         return {
-          ...(simples as Omit<Profile, 'turmas'>),
-          turmas: await this.turmasDe(id),
+          ...(simples as Omit<Profile, 'turmas' | 'cargos'>),
+          turmas,
+          cargos,
         }
       }
     }
@@ -847,6 +865,43 @@ export class SupabaseApi implements ForroApi {
 
   async deleteTurma(id: string) {
     ok(await this.sb.from('turmas').delete().eq('id', id))
+  }
+
+  // ---- Cargos do projeto ----
+
+  async listCargos(): Promise<Cargo[]> {
+    const data = ok(
+      await this.sb.from('cargos').select('id, nome').order('ordem'),
+    )
+    return data as Cargo[]
+  }
+
+  async saveCargo(nome: string) {
+    const limpo = nome.trim()
+    if (!limpo) throw new Error('Nome do cargo vazio')
+    ok(await this.sb.from('cargos').insert({ nome: limpo }))
+  }
+
+  async deleteCargo(id: string) {
+    ok(await this.sb.from('cargos').delete().eq('id', id))
+  }
+
+  async addCargoAluno(userId: string, cargo: string) {
+    ok(
+      await this.sb
+        .from('profile_cargos')
+        .upsert({ user_id: userId, cargo }, { onConflict: 'user_id,cargo' }),
+    )
+  }
+
+  async removeCargoAluno(userId: string, cargo: string) {
+    ok(
+      await this.sb
+        .from('profile_cargos')
+        .delete()
+        .eq('user_id', userId)
+        .eq('cargo', cargo),
+    )
   }
 
   // ---- Push ----

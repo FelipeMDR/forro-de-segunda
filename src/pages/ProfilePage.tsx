@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '../components/Avatar'
-import { BadgeGrid, StatsRow, TurmaChips } from '../components/PerfilResumo'
+import {
+  BadgeGrid,
+  CargoChips,
+  StatsRow,
+  TurmaChips,
+} from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -27,7 +32,7 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!userId || !profile) return
-    void carregarPerfilStats(api, userId, profile.turmas)
+    void carregarPerfilStats(api, userId, profile.turmas, profile.cargos)
       .then((r) => {
         setStats(r.stats)
         setBadges(r.badges)
@@ -40,6 +45,7 @@ export function ProfilePage() {
           computeBadges({
             userId,
             turmas: profile.turmas,
+            cargos: profile.cargos,
             checkinDates: [],
             challenges: [],
             rankings: new Map(),
@@ -126,6 +132,7 @@ export function ProfilePage() {
         />
         <div className="text-center">
           <h1 className="text-xl font-extrabold">{profile.nome}</h1>
+          <CargoChips cargos={profile.cargos} />
           <TurmaChips turmas={profile.turmas} />
         </div>
 

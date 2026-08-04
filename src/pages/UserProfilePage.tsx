@@ -3,7 +3,12 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
-import { BadgeGrid, StatsRow, TurmaChips } from '../components/PerfilResumo'
+import {
+  BadgeGrid,
+  CargoChips,
+  StatsRow,
+  TurmaChips,
+} from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
@@ -36,7 +41,7 @@ export function UserProfilePage() {
         if (cancelado) return
         setPerfil(p)
         if (!p) return
-        const r = await carregarPerfilStats(api, id, p.turmas)
+        const r = await carregarPerfilStats(api, id, p.turmas, p.cargos)
         if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
@@ -83,6 +88,7 @@ export function UserProfilePage() {
         <Avatar nome={perfil.nome} url={perfil.avatar_url} tamanho={88} />
         <div className="text-center">
           <h1 className="text-xl font-extrabold">{perfil.nome}</h1>
+          <CargoChips cargos={perfil.cargos} />
           <TurmaChips turmas={perfil.turmas} />
         </div>
         <StatsRow stats={stats} />

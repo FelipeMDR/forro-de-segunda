@@ -128,6 +128,35 @@ insert into public.turmas (nome) values
   ('Iniciante 01'), ('Intermediário'), ('Avançado')
 on conflict (nome) do nothing;
 
+-- Cargos do projeto (Presidência, Diretorias, Professor(a)…), editáveis
+-- pela organização. `ordem` controla a exibição (hierarquia).
+create table if not exists public.cargos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique,
+  ordem int not null default 99,
+  criado_em timestamptz not null default now()
+);
+insert into public.cargos (nome, ordem) values
+  ('Presidência', 1),
+  ('Vice-Presidência', 2),
+  ('Diretor(a) de Ensino', 3),
+  ('Diretor(a) de RH', 4),
+  ('Diretor(a) de Comunicação', 5),
+  ('Diretor(a) de Recursos', 6),
+  ('Professor(a)', 7),
+  ('Monitor(a)', 8),
+  ('Membro de RH', 9),
+  ('Membro de Comunicação', 10),
+  ('Membro de Recursos', 11)
+on conflict (nome) do nothing;
+
+-- Cargos de cada pessoa (uma pessoa pode acumular mais de um)
+create table if not exists public.profile_cargos (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  cargo text not null,
+  primary key (user_id, cargo)
+);
+
 -- Assinaturas de push (Fase 4)
 create table if not exists public.push_subscriptions (
   endpoint text primary key,
@@ -289,6 +318,8 @@ alter table public.reports enable row level security;
 alter table public.events enable row level security;
 alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
+alter table public.cargos enable row level security;
+alter table public.profile_cargos enable row level security;
 alter table public.push_subscriptions enable row level security;
 
 -- profiles: todos os logados leem; dono ou organizador editam
@@ -393,6 +424,23 @@ create policy "alunos_all" on public.alunos_cadastrados
 create policy "turmas_select" on public.turmas
   for select to authenticated using (true);
 create policy "turmas_write" on public.turmas
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- cargos: todos leem (aparecem nos perfis); organizador gerencia
+create policy "cargos_select" on public.cargos
+  for select to authenticated using (true);
+create policy "cargos_write" on public.cargos
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- profile_cargos: todos leem; só organizador atribui — é o que
+-- impede alguém de se autodeclarar Presidência
+create policy "profile_cargos_select" on public.profile_cargos
+  for select to authenticated using (true);
+create policy "profile_cargos_write" on public.profile_cargos
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());
