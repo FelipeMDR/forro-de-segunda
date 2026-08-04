@@ -128,6 +128,25 @@ export interface AgendaEventInput {
 }
 
 /**
+ * Feriado ou cancelamento pontual: suspende a(s) aula(s) recorrente(s)
+ * numa data específica (ex.: feriado nacional, professor ausente).
+ * `turma: null` cancela a aula de TODAS as turmas nesse dia; com uma
+ * turma definida, cancela só a aula daquela turma.
+ */
+export interface Feriado {
+  id: string
+  data: string // "YYYY-MM-DD"
+  motivo: string | null
+  turma: string | null
+}
+
+export interface FeriadoInput {
+  data: string
+  motivo: string
+  turma: string | null
+}
+
+/**
  * Linha da lista de chamada: telefone → turma (+ papel na dança).
  * O mesmo telefone pode aparecer em várias linhas (uma por turma).
  */

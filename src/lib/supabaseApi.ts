@@ -14,6 +14,8 @@ import type {
   ChallengeInput,
   Comment,
   FeedItem,
+  Feriado,
+  FeriadoInput,
   Papel,
   PapelDanca,
   Profile,
@@ -709,6 +711,32 @@ export class SupabaseApi implements ForroApi {
 
   async deleteEvent(id: string) {
     ok(await this.sb.from('events').delete().eq('id', id))
+  }
+
+  async listFeriados(): Promise<Feriado[]> {
+    const data = ok(
+      await this.sb.from('feriados').select('*').order('data'),
+    ) as unknown as Array<Record<string, unknown>>
+    return data.map((f) => ({
+      id: f.id as string,
+      data: f.data as string,
+      motivo: (f.motivo as string) ?? null,
+      turma: (f.turma as string) ?? null,
+    }))
+  }
+
+  async saveFeriado(f: FeriadoInput) {
+    ok(
+      await this.sb.from('feriados').insert({
+        data: f.data,
+        motivo: f.motivo.trim() || null,
+        turma: f.turma,
+      }),
+    )
+  }
+
+  async deleteFeriado(id: string) {
+    ok(await this.sb.from('feriados').delete().eq('id', id))
   }
 
   // ---- Organizador ----

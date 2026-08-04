@@ -1,5 +1,5 @@
 import type { ForroApi } from './api'
-import { addDays, pontosNoDesafio, toISODate } from './dates'
+import { addDays, pontosNoDesafio, proximaOcorrencia, toISODate } from './dates'
 import { blobToDataURL } from './image'
 import { normalizeTelefone, telefonesIguais } from './phone'
 import { CARGOS_PADRAO, turmaLabel } from './types'
@@ -13,6 +13,8 @@ import type {
   ChallengeInput,
   Comment,
   FeedItem,
+  Feriado,
+  FeriadoInput,
   Papel,
   PapelDanca,
   Profile,
@@ -72,12 +74,13 @@ interface DB {
     resolvido: boolean
   }[]
   events: AgendaEvent[]
+  feriados: Feriado[]
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
 }
 
-const DB_KEY = 'fds-demo-db-v5'
+const DB_KEY = 'fds-demo-db-v6'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -234,6 +237,20 @@ function seed(): DB {
     { id: uuid(), titulo: 'Aula — Avançado', descricao: null, turma: 'Avançado', dia_semana: 4, data: null, hora: '20:00' },
   ]
 
+  // Feriado de exemplo: cancela a PRÓXIMA aula de segunda (Iniciante 01)
+  // para todas as turmas — mostra como a agenda avisa o cancelamento.
+  const proximaSegunda = proximaOcorrencia(eventos[2], now)
+  const feriados: Feriado[] = proximaSegunda
+    ? [
+        {
+          id: uuid(),
+          data: toISODate(proximaSegunda),
+          motivo: 'Feriado nacional (exemplo)',
+          turma: null,
+        },
+      ]
+    : []
+
   const alunos: AlunoCadastrado[] = [
     { id: uuid(), nome: 'Maria Bonita', telefone: '11 98888-0001', turma: 'Intermediário', papel_danca: 'Conduzido(a)' },
     { id: uuid(), nome: 'João do Acordeon', telefone: '11 98888-0002', turma: 'Iniciante 01', papel_danca: 'Condutor(a)' },
@@ -299,6 +316,7 @@ function seed(): DB {
     })),
     reports: [],
     events: eventos,
+    feriados,
     alunos,
     turmas,
     cargos,
@@ -322,6 +340,7 @@ export class DemoApi implements ForroApi {
         'fds-demo-db-v2',
         'fds-demo-db-v3',
         'fds-demo-db-v4',
+        'fds-demo-db-v5',
       ]) {
         localStorage.removeItem(k)
       }
@@ -723,6 +742,25 @@ export class DemoApi implements ForroApi {
 
   async deleteEvent(id: string) {
     this.db.events = this.db.events.filter((e) => e.id !== id)
+    this.persist()
+  }
+
+  async listFeriados(): Promise<Feriado[]> {
+    return [...this.db.feriados].sort((a, b) => a.data.localeCompare(b.data))
+  }
+
+  async saveFeriado(f: FeriadoInput) {
+    this.db.feriados.push({
+      id: uuid(),
+      data: f.data,
+      motivo: f.motivo.trim() || null,
+      turma: f.turma,
+    })
+    this.persist()
+  }
+
+  async deleteFeriado(id: string) {
+    this.db.feriados = this.db.feriados.filter((f) => f.id !== id)
     this.persist()
   }
 

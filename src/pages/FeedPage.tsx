@@ -9,47 +9,57 @@ import { useAuth } from '../context/AuthContext'
 import {
   desafiosQueContam,
   formatDateLong,
-  proximaOcorrencia,
+  proximasOcorrenciasAgenda,
   toISODate,
+  type OcorrenciaAgenda,
 } from '../lib/dates'
-import type { AgendaEvent, Challenge, FeedItem } from '../lib/types'
+import type { AgendaEvent, Challenge, Feriado, FeedItem } from '../lib/types'
 
-interface Ocorrencia {
-  evento: AgendaEvent
-  quando: Date
-}
-
-function AgendaCard({ eventos }: { eventos: Ocorrencia[] }) {
-  if (eventos.length === 0) return null
+function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
+  if (ocorrencias.length === 0) return null
   const hoje = toISODate(new Date())
   return (
     <div className="card space-y-2.5 p-4">
       <h2 className="text-xs font-bold uppercase tracking-wide text-stone-500">
         📅 Agenda
       </h2>
-      {eventos.map(({ evento, quando }) => {
+      {ocorrencias.map(({ evento, quando, cancelada, motivoCancelamento }, i) => {
         const ehHoje = toISODate(quando) === hoje
         return (
-          <div key={evento.id} className="flex items-center gap-3">
-            <span className="text-xl">{evento.data ? '🎉' : '🎓'}</span>
+          <div key={`${evento.id}-${i}`} className="flex items-center gap-3">
+            <span className="text-xl">
+              {cancelada ? '🚫' : evento.data ? '🎉' : '🎓'}
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">
+              <p
+                className={`truncate text-sm font-bold ${
+                  cancelada ? 'text-stone-500 line-through' : ''
+                }`}
+              >
                 {evento.titulo}
                 {evento.turma && (
-                  <span className="ml-1.5 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-stone-400">
+                  <span className="ml-1.5 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-stone-400 no-underline">
                     {evento.turma}
                   </span>
                 )}
               </p>
-              <p className="text-xs text-stone-500">
-                {ehHoje ? (
-                  <strong className="text-brasa-400">Hoje</strong>
-                ) : (
-                  formatDateLong(quando)
-                )}
-                {evento.hora && ` · ${evento.hora}`}
-                {evento.descricao && ` — ${evento.descricao}`}
-              </p>
+              {cancelada ? (
+                <p className="text-xs text-red-400">
+                  Cancelada{motivoCancelamento ? ` — ${motivoCancelamento}` : ''}
+                  {' · seria '}
+                  {ehHoje ? 'hoje' : formatDateLong(quando)}
+                </p>
+              ) : (
+                <p className="text-xs text-stone-500">
+                  {ehHoje ? (
+                    <strong className="text-brasa-400">Hoje</strong>
+                  ) : (
+                    formatDateLong(quando)
+                  )}
+                  {evento.hora && ` · ${evento.hora}`}
+                  {evento.descricao && ` — ${evento.descricao}`}
+                </p>
+              )}
             </div>
           </div>
         )
@@ -63,6 +73,7 @@ export function FeedPage() {
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
   const [desafios, setDesafios] = useState<Challenge[]>([])
   const [eventos, setEventos] = useState<AgendaEvent[]>([])
+  const [feriados, setFeriados] = useState<Feriado[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -73,12 +84,14 @@ export function FeedPage() {
       setErro(null)
       const f = await api.getFeed()
       setFeed(f)
-      const [d, e] = await Promise.all([
+      const [d, e, fer] = await Promise.all([
         api.listChallenges().catch(() => [] as Challenge[]),
         api.listEvents().catch(() => [] as AgendaEvent[]),
+        api.listFeriados().catch(() => [] as Feriado[]),
       ])
       setDesafios(d)
       setEventos(e)
+      setFeriados(fer)
     } catch (e) {
       console.error('[feed] falha ao carregar', e)
       setErro((e as Error).message || 'Erro desconhecido')
@@ -101,22 +114,22 @@ export function FeedPage() {
     }
   }, [api, carregar])
 
-  // Próximos compromissos relevantes pra mim (qualquer turma minha, ou todos)
-  const agenda = useMemo<Ocorrencia[]>(() => {
+  // Próximos compromissos relevantes pra mim (qualquer turma minha, ou
+  // todos), já considerando feriados/cancelamentos: se a próxima aula
+  // cair num feriado, mostra "Cancelada" + quando é a próxima válida.
+  const agenda = useMemo<OcorrenciaAgenda[]>(() => {
     const agora = new Date()
     const minhasTurmas = new Set(profile?.turmas.map((m) => m.turma) ?? [])
-    return eventos
-      .filter((e) => !e.turma || minhasTurmas.has(e.turma))
-      .map((evento) => ({ evento, quando: proximaOcorrencia(evento, agora) }))
-      .filter((o): o is Ocorrencia => o.quando !== null)
-      .sort((a, b) => a.quando.getTime() - b.quando.getTime())
-      .slice(0, 4)
-  }, [eventos, profile])
+    const relevantes = eventos.filter(
+      (e) => !e.turma || minhasTurmas.has(e.turma),
+    )
+    return proximasOcorrenciasAgenda(relevantes, feriados, agora).slice(0, 4)
+  }, [eventos, feriados, profile])
 
   return (
     <div className="space-y-4">
       <InstallPrompt />
-      <AgendaCard eventos={agenda} />
+      <AgendaCard ocorrencias={agenda} />
 
       {erro ? (
         <ErrorState

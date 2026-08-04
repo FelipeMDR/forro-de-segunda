@@ -8,6 +8,8 @@ import type {
   ChallengeInput,
   Comment,
   FeedItem,
+  Feriado,
+  FeriadoInput,
   Papel,
   PapelDanca,
   Profile,
@@ -81,6 +83,13 @@ export interface ForroApi {
   listEvents(): Promise<AgendaEvent[]>
   saveEvent(e: AgendaEventInput): Promise<void>
   deleteEvent(id: string): Promise<void>
+  /**
+   * Feriados/cancelamentos: suspendem a(s) aula(s) recorrente(s) numa
+   * data específica (ex.: feriado nacional, professor ausente).
+   */
+  listFeriados(): Promise<Feriado[]>
+  saveFeriado(f: FeriadoInput): Promise<void>
+  deleteFeriado(id: string): Promise<void>
 
   // ---- Organizador ----
   getAttendance(inicioISO: string, fimISO: string): Promise<AttendanceRow[]>

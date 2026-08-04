@@ -16,6 +16,7 @@ import {
   formatDate,
   formatRelative,
   janelaDoCheckin,
+  ocorrenciasEvento,
   toISODate,
 } from '../lib/dates'
 import {
@@ -28,6 +29,8 @@ import {
   type AttendanceRow,
   type Cargo,
   type Challenge,
+  type Feriado,
+  type FeriadoInput,
   type PapelDanca,
   type Profile,
   type Report,
@@ -54,7 +57,13 @@ const EVENTO_VAZIO: AgendaEventInput & { recorrencia: 'semanal' | 'data' } = {
   recorrencia: 'semanal',
 }
 
-function SecaoAgenda({ turmas }: { turmas: Turma[] }) {
+function SecaoAgenda({
+  turmas,
+  feriados,
+}: {
+  turmas: Turma[]
+  feriados: Feriado[]
+}) {
   const { api } = useAuth()
   const toast = useToast()
   const [eventos, setEventos] = useState<AgendaEvent[] | null>(null)
@@ -250,23 +259,199 @@ function SecaoAgenda({ turmas }: { turmas: Turma[] }) {
         <p className="text-sm text-stone-500">Nenhum evento na agenda ainda.</p>
       ) : (
         <div className="divide-y divide-white/5">
-          {eventos.map((e) => (
-            <div key={e.id} className="flex items-center gap-3 py-2.5">
-              <span className="text-lg">{e.data ? '🎉' : '🎓'}</span>
+          {eventos.map((e) => {
+            const proxima = ocorrenciasEvento(e, feriados, new Date(), 1)[0]
+            return (
+              <div key={e.id} className="flex items-center gap-3 py-2.5">
+                <span className="text-lg">
+                  {proxima?.cancelada ? '🚫' : e.data ? '🎉' : '🎓'}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{e.titulo}</p>
+                  <p className="text-xs text-stone-500">
+                    {e.data
+                      ? formatDate(e.data)
+                      : `Toda ${DIAS_SEMANA[e.dia_semana ?? 0].toLowerCase()}`}
+                    {e.hora && ` · ${e.hora}`} ·{' '}
+                    {e.turma ? `turma ${e.turma}` : 'todas as turmas'}
+                  </p>
+                  {proxima?.cancelada && (
+                    <p className="text-xs font-bold text-red-400">
+                      🚫 Próxima ocorrência cancelada
+                      {proxima.motivoCancelamento
+                        ? ` — ${proxima.motivoCancelamento}`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => void excluir(e.id)}
+                  className="p-1.5 text-stone-600 hover:text-red-400"
+                  aria-label={`Remover ${e.titulo}`}
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const FERIADO_VAZIO: FeriadoInput = {
+  data: '',
+  motivo: '',
+  turma: null,
+}
+
+/**
+ * Feriados/cancelamentos: suspendem a(s) aula(s) recorrente(s) numa
+ * data específica sem precisar apagar e recriar o evento da agenda.
+ */
+function SecaoFeriados({
+  feriados,
+  turmas,
+  onChanged,
+}: {
+  feriados: Feriado[]
+  turmas: Turma[]
+  onChanged: () => void
+}) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [aberto, setAberto] = useState(false)
+  const [form, setForm] = useState<FeriadoInput>({ ...FERIADO_VAZIO })
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault()
+    setSalvando(true)
+    try {
+      await api.saveFeriado(form)
+      toast('Cancelamento adicionado! Os alunos já veem na agenda. 🚫')
+      setForm({ ...FERIADO_VAZIO })
+      setAberto(false)
+      onChanged()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const excluir = async (id: string) => {
+    try {
+      await api.deleteFeriado(id)
+      onChanged()
+      toast('Cancelamento removido — a aula volta a valer')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const hoje = toISODate(new Date())
+
+  return (
+    <section className="card space-y-3 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          🚫 Feriados e cancelamentos
+        </h2>
+        <button
+          className="btn-ghost px-3 py-1.5 text-xs"
+          onClick={() => setAberto((v) => !v)}
+        >
+          {aberto ? 'Fechar' : '+ Novo'}
+        </button>
+      </div>
+      <p className="text-xs text-stone-500">
+        Cancela a aula recorrente daquele dia sem precisar apagar o evento da
+        agenda. Os alunos veem "Cancelada" no lugar da aula normal, com o
+        motivo e quando ela volta.
+      </p>
+
+      {aberto && (
+        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-noite-950 p-4">
+          <div>
+            <label className="label" htmlFor="fer-data">
+              Data
+            </label>
+            <input
+              id="fer-data"
+              type="date"
+              className="input"
+              value={form.data}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="fer-motivo">
+              Motivo (opcional, mas ajuda o aluno a entender)
+            </label>
+            <input
+              id="fer-motivo"
+              className="input"
+              placeholder='Ex.: "Feriado nacional" ou "Professor(a) viajando"'
+              value={form.motivo}
+              onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="fer-turma">
+              Cancela para
+            </label>
+            <select
+              id="fer-turma"
+              className="input"
+              value={form.turma ?? ''}
+              onChange={(e) =>
+                setForm({ ...form, turma: e.target.value || null })
+              }
+            >
+              <option value="">Todas as turmas</option>
+              {turmas.map((t) => (
+                <option key={t.id} value={t.nome}>
+                  Só a turma {t.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn-primary w-full" disabled={salvando}>
+            Cancelar aula(s) nessa data
+          </button>
+        </form>
+      )}
+
+      {feriados.length === 0 ? (
+        <p className="text-sm text-stone-500">
+          Nenhum feriado ou cancelamento cadastrado.
+        </p>
+      ) : (
+        <div className="divide-y divide-white/5">
+          {feriados.map((f) => (
+            <div key={f.id} className="flex items-center gap-3 py-2.5">
+              <span className="text-lg">🚫</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{e.titulo}</p>
+                <p className="truncate text-sm font-bold">
+                  {formatDate(f.data)}
+                  {f.data < hoje && (
+                    <span className="ml-1.5 text-[10px] font-normal text-stone-600">
+                      (passado)
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-stone-500">
-                  {e.data
-                    ? formatDate(e.data)
-                    : `Toda ${DIAS_SEMANA[e.dia_semana ?? 0].toLowerCase()}`}
-                  {e.hora && ` · ${e.hora}`} ·{' '}
-                  {e.turma ? `turma ${e.turma}` : 'todas as turmas'}
+                  {f.motivo || 'Sem motivo informado'} ·{' '}
+                  {f.turma ? `só turma ${f.turma}` : 'todas as turmas'}
                 </p>
               </div>
               <button
-                onClick={() => void excluir(e.id)}
+                onClick={() => void excluir(f.id)}
                 className="p-1.5 text-stone-600 hover:text-red-400"
-                aria-label={`Remover ${e.titulo}`}
+                aria-label={`Remover cancelamento de ${formatDate(f.data)}`}
               >
                 ✕
               </button>
@@ -928,6 +1113,7 @@ export function AdminPage() {
 
   const [turmas, setTurmas] = useState<Turma[]>([])
   const [cargos, setCargos] = useState<Cargo[]>([])
+  const [feriados, setFeriados] = useState<Feriado[]>([])
   const [mes, setMes] = useState(mesAtual())
   const [presencas, setPresencas] = useState<AttendanceRow[] | null>(null)
   const [desafios, setDesafios] = useState<Challenge[]>([])
@@ -939,6 +1125,10 @@ export function AdminPage() {
 
   const carregarCargos = useCallback(async () => {
     setCargos(await api.listCargos())
+  }, [api])
+
+  const carregarFeriados = useCallback(async () => {
+    setFeriados(await api.listFeriados())
   }, [api])
 
   const carregarPresencas = useCallback(
@@ -957,6 +1147,7 @@ export function AdminPage() {
     }
     void carregarTurmas().catch(falhou('turmas'))
     void carregarCargos().catch(falhou('cargos'))
+    void carregarFeriados().catch(falhou('feriados'))
     void api.listChallenges().then(setDesafios).catch(falhou('desafios'))
     void api.listReports().then(setReports).catch(falhou('denúncias'))
     void carregarPresencas(mes).catch(falhou('frequência'))
@@ -1029,7 +1220,12 @@ export function AdminPage() {
         cargos={cargos}
         onTurmasChanged={() => void carregarTurmas()}
       />
-      <SecaoAgenda turmas={turmas} />
+      <SecaoAgenda turmas={turmas} feriados={feriados} />
+      <SecaoFeriados
+        feriados={feriados}
+        turmas={turmas}
+        onChanged={() => void carregarFeriados()}
+      />
 
       {/* Frequência */}
       <section className="card space-y-4 p-5">

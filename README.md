@@ -43,6 +43,10 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   (dias da semana + horário) é definida **por desafio** pela organização
 - **Agenda** — a organização cadastra eventos (ex.: Forró na Rep) e as aulas
   semanais de cada turma; o aluno vê na tela inicial só o que é da turma dele
+- **Feriados e cancelamentos** — a organização cancela a aula recorrente de
+  uma data específica (feriado, professor ausente etc.) sem apagar o evento;
+  o aluno vê "Cancelada" no lugar da aula, com o motivo e quando ela volta.
+  Pode cancelar só uma turma ou todas de uma vez
 - **Painel do organizador** — agenda, lista de chamada (telefone → turma),
   turmas dos alunos, frequência mensal com CSV, **resultado do desafio em
   CSV** e moderação de denúncias

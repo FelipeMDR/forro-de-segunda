@@ -103,6 +103,18 @@ create table if not exists public.events (
   check (dia_semana is not null or data is not null)
 );
 
+-- Feriados/cancelamentos: suspendem a(s) aula(s) recorrente(s) numa
+-- data específica (ex.: feriado nacional, professor ausente).
+-- turma = null → cancela a aula de TODAS as turmas nesse dia;
+-- com turma definida, cancela só a aula daquela turma.
+create table if not exists public.feriados (
+  id uuid primary key default gen_random_uuid(),
+  data date not null,
+  motivo text,
+  turma text,
+  criado_em timestamptz not null default now()
+);
+
 -- Lista de chamada: telefone → turma. É ela que LIBERA o cadastro:
 -- o aluno só cria conta se o telefone estiver aqui, e já entra com
 -- nome e turma preenchidos.
@@ -316,6 +328,7 @@ alter table public.reactions enable row level security;
 alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.events enable row level security;
+alter table public.feriados enable row level security;
 alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
 alter table public.cargos enable row level security;
@@ -409,6 +422,14 @@ create policy "reports_update" on public.reports
 create policy "events_select" on public.events
   for select to authenticated using (true);
 create policy "events_write" on public.events
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- feriados (cancelamentos): todos leem; organizador gerencia
+create policy "feriados_select" on public.feriados
+  for select to authenticated using (true);
+create policy "feriados_write" on public.feriados
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());

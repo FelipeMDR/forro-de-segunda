@@ -1,4 +1,4 @@
-import type { AgendaEvent, Challenge } from './types'
+import type { AgendaEvent, Challenge, Feriado } from './types'
 
 export function addDays(d: Date, n: number): Date {
   const r = new Date(d)
@@ -140,6 +140,101 @@ export function proximaOcorrencia(
   let diff = (e.dia_semana - now.getDay() + 7) % 7
   if (diff === 0 && d.getTime() < now.getTime()) diff = 7
   return addDays(d, diff)
+}
+
+function feriadoQueAfeta(
+  eventoTurma: string | null,
+  dataISO: string,
+  feriados: Feriado[],
+): Feriado | null {
+  return (
+    feriados.find(
+      (f) =>
+        f.data === dataISO && (f.turma === null || f.turma === eventoTurma),
+    ) ?? null
+  )
+}
+
+export interface OcorrenciaAgenda {
+  evento: AgendaEvent
+  quando: Date
+  cancelada: boolean
+  motivoCancelamento: string | null
+}
+
+/**
+ * Próximas ocorrências de um evento (até `quantidade`), marcando quais
+ * caem num feriado/cancelamento. Eventos recorrentes avançam semana a
+ * semana; eventos de data única têm no máximo uma ocorrência.
+ */
+export function ocorrenciasEvento(
+  evento: AgendaEvent,
+  feriados: Feriado[],
+  now: Date,
+  quantidade = 3,
+): OcorrenciaAgenda[] {
+  if (evento.data) {
+    const quando = proximaOcorrencia(evento, now)
+    if (!quando) return []
+    const feriado = feriadoQueAfeta(evento.turma, evento.data, feriados)
+    return [
+      {
+        evento,
+        quando,
+        cancelada: feriado !== null,
+        motivoCancelamento: feriado?.motivo ?? null,
+      },
+    ]
+  }
+  if (evento.dia_semana === null) return []
+
+  const hora = evento.hora ?? '00:00'
+  const [h, m] = hora.split(':').map(Number)
+  let cursor = new Date(now)
+  cursor.setHours(h || 0, m || 0, 0, 0)
+  let diff = (evento.dia_semana - now.getDay() + 7) % 7
+  if (diff === 0 && cursor.getTime() < now.getTime()) diff = 7
+  cursor = addDays(cursor, diff)
+
+  const resultado: OcorrenciaAgenda[] = []
+  for (let i = 0; i < quantidade; i++) {
+    const dataISO = toISODate(cursor)
+    const feriado = feriadoQueAfeta(evento.turma, dataISO, feriados)
+    resultado.push({
+      evento,
+      quando: new Date(cursor),
+      cancelada: feriado !== null,
+      motivoCancelamento: feriado?.motivo ?? null,
+    })
+    cursor = addDays(cursor, 7)
+  }
+  return resultado
+}
+
+/**
+ * Agenda pronta para exibir: para cada evento relevante, mostra a
+ * próxima ocorrência — e, se ela estiver cancelada (feriado), mostra
+ * junto a próxima ocorrência válida, para o aluno saber quando a aula
+ * volta em vez de só sumir da agenda sem explicação.
+ */
+export function proximasOcorrenciasAgenda(
+  eventos: AgendaEvent[],
+  feriados: Feriado[],
+  now = new Date(),
+): OcorrenciaAgenda[] {
+  const resultado: OcorrenciaAgenda[] = []
+  for (const evento of eventos) {
+    const ocorrencias = ocorrenciasEvento(evento, feriados, now, 4)
+    if (ocorrencias.length === 0) continue
+    if (ocorrencias[0].cancelada) {
+      resultado.push(ocorrencias[0])
+      const proximaValida = ocorrencias.find((o) => !o.cancelada)
+      if (proximaValida) resultado.push(proximaValida)
+    } else {
+      resultado.push(ocorrencias[0])
+    }
+  }
+  return resultado.sort((a, b) => a.quando.getTime() - b.quando.getTime())
 }
 
 const rtf = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' })
