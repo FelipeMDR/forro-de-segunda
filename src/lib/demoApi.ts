@@ -81,7 +81,8 @@ interface DB {
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
-  distintivos: DistintivoDef[]
+  /** A contagem de recebedores é derivada em listDistintivos(). */
+  distintivos: Omit<DistintivoDef, 'concedidos'>[]
   distintivosConcedidos: {
     distintivo_id: string
     user_id: string
@@ -225,19 +226,20 @@ function seed(): DB {
 
   // Distintivos personalizados de exemplo: um já concedido, outro
   // ainda sem ninguém (pra mostrar o fluxo de entregar pelo painel)
-  const distintivoAlma: DistintivoDef = {
+  type DistintivoRow = Omit<DistintivoDef, 'concedidos'>
+  const distintivoAlma: DistintivoRow = {
     id: uuid(),
     emoji: '🌟',
     titulo: 'Alma do Forró',
     descricao: 'Contagia a turma com energia boa toda aula',
   }
-  const distintivoPadrinho: DistintivoDef = {
+  const distintivoPadrinho: DistintivoRow = {
     id: uuid(),
     emoji: '🤝',
     titulo: 'Padrinho(a) de calouro',
     descricao: 'Ajudou alguém novo a se sentir em casa',
   }
-  const distintivos: DistintivoDef[] = [distintivoAlma, distintivoPadrinho]
+  const distintivos: DistintivoRow[] = [distintivoAlma, distintivoPadrinho]
   const distintivosConcedidos = [
     {
       distintivo_id: distintivoAlma.id,
@@ -996,7 +998,12 @@ export class DemoApi implements ForroApi {
   // ---- Distintivos personalizados ----
 
   async listDistintivos(): Promise<DistintivoDef[]> {
-    return [...this.db.distintivos]
+    return this.db.distintivos.map((d) => ({
+      ...d,
+      concedidos: this.db.distintivosConcedidos.filter(
+        (c) => c.distintivo_id === d.id,
+      ).length,
+    }))
   }
 
   async saveDistintivo(d: DistintivoDefInput) {

@@ -59,6 +59,9 @@ function horaCurta(v: unknown): string {
   return String(v ?? '00:00').slice(0, 5)
 }
 
+/** Distintivo sem a contagem de recebedores (embed simples). */
+type DistintivoBasico = Omit<DistintivoDef, 'concedidos'>
+
 export class SupabaseApi implements ForroApi {
   readonly mode = 'supabase' as const
   private sb: SupabaseClient
@@ -995,10 +998,19 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('distintivos')
-        .select('id, emoji, titulo, descricao')
+        .select(
+          'id, emoji, titulo, descricao, concedidos:distintivos_concedidos(count)',
+        )
         .order('criado_em'),
-    )
-    return data as DistintivoDef[]
+    ) as unknown as Array<Record<string, unknown>>
+    return data.map((d) => ({
+      id: d.id as string,
+      emoji: d.emoji as string,
+      titulo: d.titulo as string,
+      descricao: (d.descricao as string) ?? '',
+      concedidos:
+        (d.concedidos as Array<{ count: number }>)?.[0]?.count ?? 0,
+    }))
   }
 
   async saveDistintivo(d: DistintivoDefInput) {
@@ -1065,9 +1077,9 @@ export class SupabaseApi implements ForroApi {
         .from('distintivos_concedidos')
         .select('distintivo:distintivos(id, emoji, titulo, descricao)')
         .eq('user_id', userId),
-    ) as unknown as Array<{ distintivo: DistintivoDef | null }>
+    ) as unknown as Array<{ distintivo: DistintivoBasico | null }>
     return data
-      .filter((r): r is { distintivo: DistintivoDef } => r.distintivo !== null)
+      .filter((r): r is { distintivo: DistintivoBasico } => r.distintivo !== null)
       .map((r) => ({
         id: `custom-${r.distintivo.id}`,
         emoji: r.distintivo.emoji,

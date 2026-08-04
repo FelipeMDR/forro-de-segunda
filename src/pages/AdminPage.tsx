@@ -568,7 +568,13 @@ const OPCOES_TOP_N = [1, 3, 5, 10] as const
  * motivo, não só vencer um desafio. Toque num distintivo do catálogo
  * pra abrir o painel de entrega dele.
  */
-function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
+function SecaoDistintivos({
+  desafios,
+  turmas,
+}: {
+  desafios: Challenge[]
+  turmas: Turma[]
+}) {
   const { api } = useAuth()
   const toast = useToast()
   const [distintivos, setDistintivos] = useState<DistintivoDef[] | null>(null)
@@ -577,6 +583,7 @@ function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
   const [form, setForm] = useState<DistintivoDefInput>({ ...DISTINTIVO_VAZIO })
   const [salvando, setSalvando] = useState(false)
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
 
   const carregar = useCallback(async () => {
     setDistintivos(await api.listDistintivos())
@@ -615,11 +622,19 @@ function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
   }
 
   const selecionado = distintivos?.find((d) => d.id === selecionadoId) ?? null
+  const filtrados = (distintivos ?? []).filter((d) =>
+    combinaBusca(busca, [d.titulo, d.descricao]),
+  )
 
   return (
     <section className="card space-y-3 p-5">
       <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
-        🎖️ Distintivos personalizados
+        🎖️ Distintivos personalizados{' '}
+        {distintivos && distintivos.length > 0 && (
+          <span className="font-normal text-stone-600">
+            ({distintivos.length})
+          </span>
+        )}
       </h2>
       <p className="text-xs text-stone-500">
         Crie reconhecimentos e entregue pra quem você quiser, por qualquer
@@ -627,29 +642,64 @@ function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
         já recebeu ou entregar pra mais gente.
       </p>
 
+      {/* Com a lista crescendo a cada semestre, busca + contagem evitam
+          ter que caçar o distintivo certo no meio de dezenas */}
+      {distintivos && distintivos.length > 5 && (
+        <input
+          type="search"
+          className="input"
+          placeholder="🔎 Buscar distintivo…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+      )}
+
       {distintivos === null ? (
         <Spinner />
       ) : distintivos.length === 0 ? (
         <p className="text-sm text-stone-500">Nenhum distintivo criado ainda.</p>
+      ) : filtrados.length === 0 ? (
+        <p className="py-3 text-center text-sm text-stone-500">
+          Nenhum distintivo encontrado com "{busca}".
+        </p>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {distintivos.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() =>
-                setSelecionadoId(selecionadoId === d.id ? null : d.id)
-              }
-              aria-pressed={selecionadoId === d.id}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                selecionadoId === d.id
-                  ? 'bg-gradient-to-r from-brasa-400 to-brasa-600 text-white'
-                  : 'bg-white/5 text-stone-300'
-              }`}
-            >
-              {d.emoji} {d.titulo}
-            </button>
-          ))}
+        <div className="max-h-80 divide-y divide-white/5 overflow-y-auto rounded-xl bg-noite-950">
+          {filtrados.map((d) => {
+            const ativo = selecionadoId === d.id
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setSelecionadoId(ativo ? null : d.id)}
+                aria-pressed={ativo}
+                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
+                  ativo ? 'bg-brasa-500/15' : 'hover:bg-white/5'
+                }`}
+              >
+                <span className="shrink-0 text-xl">{d.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{d.titulo}</p>
+                  {d.descricao && (
+                    <p className="truncate text-[11px] text-stone-500">
+                      {d.descricao}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    d.concedidos > 0
+                      ? 'bg-brasa-500/20 text-brasa-300'
+                      : 'bg-white/5 text-stone-600'
+                  }`}
+                >
+                  {d.concedidos > 0 ? `${d.concedidos} 👤` : 'ninguém'}
+                </span>
+                <span className="shrink-0 text-stone-600">
+                  {ativo ? '▾' : '›'}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -698,7 +748,9 @@ function SecaoDistintivos({ desafios }: { desafios: Challenge[] }) {
           distintivo={selecionado}
           perfis={perfis}
           desafios={desafios}
+          turmas={turmas}
           onFechar={() => setSelecionadoId(null)}
+          onConcedido={() => void carregar()}
           onRemoverDefinicao={() => void remover(selecionado.id)}
         />
       )}
@@ -710,13 +762,18 @@ function PainelEntrega({
   distintivo,
   perfis,
   desafios,
+  turmas,
   onFechar,
+  onConcedido,
   onRemoverDefinicao,
 }: {
   distintivo: DistintivoDef
   perfis: Profile[]
   desafios: Challenge[]
+  turmas: Turma[]
   onFechar: () => void
+  /** Avisa a lista pra atualizar a contagem de recebedores. */
+  onConcedido: () => void
   onRemoverDefinicao: () => void
 }) {
   const { api } = useAuth()
@@ -727,6 +784,7 @@ function PainelEntrega({
   const [busca, setBusca] = useState('')
   const [desafioId, setDesafioId] = useState('')
   const [topN, setTopN] = useState<number>(3)
+  const [turmaEscolhida, setTurmaEscolhida] = useState('')
   const [entregando, setEntregando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
 
@@ -748,6 +806,7 @@ function PainelEntrega({
     try {
       await api.concederDistintivo(distintivo.id, userIds)
       await carregarRecebedores()
+      onConcedido()
       toast(msgSucesso)
     } catch (err) {
       toast((err as Error).message, 'erro')
@@ -760,9 +819,28 @@ function PainelEntrega({
     try {
       await api.revogarDistintivo(distintivo.id, userId)
       await carregarRecebedores()
+      onConcedido()
     } catch (err) {
       toast((err as Error).message, 'erro')
     }
+  }
+
+  // Alunos de uma turma — pra premiar quem se formou naquela turma
+  // no semestre de uma vez só
+  const alunosDaTurma = turmaEscolhida
+    ? perfis.filter((p) => p.turmas.some((t) => t.turma === turmaEscolhida))
+    : []
+  const novosDaTurma = alunosDaTurma.filter((p) => !jaTem(p.id))
+
+  const entregarTurma = async () => {
+    if (novosDaTurma.length === 0) return
+    await entregarPara(
+      novosDaTurma.map((p) => p.id),
+      `Turma ${turmaEscolhida}: ${novosDaTurma.length} ${
+        novosDaTurma.length === 1 ? 'aluno recebeu' : 'alunos receberam'
+      } o distintivo! 🎓`,
+    )
+    setTurmaEscolhida('')
   }
 
   const entregarTopN = async () => {
@@ -781,6 +859,7 @@ function PainelEntrega({
       }
       await api.concederDistintivo(distintivo.id, topUserIds)
       await carregarRecebedores()
+      onConcedido()
       toast(
         `Entregue para o top ${topUserIds.length} de "${desafio.titulo}"! 🏆`,
       )
@@ -815,6 +894,53 @@ function PainelEntrega({
           aria-label="Fechar painel de entrega"
         >
           ✕
+        </button>
+      </div>
+
+      {/* Entregar pra uma turma inteira (ex.: quem se formou no semestre) */}
+      <div className="space-y-2">
+        <span className="label">Entregar pra uma turma inteira</span>
+        <select
+          className="input"
+          value={turmaEscolhida}
+          onChange={(e) => setTurmaEscolhida(e.target.value)}
+        >
+          <option value="">Escolha a turma…</option>
+          {turmas.map((t) => (
+            <option key={t.id} value={t.nome}>
+              {t.nome}
+            </option>
+          ))}
+        </select>
+        {turmaEscolhida && (
+          <p className="text-xs text-stone-500">
+            {alunosDaTurma.length === 0 ? (
+              'Nenhum aluno com conta nessa turma ainda.'
+            ) : novosDaTurma.length === 0 ? (
+              alunosDaTurma.length === 1 ? (
+                'O único aluno dessa turma já recebeu.'
+              ) : (
+                `Todos os ${alunosDaTurma.length} já receberam.`
+              )
+            ) : (
+              <>
+                <strong className="text-stone-300">
+                  {novosDaTurma.length}
+                </strong>{' '}
+                de {alunosDaTurma.length} vão receber
+                {alunosDaTurma.length !== novosDaTurma.length &&
+                  ` (${alunosDaTurma.length - novosDaTurma.length} já tinham)`}
+              </>
+            )}
+          </p>
+        )}
+        <button
+          type="button"
+          className="btn-ghost w-full"
+          disabled={novosDaTurma.length === 0 || entregando}
+          onClick={() => void entregarTurma()}
+        >
+          Entregar pra turma toda 🎓
         </button>
       </div>
 
@@ -1678,7 +1804,9 @@ export function AdminPage() {
         </>
       )}
 
-      {aba === 'distintivos' && <SecaoDistintivos desafios={desafios} />}
+      {aba === 'distintivos' && (
+        <SecaoDistintivos desafios={desafios} turmas={turmas} />
+      )}
 
       {aba === 'frequencia' && (
       <section className="card space-y-4 p-5">

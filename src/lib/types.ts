@@ -191,6 +191,8 @@ export interface DistintivoDef {
   emoji: string
   titulo: string
   descricao: string
+  /** Quantas pessoas já receberam — ajuda a navegar quando há muitos. */
+  concedidos: number
 }
 
 export interface DistintivoDefInput {
