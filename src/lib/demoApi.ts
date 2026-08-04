@@ -2,7 +2,7 @@ import type { ForroApi } from './api'
 import { addDays, pontosNoDesafio, proximaOcorrencia, toISODate } from './dates'
 import { blobToDataURL } from './image'
 import { normalizeTelefone, telefonesIguais } from './phone'
-import { CARGOS_PADRAO, turmaLabel } from './types'
+import { CARGOS_PADRAO, LIMITE_FAVORITOS, turmaLabel } from './types'
 import type {
   AgendaEvent,
   AgendaEventInput,
@@ -13,6 +13,7 @@ import type {
   Challenge,
   ChallengeInput,
   ChallengeJanela,
+  CheckinFavorito,
   Comment,
   DistintivoDef,
   DistintivoDefInput,
@@ -40,6 +41,8 @@ interface CheckinRow {
   foto_url: string
   legenda: string | null
   criado_em: string
+  /** Ausente nos dados antigos do localStorage — vale como false. */
+  favorito?: boolean
 }
 
 interface ChallengeRow {
@@ -543,6 +546,7 @@ export class DemoApi implements ForroApi {
     const autor = this.db.profiles.find((p) => p.id === c.user_id)
     return {
       ...c,
+      favorito: Boolean(c.favorito),
       autor: {
         nome: autor?.nome ?? 'Alguém',
         avatar_url: autor?.avatar_url ?? null,
@@ -649,6 +653,39 @@ export class DemoApi implements ForroApi {
     return this.db.checkins
       .filter((c) => c.user_id === userId)
       .map((c) => ({ criado_em: c.criado_em }))
+  }
+
+  async setFavorito(checkinId: string, favorito: boolean) {
+    const c = this.db.checkins.find((x) => x.id === checkinId)
+    if (!c) throw new Error('Check-in não encontrado')
+    if (c.user_id !== this.uid()) {
+      throw new Error('Você só pode favoritar os seus próprios check-ins')
+    }
+    if (favorito) {
+      const total = this.db.checkins.filter(
+        (x) => x.user_id === c.user_id && x.favorito && x.id !== checkinId,
+      ).length
+      if (total >= LIMITE_FAVORITOS) {
+        throw new Error(
+          `Você já tem ${LIMITE_FAVORITOS} favoritos. Desmarque um para guardar outro.`,
+        )
+      }
+    }
+    c.favorito = favorito
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async favoritosDe(userId: string): Promise<CheckinFavorito[]> {
+    return this.db.checkins
+      .filter((c) => c.user_id === userId && c.favorito)
+      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+      .map((c) => ({
+        id: c.id,
+        foto_url: c.foto_url,
+        legenda: c.legenda,
+        criado_em: c.criado_em,
+      }))
   }
 
   // ---- Desafios ----

@@ -65,6 +65,22 @@ export function CheckinCard({
   }
 
   const podeExcluir = item.user_id === userId || papel === 'organizador'
+  // Só o dono favorita: é o arquivo pessoal dele, não uma curtida
+  const meuCheckin = item.user_id === userId
+
+  const favoritar = async () => {
+    try {
+      await api.setFavorito(item.id, !item.favorito)
+      toast(
+        item.favorito
+          ? 'Tirado dos favoritos'
+          : 'Guardado nos favoritos! ⭐ Essa foto não será arquivada.',
+      )
+      onChanged()
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    }
+  }
 
   return (
     <article className="card overflow-hidden">
@@ -188,6 +204,27 @@ export function CheckinCard({
           💬
           <span className="text-xs font-bold">{item.comentarios}</span>
         </button>
+        {meuCheckin && (
+          <button
+            onClick={() => void favoritar()}
+            aria-pressed={item.favorito}
+            title={
+              item.favorito
+                ? 'Guardado no seu perfil — clique para tirar'
+                : 'Guardar no seu perfil (não será arquivado)'
+            }
+            aria-label={
+              item.favorito ? 'Tirar dos favoritos' : 'Guardar nos favoritos'
+            }
+            className={`rounded-full px-3 py-1.5 text-sm transition active:scale-90 ${
+              item.favorito
+                ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
+                : 'bg-white/5 hover:bg-white/10'
+            }`}
+          >
+            {item.favorito ? '⭐' : '☆'}
+          </button>
+        )}
       </footer>
 
       {comentariosAbertos && (

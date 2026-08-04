@@ -66,10 +66,16 @@ create table if not exists public.checkins (
   user_id uuid not null references public.profiles(id) on delete cascade,
   foto_url text not null,
   legenda text,
+  -- Favorito do dono: ganha galeria no perfil e escapa da retenção de
+  -- fotos (retencao.sql). Só muda via favoritar_checkin().
+  favorito boolean not null default false,
   criado_em timestamptz not null default now()
 );
 create index if not exists checkins_criado_em_idx on public.checkins (criado_em desc);
 create index if not exists checkins_user_idx on public.checkins (user_id);
+create index if not exists checkins_favoritos_idx
+  on public.checkins (user_id, criado_em desc)
+  where favorito;
 
 create table if not exists public.reactions (
   checkin_id uuid not null references public.checkins(id) on delete cascade,
@@ -337,6 +343,47 @@ drop trigger if exists profiles_protege_telefone on public.profiles;
 create trigger profiles_protege_telefone
   before update on public.profiles
   for each row execute function public.protege_telefone();
+
+-- Favoritar é a ÚNICA alteração permitida num check-in — por isso uma
+-- função em vez de policy de update (que deixaria o dono trocar foto e
+-- legenda depois de publicadas). O teto de 12 existe porque favorito
+-- significa foto guardada pra sempre (ver LIMITE_FAVORITOS no app).
+create or replace function public.favoritar_checkin(
+  p_checkin uuid,
+  p_valor boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_dono uuid;
+  v_total int;
+begin
+  select user_id into v_dono from public.checkins where id = p_checkin;
+  if v_dono is null then
+    raise exception 'Check-in não encontrado';
+  end if;
+  if v_dono <> auth.uid() then
+    raise exception 'Você só pode favoritar os seus próprios check-ins';
+  end if;
+
+  if p_valor then
+    select count(*) into v_total
+    from public.checkins
+    where user_id = auth.uid() and favorito and id <> p_checkin;
+    if v_total >= 12 then
+      raise exception 'Você já tem 12 favoritos. Desmarque um para guardar outro.';
+    end if;
+  end if;
+
+  update public.checkins set favorito = p_valor where id = p_checkin;
+end;
+$$;
+
+revoke all on function public.favoritar_checkin(uuid, boolean) from public;
+grant execute on function public.favoritar_checkin(uuid, boolean) to authenticated;
 
 -- Keep-alive: chamada semanal via GitHub Actions evita a pausa por inatividade
 create or replace function public.ping()

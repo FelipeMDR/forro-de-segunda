@@ -3,6 +3,7 @@ import { Avatar } from '../components/Avatar'
 import {
   BadgeGrid,
   CargoChips,
+  FavoritosGrid,
   StatsRow,
   TurmaChips,
 } from '../components/PerfilResumo'
@@ -13,7 +14,7 @@ import { computeBadges } from '../lib/badges'
 import { compressImage } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
-import type { Badge } from '../lib/types'
+import type { Badge, CheckinFavorito } from '../lib/types'
 
 export function ProfilePage() {
   const { api, userId, profile, refreshProfile } = useAuth()
@@ -24,6 +25,7 @@ export function ProfilePage() {
   const [salvando, setSalvando] = useState(false)
   const [stats, setStats] = useState<PerfilStats | null>(null)
   const [badges, setBadges] = useState<Badge[] | null>(null)
+  const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
   const [pushAtivo, setPushAtivo] = useState(false)
 
   useEffect(() => {
@@ -58,6 +60,14 @@ export function ProfilePage() {
             events: [],
           }),
         )
+      })
+    void api
+      .favoritosDe(userId)
+      .then(setFavoritos)
+      .catch((e) => {
+        // Sem a migração 005 a coluna não existe — o resto do perfil vale
+        console.error('[perfil] falha ao carregar favoritos', e)
+        setFavoritos([])
       })
     void isPushEnabled().then(setPushAtivo)
   }, [api, userId, profile])
@@ -148,6 +158,12 @@ export function ProfilePage() {
       <BadgeGrid
         badges={badges}
         vazio="Faça seu primeiro check-in para começar a colecionar! 📸"
+      />
+
+      <FavoritosGrid
+        favoritos={favoritos}
+        mostrarLimite
+        vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 6 meses."
       />
 
       <div className="card space-y-4 p-5">

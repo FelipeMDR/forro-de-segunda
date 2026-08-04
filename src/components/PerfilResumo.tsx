@@ -1,6 +1,14 @@
+import { useState } from 'react'
 import { Spinner } from './Spinner'
+import { formatRelative } from '../lib/dates'
 import type { PerfilStats } from '../lib/perfilStats'
-import { emojiCargo, type Badge, type TurmaMembro } from '../lib/types'
+import {
+  emojiCargo,
+  LIMITE_FAVORITOS,
+  type Badge,
+  type CheckinFavorito,
+  type TurmaMembro,
+} from '../lib/types'
 
 /** Turmas + papel na dança, em chips. */
 export function TurmaChips({ turmas }: { turmas: TurmaMembro[] }) {
@@ -57,6 +65,98 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
           </p>
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Galeria dos check-ins favoritos. Miniaturas em grade; tocar numa
+ * abre a foto grande com a legenda e a data.
+ */
+export function FavoritosGrid({
+  favoritos,
+  vazio,
+  mostrarLimite = false,
+}: {
+  favoritos: CheckinFavorito[] | null
+  vazio: string
+  /** Só no próprio perfil: lembra quantos ainda dá pra guardar. */
+  mostrarLimite?: boolean
+}) {
+  const [aberto, setAberto] = useState<CheckinFavorito | null>(null)
+
+  return (
+    <div className="card space-y-3 p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          ⭐ Favoritos{' '}
+          {favoritos && favoritos.length > 0 && `(${favoritos.length})`}
+        </h2>
+        {mostrarLimite && favoritos && (
+          <span className="text-[10px] font-bold text-stone-600">
+            {favoritos.length}/{LIMITE_FAVORITOS}
+          </span>
+        )}
+      </div>
+
+      {favoritos === null ? (
+        <Spinner />
+      ) : favoritos.length === 0 ? (
+        <p className="text-sm text-stone-500">{vazio}</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {favoritos.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setAberto(f)}
+              className="overflow-hidden rounded-xl bg-noite-950"
+              aria-label={f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`}
+            >
+              {f.foto_url ? (
+                <img
+                  src={f.foto_url}
+                  alt={f.legenda ?? ''}
+                  loading="lazy"
+                  className="aspect-square w-full object-cover"
+                />
+              ) : (
+                <span className="flex aspect-square w-full items-center justify-center text-2xl">
+                  🎞️
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {aberto && (
+        <div
+          className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/85 p-5"
+          onClick={() => setAberto(null)}
+          role="dialog"
+        >
+          {aberto.foto_url && (
+            <img
+              src={aberto.foto_url}
+              alt={aberto.legenda ?? ''}
+              className="max-h-[70vh] w-auto max-w-full rounded-2xl object-contain"
+            />
+          )}
+          <div className="text-center">
+            {aberto.legenda && (
+              <p className="text-sm font-bold text-stone-100">
+                {aberto.legenda}
+              </p>
+            )}
+            <p className="text-xs text-stone-400">
+              {formatRelative(aberto.criado_em)}
+            </p>
+          </div>
+          <button className="btn-ghost" onClick={() => setAberto(null)}>
+            Fechar
+          </button>
+        </div>
+      )}
     </div>
   )
 }

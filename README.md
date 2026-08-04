@@ -36,6 +36,9 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   organização cria um distintivo (emoji + título + descrição) e entrega pra
   quem quiser, por qualquer motivo — inclusive em lote pro topo do ranking
   de um desafio (top 1, top 3, top 5…)
+- **Favoritos ⭐** — o aluno marca os próprios check-ins que quer guardar
+  (até 12). Eles viram uma galeria no perfil e ficam **de fora da política
+  de retenção**, que arquiva as demais fotos depois de 6 meses
 - **Check-in só com foto na hora** — a câmera abre dentro do app (sem
   galeria, nada de foto antiga); a imagem é comprimida no celular
   (WebP ~120 KB) antes de subir
@@ -163,7 +166,7 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 
 | Limite | Estratégia já implementada |
 |---|---|
-| 1 GB de storage | Compressão no cliente (WebP ~1080px). ~8.000 fotos ≈ 2 anos. Depois, rode [`supabase/retencao.sql`](supabase/retencao.sql) (apaga fotos de +6 meses, mantém a presença) |
+| 1 GB de storage | Compressão no cliente (WebP ~1080px). ~8.000 fotos ≈ 2 anos. Depois, rode [`supabase/retencao.sql`](supabase/retencao.sql) (apaga fotos de +6 meses, mantém a presença e pula os favoritos) |
 | 5 GB egress/mês | Fotos cacheadas no service worker (CacheFirst, 30 dias) |
 | 500 MB de banco | Check-ins são linhas pequenas — irrelevante nessa escala |
 | Pausa por inatividade | Workflow de keep-alive semanal |

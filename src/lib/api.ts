@@ -7,6 +7,7 @@ import type {
   Cargo,
   Challenge,
   ChallengeInput,
+  CheckinFavorito,
   Comment,
   DistintivoDef,
   DistintivoDefInput,
@@ -71,6 +72,14 @@ export interface ForroApi {
   reportCheckin(checkinId: string, motivo: string): Promise<void>
   /** Check-ins de qualquer aluno (usado no próprio perfil e no público). */
   checkinsDe(userId: string): Promise<{ criado_em: string }[]>
+  /**
+   * Marca/desmarca um check-in próprio como favorito. Favoritos ficam
+   * numa galeria no perfil e escapam da política de retenção de fotos.
+   * Erro se passar de LIMITE_FAVORITOS.
+   */
+  setFavorito(checkinId: string, favorito: boolean): Promise<void>
+  /** Galeria de favoritos de alguém (própria ou de outro aluno). */
+  favoritosDe(userId: string): Promise<CheckinFavorito[]>
 
   // ---- Desafios (competição de presença) ----
   listChallenges(): Promise<Challenge[]>

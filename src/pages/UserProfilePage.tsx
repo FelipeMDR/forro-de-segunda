@@ -6,13 +6,14 @@ import { ErrorState } from '../components/ErrorState'
 import {
   BadgeGrid,
   CargoChips,
+  FavoritosGrid,
   StatsRow,
   TurmaChips,
 } from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
-import type { Badge, Profile } from '../lib/types'
+import type { Badge, CheckinFavorito, Profile } from '../lib/types'
 
 /**
  * Perfil público de outro aluno: mesmas informações do próprio perfil,
@@ -26,6 +27,7 @@ export function UserProfilePage() {
   const [perfil, setPerfil] = useState<Profile | null | undefined>()
   const [stats, setStats] = useState<PerfilStats | null>(null)
   const [badges, setBadges] = useState<Badge[] | null>(null)
+  const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export function UserProfilePage() {
     setPerfil(undefined)
     setStats(null)
     setBadges(null)
+    setFavoritos(null)
     setErro(null)
     void (async () => {
       try {
@@ -45,6 +48,13 @@ export function UserProfilePage() {
         if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
+        const favs = await api.favoritosDe(id).catch((e) => {
+          // Sem a migração 005 a coluna não existe — o resto do perfil vale
+          console.error('[perfil público] falha ao carregar favoritos', e)
+          return []
+        })
+        if (cancelado) return
+        setFavoritos(favs)
       } catch (e) {
         if (cancelado) return
         console.error('[perfil público] falha ao carregar', e)
@@ -97,6 +107,11 @@ export function UserProfilePage() {
       <BadgeGrid
         badges={badges}
         vazio={`${primeiroNome} ainda não tem distintivos. Chama pra dançar! 💃`}
+      />
+
+      <FavoritosGrid
+        favoritos={favoritos}
+        vazio={`${primeiroNome} ainda não guardou nenhum check-in nos favoritos.`}
       />
     </div>
   )

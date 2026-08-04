@@ -13,6 +13,7 @@ import type {
   Cargo,
   Challenge,
   ChallengeInput,
+  CheckinFavorito,
   Comment,
   DistintivoDef,
   DistintivoDefInput,
@@ -39,8 +40,8 @@ function traduz(msg: string): string {
       'A senha precisa ter pelo menos 6 caracteres',
   }
   if (mapa[msg]) return mapa[msg]
-  // Tabela nova que ainda não foi criada no banco em produção
-  if (msg.includes('schema cache')) {
+  // Tabela/coluna nova que ainda não foi criada no banco em produção
+  if (msg.includes('schema cache') || /column .* does not exist/.test(msg)) {
     return (
       'Falta rodar a migração do banco. No Supabase: SQL Editor → cole o ' +
       'arquivo mais recente de supabase/migracoes → Run, e depois ' +
@@ -273,7 +274,7 @@ export class SupabaseApi implements ForroApi {
       // (a FK direta e o M2M que o PostgREST deduz via `reactions`), então
       // é preciso apontar a chave estrangeira explicitamente.
       .select(
-        `id, user_id, foto_url, legenda, criado_em,
+        `id, user_id, foto_url, legenda, criado_em, favorito,
            autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)),
            reacoes:reactions(tipo, user_id),
            comentarios:comments(count)`,
@@ -303,6 +304,7 @@ export class SupabaseApi implements ForroApi {
         foto_url: c.foto_url as string,
         legenda: c.legenda as string | null,
         criado_em: c.criado_em as string,
+        favorito: Boolean(c.favorito),
         autor: {
           nome: autor?.nome ?? 'Alguém',
           avatar_url: autor?.avatar_url ?? null,
@@ -391,6 +393,9 @@ export class SupabaseApi implements ForroApi {
       const p = perfilPor.get(c.user_id)
       return {
         ...c,
+        // Este plano B também cobre o caso da migração 005 não ter
+        // rodado ainda (sem a coluna `favorito` o embed acima falha).
+        favorito: false,
         autor: {
           nome: p?.nome ?? 'Alguém',
           avatar_url: p?.avatar_url ?? null,
@@ -523,6 +528,28 @@ export class SupabaseApi implements ForroApi {
         .eq('user_id', userId),
     )
     return data as { criado_em: string }[]
+  }
+
+  async setFavorito(checkinId: string, favorito: boolean) {
+    // A regra de dono e o teto ficam na função (security definer): a RLS
+    // de checkins não permite update, e nem deve — a foto é imutável.
+    const { error } = await this.sb.rpc('favoritar_checkin', {
+      p_checkin: checkinId,
+      p_valor: favorito,
+    })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async favoritosDe(userId: string): Promise<CheckinFavorito[]> {
+    const data = ok(
+      await this.sb
+        .from('checkins')
+        .select('id, foto_url, legenda, criado_em')
+        .eq('user_id', userId)
+        .eq('favorito', true)
+        .order('criado_em', { ascending: false }),
+    )
+    return data as CheckinFavorito[]
   }
 
   async contarDesafios(userId: string) {

@@ -44,6 +44,8 @@ export interface FeedItem {
   foto_url: string
   legenda: string | null
   criado_em: string
+  /** Marcado como favorito pelo dono — aparece no perfil e não é arquivado. */
+  favorito: boolean
   autor: {
     nome: string
     avatar_url: string | null
@@ -53,6 +55,25 @@ export interface FeedItem {
   reacoes: { tipo: string; user_id: string }[]
   comentarios: number
 }
+
+/**
+ * Check-in favoritado, como aparece na galeria do perfil. As fotos dos
+ * check-ins comuns são apagadas pela política de retenção (6 meses);
+ * as favoritas ficam guardadas.
+ */
+export interface CheckinFavorito {
+  id: string
+  foto_url: string
+  legenda: string | null
+  criado_em: string
+}
+
+/**
+ * Teto de favoritos por pessoa. Favorito = foto que nunca é apagada,
+ * então o limite é o que segura o storage dentro do plano gratuito.
+ * Mudou aqui? Mude também em `favoritar_checkin` (migração 005).
+ */
+export const LIMITE_FAVORITOS = 12
 
 export interface Comment {
   id: string
