@@ -201,13 +201,13 @@ export function ChallengeDetailPage() {
             🎟️{' '}
             {desafio.sou_membro ? (
               <>
-                Você está na lista deste evento. A organização é quem
-                gerencia quem participa.
+                Você está na lista deste desafio restrito. A organização é
+                quem gerencia quem participa.
               </>
             ) : (
               <>
-                Este desafio é do evento e só a organização adiciona
-                participantes. Comprou ingresso e não está aqui? Fale com a
+                Este é um desafio restrito — só a organização adiciona
+                participantes. Acha que deveria estar aqui? Fale com a
                 organização.
               </>
             )}
