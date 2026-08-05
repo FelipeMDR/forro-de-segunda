@@ -1572,7 +1572,7 @@ function LinhaAlunoApp({
         ))}
         {cargosDisponiveis.length > 0 && (
           <select
-            className="input w-40 py-1 text-[11px]"
+            className="input w-40 py-1"
             value=""
             aria-label={`Dar cargo para ${perfil.nome}`}
             onChange={(e) => {
@@ -1614,7 +1614,7 @@ function LinhaAlunoApp({
       {disponiveis.length > 0 && (
         <div className="flex gap-1.5">
           <select
-            className="input py-1.5 text-xs"
+            className="input py-1.5"
             value={turma}
             aria-label={`Adicionar turma para ${perfil.nome}`}
             onChange={(e) => setTurma(e.target.value)}
@@ -1627,7 +1627,7 @@ function LinhaAlunoApp({
             ))}
           </select>
           <select
-            className="input py-1.5 text-xs"
+            className="input py-1.5"
             value={papel ?? ''}
             aria-label={`Papel de ${perfil.nome}`}
             onChange={(e) =>

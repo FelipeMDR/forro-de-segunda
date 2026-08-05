@@ -32,15 +32,36 @@
 @layer base {
   html {
     background-color: var(--color-noite-950);
+    /* Sem isso o iOS aumenta o texto sozinho ao girar a tela */
+    -webkit-text-size-adjust: 100%;
+    /*
+     * Trava o zoom por gesto: `pan-x pan-y` deixa rolar normalmente mas
+     * desliga a pinça e o duplo-toque, que no uso real do app disparam
+     * sem querer — dois dedos rolando o feed, ou um toque duplo rápido
+     * num botão. O <meta viewport> cobre o Android; isto cobre o iOS,
+     * que ignora `user-scalable=no` desde o iOS 10.
+     *
+     * Custo: também impede dar zoom numa foto do feed. Para devolver o
+     * zoom (perdendo a trava), troque por `manipulation` — que mantém a
+     * pinça e desliga só o duplo-toque.
+     */
+    touch-action: pan-x pan-y;
   }
   body {
     @apply bg-noite-950 text-stone-100 font-sans antialiased;
     min-height: 100dvh;
   }
+  /*
+   * 16px é o mínimo que evita o zoom automático do iOS ao focar um
+   * campo — abaixo disso o Safari aproxima a tela e o usuário fica
+   * preso num layout ampliado. Vale para qualquer campo, mesmo os que
+   * não usam a classe .input.
+   */
   input,
   textarea,
   select {
     @apply text-stone-100;
+    font-size: 16px;
   }
 }
 
@@ -60,8 +81,10 @@
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-red-600/20 text-red-400 border border-red-600/30;
   }
+  /* text-base (16px) e não text-sm: abaixo de 16px o iOS dá zoom
+     automático ao focar o campo. Ver a regra de base acima. */
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-noite-900 px-3.5 py-2.5 text-sm placeholder:text-stone-500 focus:border-brasa-400 focus:outline-none focus:ring-1 focus:ring-brasa-400;
+    @apply w-full rounded-xl border border-white/10 bg-noite-900 px-3.5 py-2.5 text-base placeholder:text-stone-500 focus:border-brasa-400 focus:outline-none focus:ring-1 focus:ring-brasa-400;
   }
   .label {
     @apply mb-1.5 block text-xs font-bold uppercase tracking-wide text-stone-400;

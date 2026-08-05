@@ -2,9 +2,11 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <!-- maximum-scale/user-scalable travam o zoom por gesto no Android;
+         no iOS quem faz isso é `touch-action` no CSS (ver index.css) -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no"
     />
     <meta
       name="description"
