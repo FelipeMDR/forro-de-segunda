@@ -71,19 +71,42 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
 
 /**
  * Galeria dos check-ins favoritos. Miniaturas em grade; tocar numa
- * abre a foto grande com a legenda e a data.
+ * abre a foto grande com a legenda, a data e — no próprio perfil — a
+ * opção de tirar dos favoritos. Sem isso, desfavoritar exigiria achar
+ * a publicação lá atrás no feed.
  */
 export function FavoritosGrid({
   favoritos,
   vazio,
   mostrarLimite = false,
+  onDesfavoritar,
 }: {
   favoritos: CheckinFavorito[] | null
   vazio: string
   /** Só no próprio perfil: lembra quantos ainda dá pra guardar. */
   mostrarLimite?: boolean
+  /** Só no próprio perfil: sem isso, a galeria é somente leitura. */
+  onDesfavoritar?: (id: string) => Promise<void>
 }) {
   const [aberto, setAberto] = useState<CheckinFavorito | null>(null)
+  const [confirmando, setConfirmando] = useState(false)
+  const [removendo, setRemovendo] = useState(false)
+
+  const fechar = () => {
+    setAberto(null)
+    setConfirmando(false)
+  }
+
+  const desfavoritar = async () => {
+    if (!aberto || !onDesfavoritar) return
+    setRemovendo(true)
+    try {
+      await onDesfavoritar(aberto.id)
+      fechar()
+    } finally {
+      setRemovendo(false)
+    }
+  }
 
   return (
     <div className="card space-y-3 p-5">
@@ -104,42 +127,51 @@ export function FavoritosGrid({
       ) : favoritos.length === 0 ? (
         <p className="text-sm text-stone-500">{vazio}</p>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {favoritos.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setAberto(f)}
-              className="overflow-hidden rounded-xl bg-noite-950"
-              aria-label={f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`}
-            >
-              {f.foto_url ? (
-                <img
-                  src={f.foto_url}
-                  alt={f.legenda ?? ''}
-                  loading="lazy"
-                  className="aspect-square w-full object-cover"
-                />
-              ) : (
-                <span className="flex aspect-square w-full items-center justify-center text-2xl">
-                  🎞️
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <>
+          {onDesfavoritar && (
+            <p className="text-xs text-stone-500">
+              Toque numa foto para ver de perto ou tirar dos favoritos.
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            {favoritos.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setAberto(f)}
+                className="overflow-hidden rounded-xl bg-noite-950"
+                aria-label={
+                  f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`
+                }
+              >
+                {f.foto_url ? (
+                  <img
+                    src={f.foto_url}
+                    alt={f.legenda ?? ''}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : (
+                  <span className="flex aspect-square w-full items-center justify-center text-2xl">
+                    🎞️
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {aberto && (
         <div
           className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/85 p-5"
-          onClick={() => setAberto(null)}
+          onClick={fechar}
           role="dialog"
         >
           {aberto.foto_url && (
             <img
               src={aberto.foto_url}
               alt={aberto.legenda ?? ''}
-              className="max-h-[70vh] w-auto max-w-full rounded-2xl object-contain"
+              className="max-h-[60vh] w-auto max-w-full rounded-2xl object-contain"
             />
           )}
           <div className="text-center">
@@ -152,9 +184,39 @@ export function FavoritosGrid({
               {formatRelative(aberto.criado_em)}
             </p>
           </div>
-          <button className="btn-ghost" onClick={() => setAberto(null)}>
-            Fechar
-          </button>
+
+          {/* stopPropagation: o clique no fundo fecha, nos botões não */}
+          <div
+            className="flex flex-col items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {onDesfavoritar &&
+              (confirmando ? (
+                <>
+                  <p className="max-w-xs text-center text-xs text-stone-400">
+                    A foto sai da galeria e volta a ser arquivada com as
+                    outras depois de 4 meses.
+                  </p>
+                  <button
+                    className="btn-danger"
+                    disabled={removendo}
+                    onClick={() => void desfavoritar()}
+                  >
+                    {removendo ? 'Tirando…' : '⚠️ Confirmar, tirar dos favoritos'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn-ghost"
+                  onClick={() => setConfirmando(true)}
+                >
+                  ⭐ Tirar dos favoritos
+                </button>
+              ))}
+            <button className="btn-ghost" onClick={fechar}>
+              Fechar
+            </button>
+          </div>
         </div>
       )}
     </div>

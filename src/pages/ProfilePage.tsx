@@ -97,6 +97,16 @@ export function ProfilePage() {
     }
   }
 
+  const desfavoritar = async (id: string) => {
+    try {
+      await api.setFavorito(id, false)
+      setFavoritos((atual) => (atual ?? []).filter((f) => f.id !== id))
+      toast('Tirado dos favoritos')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    }
+  }
+
   const trocarAvatar = async (file: File | undefined) => {
     if (!file) return
     try {
@@ -163,6 +173,7 @@ export function ProfilePage() {
       <FavoritosGrid
         favoritos={favoritos}
         mostrarLimite
+        onDesfavoritar={desfavoritar}
         vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
       />
 
