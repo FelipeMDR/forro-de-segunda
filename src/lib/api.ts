@@ -18,6 +18,7 @@ import type {
   FeriadoInput,
   Papel,
   PapelDanca,
+  PerfilPublico,
   Profile,
   RankingEntry,
   Report,
@@ -57,6 +58,12 @@ export interface ForroApi {
 
   // ---- Perfil ----
   getProfile(id: string): Promise<Profile | null>
+  /**
+   * Todos os perfis para a busca do aluno — SEM telefone. Não use
+   * listProfiles() aqui: aquela é do painel e traz o número de todo
+   * mundo, que não tem por que ir parar no aparelho de cada aluno.
+   */
+  listPerfisPublicos(): Promise<PerfilPublico[]>
   getMyRole(): Promise<Papel>
   updateProfile(patch: { nome?: string; avatarBlob?: Blob }): Promise<void>
 

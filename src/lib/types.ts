@@ -26,6 +26,13 @@ export interface Profile {
   criado_em: string
 }
 
+/**
+ * Perfil como os outros alunos podem ver: sem telefone. A busca de
+ * perfis usa este formato justamente para o número de ninguém sair
+ * trafegando para o aparelho de todo mundo.
+ */
+export type PerfilPublico = Omit<Profile, 'telefone'>
+
 /** Rótulo compacto das turmas de alguém (feed, ranking, chamada). */
 export function turmaLabel(turmas: TurmaMembro[]): string | null {
   if (turmas.length === 0) return null

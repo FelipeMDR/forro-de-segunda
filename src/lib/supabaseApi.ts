@@ -24,6 +24,7 @@ import type {
   FeriadoInput,
   Papel,
   PapelDanca,
+  PerfilPublico,
   Profile,
   RankingEntry,
   Report,
@@ -1031,6 +1032,23 @@ export class SupabaseApi implements ForroApi {
       )
     }
     return { importados: novos.length, ignorados: rows.length - novos.length }
+  }
+
+  async listPerfisPublicos(): Promise<PerfilPublico[]> {
+    // Colunas nomeadas de propósito: `*` traria o telefone junto, e a
+    // busca é usada por qualquer aluno.
+    const data = ok(
+      await this.sb
+        .from('profiles')
+        .select(
+          'id, nome, avatar_url, criado_em, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)',
+        )
+        .order('nome'),
+    ) as unknown as Array<Record<string, unknown>>
+    return data.map((p) => {
+      const { telefone: _ignorado, ...publico } = this.mapProfile(p)
+      return publico
+    })
   }
 
   async listProfiles(): Promise<Profile[]> {

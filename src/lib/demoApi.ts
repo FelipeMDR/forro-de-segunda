@@ -26,6 +26,7 @@ import type {
   FeriadoInput,
   Papel,
   PapelDanca,
+  PerfilPublico,
   Profile,
   RankingEntry,
   Report,
@@ -1010,6 +1011,12 @@ export class DemoApi implements ForroApi {
 
   async listProfiles(): Promise<Profile[]> {
     return [...this.db.profiles].sort((a, b) => a.nome.localeCompare(b.nome))
+  }
+
+  async listPerfisPublicos(): Promise<PerfilPublico[]> {
+    return [...this.db.profiles]
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map(({ telefone: _ignorado, ...publico }) => publico)
   }
 
   async addTurmaAluno(userId: string, turma: string, papel: PapelDanca | null) {

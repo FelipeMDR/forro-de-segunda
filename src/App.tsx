@@ -5,6 +5,7 @@ import { Spinner } from './components/Spinner'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { AdminPage } from './pages/AdminPage'
+import { BuscarPage } from './pages/BuscarPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
 import { CheckinPage } from './pages/CheckinPage'
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/checkin" element={<CheckinPage />} />
               <Route path="/desafios" element={<ChallengesPage />} />
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
+              <Route path="/buscar" element={<BuscarPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />

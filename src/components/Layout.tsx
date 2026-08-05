@@ -45,7 +45,18 @@ export function Layout() {
           <span className="text-sm font-bold text-stone-400">de</span>{' '}
           <span className="text-[#3fa9f5]">Segunda</span>
         </h1>
-        <NavLink to="/perfil" className="ml-auto" aria-label="Meu perfil">
+        <NavLink
+          to="/buscar"
+          aria-label="Buscar pessoas"
+          className={({ isActive }) =>
+            `ml-auto flex h-9 w-9 items-center justify-center rounded-full text-lg transition active:scale-90 ${
+              isActive ? 'bg-brasa-500/20 text-brasa-300' : 'hover:bg-white/5'
+            }`
+          }
+        >
+          🔎
+        </NavLink>
+        <NavLink to="/perfil" aria-label="Meu perfil">
           <Avatar
             nome={profile?.nome ?? '?'}
             url={profile?.avatar_url ?? null}
