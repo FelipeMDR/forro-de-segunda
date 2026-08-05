@@ -10,6 +10,7 @@ import type {
   ChallengeInput,
   CheckinFavorito,
   Comment,
+  ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
   DistintivoRecebedor,
@@ -107,6 +108,21 @@ export interface ForroApi {
   joinChallenge(id: string): Promise<void>
   leaveChallenge(id: string): Promise<void>
   getRanking(challenge: Challenge): Promise<RankingEntry[]>
+  /** Adiciona alguém a um desafio (organizador) — usado nos restritos. */
+  addMembroDesafio(challengeId: string, userId: string): Promise<void>
+  removeMembroDesafio(challengeId: string, userId: string): Promise<void>
+  /** Convidados por telefone que ainda não criaram conta. */
+  listConvidados(challengeId: string): Promise<ConvidadoDesafio[]>
+  removeConvidado(challengeId: string, telefone: string): Promise<void>
+  /**
+   * Importa a lista de ingressos: quem já tem conta entra no desafio na
+   * hora; quem não tem fica como convidado e entra sozinho ao se
+   * cadastrar (a festa é aberta, nem todo comprador é do projeto).
+   */
+  importarConvidados(
+    challengeId: string,
+    linhas: { nome: string; telefone: string }[],
+  ): Promise<{ adicionados: number; pendentes: number; jaEstavam: number }>
   /** Em quantos desafios um aluno entrou (estatística do perfil). */
   contarDesafios(userId: string): Promise<number>
 

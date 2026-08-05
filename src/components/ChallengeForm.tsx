@@ -30,6 +30,7 @@ export function ChallengeForm({
     data_fim: desafio?.data_fim ?? hoje,
     janelas: desafio?.janelas ?? [],
     local: desafio?.local ?? null,
+    entrada_restrita: desafio?.entrada_restrita ?? false,
   })
   const [salvando, setSalvando] = useState(false)
   const [buscandoLocal, setBuscandoLocal] = useState(false)
@@ -313,6 +314,28 @@ export function ChallengeForm({
             Repita quantas vezes precisar — se um dia já tiver horário, o
             novo substitui.
           </p>
+        </div>
+
+        <div className="space-y-3 rounded-2xl bg-noite-950 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">🎟️ Entrada só pela organização</p>
+              <p className="text-[11px] text-stone-500">
+                Para evento pago: o aluno não entra sozinho. Depois de
+                salvar, adicione os participantes na página do desafio —
+                dá para importar a lista de ingressos por CSV.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
+              aria-label="Entrada só pela organização"
+              checked={form.entrada_restrita}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, entrada_restrita: e.target.checked }))
+              }
+            />
+          </div>
         </div>
 
         <div className="space-y-3 rounded-2xl bg-noite-950 p-4">

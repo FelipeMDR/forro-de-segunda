@@ -21,8 +21,8 @@ export interface ResultadoParse {
   avisos: string[]
 }
 
-function dividir(linha: string, sep: string): string[] {
-  // Divisão simples com suporte a células entre aspas
+/** Divide uma linha de CSV respeitando células entre aspas. */
+export function dividirLinhaCSV(linha: string, sep: string): string[] {
   const celulas: string[] = []
   let atual = ''
   let dentroDeAspas = false
@@ -66,7 +66,7 @@ export function parseAlunosCSV(
 
   let idx = { nome: 0, telefone: 1, turma: 2, papel: 3 }
   let inicio = 0
-  const cabecalho = dividir(primeira.toLowerCase(), sep)
+  const cabecalho = dividirLinhaCSV(primeira.toLowerCase(), sep)
   if (cabecalho.some((c) => c.includes('telefone') || c.includes('celular'))) {
     idx = {
       nome: cabecalho.findIndex((c) => c.includes('nome')),
@@ -89,7 +89,7 @@ export function parseAlunosCSV(
   const vistos = new Set<string>()
 
   for (let i = inicio; i < brutas.length; i++) {
-    const celulas = dividir(brutas[i], sep)
+    const celulas = dividirLinhaCSV(brutas[i], sep)
     const nome = idx.nome >= 0 ? (celulas[idx.nome] ?? '') : ''
     const telefone = celulas[idx.telefone] ?? ''
     const turma = idx.turma >= 0 ? (celulas[idx.turma] ?? '') : ''

@@ -59,6 +59,7 @@ interface ChallengeRow {
   data_fim: string
   janelas: ChallengeJanela[]
   local: ChallengeLocal | null
+  entrada_restrita?: boolean
   criado_por: string | null
 }
 
@@ -78,6 +79,13 @@ interface DB {
   }[]
   challenges: ChallengeRow[]
   members: { challenge_id: string; user_id: string; entrou_em: string }[]
+  /** Convidados por telefone que ainda não criaram conta. */
+  convidados: {
+    challenge_id: string
+    telefone: string
+    telefone_exibicao: string | null
+    nome: string | null
+  }[]
   reports: {
     id: string
     checkin_id: string
@@ -362,6 +370,7 @@ function seed(): DB {
       user_id: p.id,
       entrou_em: em(16, 12, 0),
     })),
+    convidados: [],
     reports: [],
     events: eventos,
     feriados,
@@ -443,12 +452,17 @@ export class DemoApi implements ForroApi {
 
   async telefoneNaLista(telefone: string) {
     const matches = this.membrosDaLista(telefone)
+    // Convidado de festa também pode se cadastrar: a festa é aberta,
+    // então quem comprou ingresso pode não estar na lista de chamada.
+    const convite = this.db.convidados.find(
+      (c) => c.telefone === normalizeTelefone(telefone),
+    )
     const jaTemConta = this.db.profiles.some(
       (p) => p.telefone && telefonesIguais(p.telefone, telefone),
     )
     return {
-      existe: matches.length > 0,
-      nome: matches[0]?.nome ?? null,
+      existe: matches.length > 0 || Boolean(convite),
+      nome: matches[0]?.nome ?? convite?.nome ?? null,
       jaTemConta,
     }
   }
@@ -475,9 +489,14 @@ export class DemoApi implements ForroApi {
       )
     }
     const matches = this.membrosDaLista(telefone)
+    const convite = this.db.convidados.find(
+      (c) => c.telefone === normalizeTelefone(telefone),
+    )
     const profile: Profile = {
       id: uuid(),
-      nome: matches[0]?.nome ?? 'Dançarino(a)',
+      // Convidado da festa não está na lista de chamada, mas o nome
+      // veio na planilha de ingressos
+      nome: matches[0]?.nome ?? convite?.nome ?? 'Dançarino(a)',
       avatar_url: null,
       turmas: matches.map((m) => ({
         turma: m.turma,
@@ -490,6 +509,21 @@ export class DemoApi implements ForroApi {
     this.db.profiles.push(profile)
     this.db.roles[profile.id] = 'aluno'
     this.db.senhas[normalizeTelefone(telefone)] = senha
+
+    // Convites viram participação e saem da espera (espelha o trecho
+    // acrescentado a handle_new_user na migração 010)
+    const norm = normalizeTelefone(telefone)
+    for (const convite of this.db.convidados.filter(
+      (c) => c.telefone === norm,
+    )) {
+      this.db.members.push({
+        challenge_id: convite.challenge_id,
+        user_id: profile.id,
+        entrou_em: new Date().toISOString(),
+      })
+    }
+    this.db.convidados = this.db.convidados.filter((c) => c.telefone !== norm)
+
     this.persist()
     this.iniciarSessao(profile.id)
   }
@@ -733,6 +767,7 @@ export class DemoApi implements ForroApi {
     const uid = localStorage.getItem(SESSION_KEY)
     return {
       ...c,
+      entrada_restrita: Boolean(c.entrada_restrita),
       participantes: this.db.members.filter((m) => m.challenge_id === c.id)
         .length,
       sou_membro: this.db.members.some(
@@ -762,6 +797,7 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
+        entrada_restrita: data.entrada_restrita,
         // Espelha o trigger marca_local_desde (migração 009): o marco
         // nasce quando a trava é ligada e é preservado depois.
         local: data.local && {
@@ -777,6 +813,7 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
+        entrada_restrita: data.entrada_restrita,
         local: data.local && {
           ...data.local,
           desde: new Date().toISOString(),
@@ -793,8 +830,18 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
+  private exigeConvite(id: string) {
+    const c = this.db.challenges.find((x) => x.id === id)
+    if (c?.entrada_restrita && this.db.roles[this.uid()] !== 'organizador') {
+      throw new Error(
+        'Este desafio é só para quem a organização adicionar (evento pago)',
+      )
+    }
+  }
+
   async joinChallenge(id: string) {
     const uid = this.uid()
+    this.exigeConvite(id)
     if (
       !this.db.members.some((m) => m.challenge_id === id && m.user_id === uid)
     ) {
@@ -809,10 +856,96 @@ export class DemoApi implements ForroApi {
 
   async leaveChallenge(id: string) {
     const uid = this.uid()
+    this.exigeConvite(id)
     this.db.members = this.db.members.filter(
       (m) => !(m.challenge_id === id && m.user_id === uid),
     )
     this.persist()
+  }
+
+  async addMembroDesafio(challengeId: string, userId: string) {
+    if (
+      !this.db.members.some(
+        (m) => m.challenge_id === challengeId && m.user_id === userId,
+      )
+    ) {
+      this.db.members.push({
+        challenge_id: challengeId,
+        user_id: userId,
+        entrou_em: new Date().toISOString(),
+      })
+      this.persist()
+    }
+  }
+
+  async removeMembroDesafio(challengeId: string, userId: string) {
+    this.db.members = this.db.members.filter(
+      (m) => !(m.challenge_id === challengeId && m.user_id === userId),
+    )
+    this.persist()
+  }
+
+  async listConvidados(challengeId: string) {
+    return this.db.convidados
+      .filter((c) => c.challenge_id === challengeId)
+      .map(({ telefone, telefone_exibicao, nome }) => ({
+        telefone,
+        telefone_exibicao,
+        nome,
+      }))
+      .sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? ''))
+  }
+
+  async removeConvidado(challengeId: string, telefone: string) {
+    const alvo = normalizeTelefone(telefone)
+    this.db.convidados = this.db.convidados.filter(
+      (c) => !(c.challenge_id === challengeId && c.telefone === alvo),
+    )
+    this.persist()
+  }
+
+  async importarConvidados(
+    challengeId: string,
+    linhas: { nome: string; telefone: string }[],
+  ) {
+    let adicionados = 0
+    let pendentes = 0
+    let jaEstavam = 0
+    for (const linha of linhas) {
+      const perfil = this.db.profiles.find(
+        (p) => p.telefone && telefonesIguais(p.telefone, linha.telefone),
+      )
+      if (!perfil) {
+        const tel = normalizeTelefone(linha.telefone)
+        const existente = this.db.convidados.find(
+          (c) => c.challenge_id === challengeId && c.telefone === tel,
+        )
+        if (existente) existente.nome = linha.nome || existente.nome
+        else
+          this.db.convidados.push({
+            challenge_id: challengeId,
+            telefone: tel,
+            telefone_exibicao: linha.telefone,
+            nome: linha.nome || null,
+          })
+        pendentes++
+      } else if (
+        this.db.members.some(
+          (m) => m.challenge_id === challengeId && m.user_id === perfil.id,
+        )
+      ) {
+        jaEstavam++
+      } else {
+        this.db.members.push({
+          challenge_id: challengeId,
+          user_id: perfil.id,
+          entrou_em: new Date().toISOString(),
+        })
+        adicionados++
+      }
+    }
+    this.persist()
+    return { adicionados, pendentes, jaEstavam }
   }
 
   async getRanking(challenge: Challenge): Promise<RankingEntry[]> {

@@ -144,6 +144,11 @@ export interface Challenge {
   janelas: ChallengeJanela[]
   /** null = conta de qualquer lugar. */
   local: ChallengeLocal | null
+  /**
+   * Evento pago: o aluno não entra nem sai sozinho, só a organização
+   * adiciona (normalmente importando a lista de ingressos).
+   */
+  entrada_restrita: boolean
   criado_por: string | null
   participantes: number
   sou_membro: boolean
@@ -157,6 +162,20 @@ export interface ChallengeInput {
   data_fim: string
   janelas: ChallengeJanela[]
   local: ChallengeLocal | null
+  entrada_restrita: boolean
+}
+
+/**
+ * Convidado de um desafio restrito que ainda não tem conta no app — a
+ * festa é aberta, então parte da lista de ingressos é de fora do
+ * projeto. Entra sozinho no desafio quando criar a conta.
+ */
+export interface ConvidadoDesafio {
+  /** Normalizado (só dígitos) — é a chave que casa com o cadastro. */
+  telefone: string
+  /** Como veio na planilha, para conferir a olho. */
+  telefone_exibicao: string | null
+  nome: string | null
 }
 
 export interface RankingEntry {

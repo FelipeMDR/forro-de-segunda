@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { downloadCSV } from '../lib/csv'
 import { challengePhase, daysLeft, formatDate } from '../lib/dates'
+import { ParticipantesDesafio } from '../components/ParticipantesDesafio'
 import { colocacoes } from '../lib/ranking'
 import { DIAS_ABREV, type Challenge, type RankingEntry } from '../lib/types'
 
@@ -193,14 +194,38 @@ export function ChallengeDetailPage() {
           </div>
         )}
 
-        {fase !== 'encerrado' && (
-          <button
-            className={desafio.sou_membro ? 'btn-ghost w-full' : 'btn-primary w-full'}
-            disabled={ocupado}
-            onClick={() => void entrarOuSair()}
-          >
-            {desafio.sou_membro ? 'Sair do desafio' : 'Entrar na competição 🔥'}
-          </button>
+        {/* Entrada restrita: quem entra é a organização, então nem o
+            botão de entrar nem o de sair fazem sentido para o aluno */}
+        {desafio.entrada_restrita ? (
+          <div className="rounded-xl bg-noite-950 px-4 py-3 text-sm text-stone-400">
+            🎟️{' '}
+            {desafio.sou_membro ? (
+              <>
+                Você está na lista deste evento. A organização é quem
+                gerencia quem participa.
+              </>
+            ) : (
+              <>
+                Este desafio é do evento e só a organização adiciona
+                participantes. Comprou ingresso e não está aqui? Fale com a
+                organização.
+              </>
+            )}
+          </div>
+        ) : (
+          fase !== 'encerrado' && (
+            <button
+              className={
+                desafio.sou_membro ? 'btn-ghost w-full' : 'btn-primary w-full'
+              }
+              disabled={ocupado}
+              onClick={() => void entrarOuSair()}
+            >
+              {desafio.sou_membro
+                ? 'Sair do desafio'
+                : 'Entrar na competição 🔥'}
+            </button>
+          )
         )}
       </div>
 
@@ -264,6 +289,12 @@ export function ChallengeDetailPage() {
           </ol>
         )}
       </section>
+
+      {papel === 'organizador' && desafio.entrada_restrita && (
+        <section className="card p-4">
+          <ParticipantesDesafio desafio={desafio} onMudou={() => void carregar()} />
+        </section>
+      )}
 
       {papel === 'organizador' && (
         <section className="card space-y-2 p-4">

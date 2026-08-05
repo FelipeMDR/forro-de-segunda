@@ -3,7 +3,7 @@ import type { ForroApi } from './api'
 import { pontosNoDesafio } from './dates'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
-import { synthEmail, telefonesIguais } from './phone'
+import { normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { turmaLabel } from './types'
 import type {
   AgendaEvent,
@@ -16,6 +16,7 @@ import type {
   ChallengeInput,
   CheckinFavorito,
   Comment,
+  ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
   DistintivoRecebedor,
@@ -615,6 +616,120 @@ export class SupabaseApi implements ForroApi {
     return data as CheckinFavorito[]
   }
 
+  async addMembroDesafio(challengeId: string, userId: string) {
+    ok(
+      await this.sb
+        .from('challenge_members')
+        .upsert(
+          { challenge_id: challengeId, user_id: userId },
+          { onConflict: 'challenge_id,user_id' },
+        ),
+    )
+  }
+
+  async removeMembroDesafio(challengeId: string, userId: string) {
+    ok(
+      await this.sb
+        .from('challenge_members')
+        .delete()
+        .eq('challenge_id', challengeId)
+        .eq('user_id', userId),
+    )
+  }
+
+  async listConvidados(challengeId: string): Promise<ConvidadoDesafio[]> {
+    const data = ok(
+      await this.sb
+        .from('challenge_convidados')
+        .select('telefone, telefone_exibicao, nome')
+        .eq('challenge_id', challengeId)
+        .order('nome'),
+    ) as ConvidadoDesafio[]
+    return data
+  }
+
+  async removeConvidado(challengeId: string, telefone: string) {
+    ok(
+      await this.sb
+        .from('challenge_convidados')
+        .delete()
+        .eq('challenge_id', challengeId)
+        .eq('telefone', normalizeTelefone(telefone)),
+    )
+  }
+
+  async importarConvidados(
+    challengeId: string,
+    linhas: { nome: string; telefone: string }[],
+  ) {
+    // Casa a lista de ingressos com quem já tem conta. O telefone é o
+    // elo: é o login do app e o que a bilheteria costuma anotar.
+    const perfis = ok(
+      await this.sb.from('profiles').select('id, telefone'),
+    ) as Array<{ id: string; telefone: string | null }>
+
+    const jaMembros = ok(
+      await this.sb
+        .from('challenge_members')
+        .select('user_id')
+        .eq('challenge_id', challengeId),
+    ) as Array<{ user_id: string }>
+    const membros = new Set(jaMembros.map((m) => m.user_id))
+
+    const novosMembros: string[] = []
+    const pendentes: Array<{
+      challenge_id: string
+      telefone: string
+      telefone_exibicao: string
+      nome: string | null
+    }> = []
+    let jaEstavam = 0
+
+    for (const linha of linhas) {
+      const perfil = perfis.find(
+        (p) => p.telefone && telefonesIguais(p.telefone, linha.telefone),
+      )
+      if (!perfil) {
+        pendentes.push({
+          challenge_id: challengeId,
+          telefone: normalizeTelefone(linha.telefone),
+          telefone_exibicao: linha.telefone,
+          nome: linha.nome || null,
+        })
+      } else if (membros.has(perfil.id)) {
+        jaEstavam++
+      } else {
+        novosMembros.push(perfil.id)
+        membros.add(perfil.id)
+      }
+    }
+
+    if (novosMembros.length > 0) {
+      ok(
+        await this.sb.from('challenge_members').upsert(
+          novosMembros.map((user_id) => ({
+            challenge_id: challengeId,
+            user_id,
+          })),
+          { onConflict: 'challenge_id,user_id' },
+        ),
+      )
+    }
+    if (pendentes.length > 0) {
+      ok(
+        await this.sb
+          .from('challenge_convidados')
+          .upsert(pendentes, { onConflict: 'challenge_id,telefone' }),
+      )
+    }
+
+    return {
+      adicionados: novosMembros.length,
+      pendentes: pendentes.length,
+      jaEstavam,
+    }
+  }
+
   async contarDesafios(userId: string) {
     const { count, error } = await this.sb
       .from('challenge_members')
@@ -644,6 +759,7 @@ export class SupabaseApi implements ForroApi {
           hora_fim: horaCurta(j.hora_fim),
         }))
         .sort((a, b) => a.dia_semana - b.dia_semana),
+      entrada_restrita: Boolean(c.entrada_restrita),
       // Ausente enquanto a migração 008 não roda — sem trava de local
       local:
         c.local_lat != null && c.local_lng != null
@@ -699,6 +815,7 @@ export class SupabaseApi implements ForroApi {
       local_lat: data.local?.lat ?? null,
       local_lng: data.local?.lng ?? null,
       local_raio_m: data.local?.raio_m ?? null,
+      entrada_restrita: data.entrada_restrita,
     }
     let challengeId = data.id
     if (challengeId) {

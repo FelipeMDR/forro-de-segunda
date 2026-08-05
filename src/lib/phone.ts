@@ -20,6 +20,23 @@ export function telefoneValido(t: string): boolean {
 }
 
 /**
+ * Deixa o número legível para conferência a olho, sem inventar o que
+ * não se sabe: como a normalização guarda só os 10 últimos dígitos, o
+ * DDD pode ter sido cortado — então nada de "(11)" a menos que o
+ * original tenha vindo completo. Só separa os 4 últimos dígitos, que é
+ * o que ajuda a bater a linha com a lista de ingressos.
+ */
+export function formatTelefone(t: string): string {
+  const originais = t.replace(/\D/g, '')
+  if (originais.length === 11) {
+    return `(${originais.slice(0, 2)}) ${originais.slice(2, 7)}-${originais.slice(7)}`
+  }
+  const d = normalizeTelefone(t)
+  if (d.length < 8) return t
+  return `${d.slice(0, -4)}-${d.slice(-4)}`
+}
+
+/**
  * O Supabase Auth exige e-mail, mas o aluno entra só com telefone +
  * senha. Convertemos o telefone num e-mail sintético estável — ele
  * nunca recebe mensagem (por isso a confirmação de e-mail precisa
