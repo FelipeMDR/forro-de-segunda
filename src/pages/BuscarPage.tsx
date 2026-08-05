@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { combinaBusca } from '../lib/busca'
 import {
   cargoPrincipal,
+  ehDiretoria,
   emojiCargo,
   turmaLabel,
   type PerfilPublico,
@@ -47,16 +48,22 @@ export function BuscarPage() {
     }
   }, [api])
 
+  const termo = busca.trim()
+
+  // Sem busca, mostra só a diretoria: listar o projeto inteiro deixa de
+  // caber conforme ele cresce, e é a diretoria que se procura sem saber
+  // o nome. Digitando, a busca vale para todo mundo.
   const resultados = useMemo(() => {
     if (!perfis) return []
+    if (!termo) return perfis.filter((p) => ehDiretoria(p.cargos))
     return perfis.filter((p) =>
-      combinaBusca(busca, [
+      combinaBusca(termo, [
         p.nome,
         ...p.turmas.map((t) => t.turma),
         ...p.cargos,
       ]),
     )
-  }, [perfis, busca])
+  }, [perfis, termo])
 
   if (erro) return <ErrorState erro={erro} onRetry={() => navigate(0)} />
 
@@ -77,16 +84,33 @@ export function BuscarPage() {
       {perfis === null ? (
         <Spinner texto="Carregando pessoas…" />
       ) : resultados.length === 0 ? (
-        <EmptyState
-          emoji="🤷"
-          titulo="Ninguém encontrado"
-          texto={`Nada casou com "${busca.trim()}". Tente outro nome ou uma turma.`}
-        />
+        termo ? (
+          <EmptyState
+            emoji="🤷"
+            titulo="Ninguém encontrado"
+            texto={`Nada casou com "${termo}". Tente outro nome ou uma turma.`}
+          />
+        ) : (
+          <EmptyState
+            emoji="🔎"
+            titulo="Comece a digitar"
+            texto="Busque qualquer pessoa por nome, turma ou cargo."
+          />
+        )
       ) : (
         <>
           <p className="text-xs text-stone-500">
-            {resultados.length}{' '}
-            {resultados.length === 1 ? 'pessoa' : 'pessoas'}
+            {termo ? (
+              <>
+                {resultados.length}{' '}
+                {resultados.length === 1 ? 'pessoa' : 'pessoas'}
+              </>
+            ) : (
+              <>
+                <strong className="text-stone-400">Diretoria do projeto</strong>{' '}
+                · digite para buscar qualquer pessoa
+              </>
+            )}
           </p>
           <ul className="card divide-y divide-white/5">
             {resultados.map((p) => {
