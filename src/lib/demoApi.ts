@@ -834,7 +834,7 @@ export class DemoApi implements ForroApi {
     const c = this.db.challenges.find((x) => x.id === id)
     if (c?.entrada_restrita && this.db.roles[this.uid()] !== 'organizador') {
       throw new Error(
-        'Este desafio é só para quem a organização adicionar (evento pago)',
+        'Este desafio é só para quem a organização adicionar (evento restrito)',
       )
     }
   }

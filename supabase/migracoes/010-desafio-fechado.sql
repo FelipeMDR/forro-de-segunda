@@ -1,7 +1,7 @@
 -- ============================================================
--- MIGRAÇÃO 010 — Desafio de entrada restrita (evento pago)
+-- MIGRAÇÃO 010 — Desafio de entrada restrita
 --
--- Para desafios amarrados a evento pago (Forró na Rep): o aluno não
+-- Para desafios de evento restrito (Forró na Rep): o aluno não
 -- entra sozinho, só a organização adiciona — normalmente importando a
 -- lista de quem comprou ingresso.
 --
