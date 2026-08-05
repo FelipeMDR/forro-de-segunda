@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#ffffff"/>
+  <!-- zabumba -->
+  <circle cx="240.0" cy="280.0" r="150.0" fill="#7dba2f" stroke="#1a1a1a" stroke-width="22.0"/>
+  <circle cx="240.0" cy="280.0" r="108.0" fill="#f8f6c8" stroke="#1a1a1a" stroke-width="17.0"/>
+  <line x1="262.0" y1="228.0" x2="472.0" y2="122.0" stroke="#1a1a1a" stroke-width="22.0" stroke-linecap="round"/>
+  <circle cx="262.0" cy="228.0" r="21.0" fill="#ffffff" stroke="#1a1a1a" stroke-width="13.0"/>
+  <!-- bandana -->
+  <path d="M 110.0 150.0
+           Q 164.0 36.0 258.0 46.0
+           Q 353.0 60.0 380.0 122.0
+           L 331.0 139.0
+           Q 272.0 168.0 218.0 150.0
+           Q 164.0 168.0 110.0 150.0 Z"
+        fill="#e56a19" stroke="#1a1a1a" stroke-width="12.0" stroke-linejoin="round"/>
+  <path d="M 364.0 96.0 q 45.0 -12 38.0 34.0 q -16 -6 -42 -2 Z"
+        fill="#e56a19" stroke="#1a1a1a" stroke-width="8.0" stroke-linejoin="round"/>
+  <polygon points="168.0,90.0 172.8,101.4 185.1,102.4 175.7,110.5 178.6,122.6 168.0,116.1 157.4,122.6 160.3,110.5 150.9,102.4 163.2,101.4" fill="#f9c74f" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="244.0,64.0 249.3,76.7 263.0,77.8 252.6,86.8 255.8,100.2 244.0,93.0 232.2,100.2 235.4,86.8 225.0,77.8 238.7,76.7" fill="#f9c74f" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="318.0,88.0 322.2,98.2 333.2,99.1 324.8,106.2 327.4,116.9 318.0,111.2 308.6,116.9 311.2,106.2 302.8,99.1 313.8,98.2" fill="#f9c74f" stroke="#1a1a1a" stroke-width="3"/>
+  <!-- triângulo -->
+  <path d="M 328.0 434.0 L 375.0 326.0 L 438.0 452.0 L 340.0 452.0"
+        fill="none" stroke="#1b87c9" stroke-width="22.0" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="390.0" y1="384.0" x2="452.0" y2="336.0" stroke="#1b87c9" stroke-width="16.0" stroke-linecap="round"/>
+</svg>
