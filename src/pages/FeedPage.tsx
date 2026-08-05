@@ -7,13 +7,12 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import {
-  desafiosQueContam,
   formatDateLong,
   proximasOcorrenciasAgenda,
   toISODate,
   type OcorrenciaAgenda,
 } from '../lib/dates'
-import type { AgendaEvent, Challenge, Feriado, FeedItem } from '../lib/types'
+import type { AgendaEvent, Feriado, FeedItem } from '../lib/types'
 
 function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
   if (ocorrencias.length === 0) return null
@@ -71,7 +70,6 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
 export function FeedPage() {
   const { api, profile } = useAuth()
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
-  const [desafios, setDesafios] = useState<Challenge[]>([])
   const [eventos, setEventos] = useState<AgendaEvent[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
   const [erro, setErro] = useState<string | null>(null)
@@ -79,17 +77,15 @@ export function FeedPage() {
 
   const carregar = useCallback(async () => {
     try {
-      // Carregados em separado: se a agenda ou os desafios falharem,
-      // o feed ainda aparece (antes um erro derrubava a tela inteira).
+      // Carregados em separado: se a agenda falhar, o feed ainda
+      // aparece (antes um erro derrubava a tela inteira).
       setErro(null)
       const f = await api.getFeed()
       setFeed(f)
-      const [d, e, fer] = await Promise.all([
-        api.listChallenges().catch(() => [] as Challenge[]),
+      const [e, fer] = await Promise.all([
         api.listEvents().catch(() => [] as AgendaEvent[]),
         api.listFeriados().catch(() => [] as Feriado[]),
       ])
-      setDesafios(d)
       setEventos(e)
       setFeriados(fer)
     } catch (e) {
@@ -154,7 +150,6 @@ export function FeedPage() {
           <CheckinCard
             key={item.id}
             item={item}
-            contaPontos={desafiosQueContam(item.criado_em, desafios).length > 0}
             onChanged={() => void carregar()}
           />
         ))

@@ -14,12 +14,9 @@ import { CommentsSheet } from './CommentsSheet'
 
 export function CheckinCard({
   item,
-  contaPontos,
   onChanged,
 }: {
   item: FeedItem
-  /** Se o check-in cai na janela de algum desafio (selo informativo). */
-  contaPontos: boolean
   onChanged: () => void
 }) {
   const { api, userId, papel } = useAuth()
@@ -112,11 +109,6 @@ export function CheckinCard({
             </p>
           </div>
         </Link>
-        {!contaPontos && (
-          <span className="shrink-0 rounded-full bg-preto/5 px-2 py-1 text-[10px] font-bold text-tinta-600">
-            fora da janela
-          </span>
-        )}
         <div className="relative">
           <button
             className="rounded-lg px-2 py-1 text-tinta-500 hover:bg-preto/5"
