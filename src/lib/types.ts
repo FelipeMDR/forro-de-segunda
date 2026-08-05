@@ -317,13 +317,16 @@ export function pesoCargo(nome: string): number {
 }
 
 /**
- * Diretoria: presidência, vice e diretorias. Usado como lista inicial
- * da busca — mostrar o projeto inteiro deixa de fazer sentido conforme
- * ele cresce, e a diretoria é quem mais se procura sem saber o nome.
- * Para incluir professores e monitores, troque o 3 por 5.
+ * Está na equipe do projeto: tem qualquer cargo (diretoria, professor,
+ * monitor, membro de comissão…). Lista inicial da busca — mostrar o
+ * projeto inteiro deixa de caber conforme ele cresce, e a equipe é quem
+ * se procura sem saber o nome.
+ *
+ * Qualquer cargo, e não uma lista fechada, para que cargo novo criado
+ * no painel entre aqui sozinho.
  */
-export function ehDiretoria(cargos: string[]): boolean {
-  return cargos.some((c) => pesoCargo(c) <= 3)
+export function ehEquipeDoProjeto(cargos: string[]): boolean {
+  return cargos.length > 0
 }
 
 /** Cargo mais alto de alguém — é o que aparece em destaque no feed. */

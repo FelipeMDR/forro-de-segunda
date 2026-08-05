@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { combinaBusca } from '../lib/busca'
 import {
   cargoPrincipal,
-  ehDiretoria,
+  ehEquipeDoProjeto,
   emojiCargo,
   turmaLabel,
   type PerfilPublico,
@@ -50,12 +50,12 @@ export function BuscarPage() {
 
   const termo = busca.trim()
 
-  // Sem busca, mostra só a diretoria: listar o projeto inteiro deixa de
-  // caber conforme ele cresce, e é a diretoria que se procura sem saber
-  // o nome. Digitando, a busca vale para todo mundo.
+  // Sem busca, mostra só a equipe do projeto: listar todo mundo deixa
+  // de caber conforme ele cresce, e é a equipe que se procura sem saber
+  // o nome. Digitando, a busca vale para todos os alunos.
   const resultados = useMemo(() => {
     if (!perfis) return []
-    if (!termo) return perfis.filter((p) => ehDiretoria(p.cargos))
+    if (!termo) return perfis.filter((p) => ehEquipeDoProjeto(p.cargos))
     return perfis.filter((p) =>
       combinaBusca(termo, [
         p.nome,
@@ -107,8 +107,8 @@ export function BuscarPage() {
               </>
             ) : (
               <>
-                <strong className="text-stone-400">Diretoria do projeto</strong>{' '}
-                · digite para buscar qualquer pessoa
+                <strong className="text-stone-400">Equipe do projeto</strong> ·
+                digite para buscar qualquer aluno
               </>
             )}
           </p>
