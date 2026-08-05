@@ -1,5 +1,6 @@
 import type { ForroApi } from './api'
 import { addDays, pontosNoDesafio, proximaOcorrencia, toISODate } from './dates'
+import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import { normalizeTelefone, telefonesIguais } from './phone'
@@ -14,6 +15,7 @@ import type {
   Challenge,
   ChallengeInput,
   ChallengeJanela,
+  ChallengeLocal,
   CheckinFavorito,
   Comment,
   DistintivoDef,
@@ -44,6 +46,8 @@ interface CheckinRow {
   criado_em: string
   /** Ausente nos dados antigos do localStorage — vale como false. */
   favorito?: boolean
+  /** Desafios em que a foto valeu no local (espelha checkin_locais). */
+  locais?: string[]
 }
 
 interface ChallengeRow {
@@ -53,6 +57,7 @@ interface ChallengeRow {
   data_inicio: string
   data_fim: string
   janelas: ChallengeJanela[]
+  local: ChallengeLocal | null
   criado_por: string | null
 }
 
@@ -216,6 +221,7 @@ function seed(): DB {
       hora_inicio: '00:00',
       hora_fim: '23:59',
     })),
+    local: null,
     criado_por: ana.id,
   }
 
@@ -566,7 +572,11 @@ export class DemoApi implements ForroApi {
     return () => this.feedListeners.delete(cb)
   }
 
-  async createCheckin(foto: Blob, legenda: string) {
+  async createCheckin(
+    foto: Blob,
+    legenda: string,
+    coords?: Coordenada | null,
+  ) {
     // Mesma trava do trigger em produção (migração 007)
     const estado = limiteCheckin(
       this.db.checkins
@@ -586,6 +596,20 @@ export class DemoApi implements ForroApi {
       foto_url: await blobToDataURL(foto),
       legenda: legenda.trim() || null,
       criado_em: new Date().toISOString(),
+      // Mesmo veredito que a função registrar_checkin faz no servidor:
+      // guarda em quais desafios valeu, nunca a coordenada.
+      locais: coords
+        ? this.db.challenges
+            .filter(
+              (c) =>
+                c.local &&
+                this.db.members.some(
+                  (m) => m.challenge_id === c.id && m.user_id === this.uid(),
+                ) &&
+                distanciaMetros(coords, c.local) <= c.local.raio_m,
+            )
+            .map((c) => c.id)
+        : [],
     }
     this.db.checkins.push(row)
     this.persist()
@@ -737,6 +761,7 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
+        local: data.local,
       })
     } else {
       this.db.challenges.push({
@@ -746,6 +771,7 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
+        local: data.local,
         criado_por: this.uid(),
       })
     }
@@ -790,7 +816,12 @@ export class DemoApi implements ForroApi {
         // Máximo de 1 ponto por dia, mesmo com várias fotos
         const pontos = pontosNoDesafio(
           this.db.checkins
-            .filter((c) => c.user_id === uid)
+            .filter(
+              (c) =>
+                c.user_id === uid &&
+                // Com trava de local, valem só os que têm veredito
+                (!challenge.local || (c.locais ?? []).includes(challenge.id)),
+            )
             .map((c) => new Date(c.criado_em)),
           challenge,
         )

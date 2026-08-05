@@ -2,7 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { toISODate } from '../lib/dates'
-import { DIAS_ABREV, type Challenge, type ChallengeInput } from '../lib/types'
+import { obterPosicao } from '../lib/geo'
+import {
+  DIAS_ABREV,
+  RAIO_LOCAL_PADRAO_M,
+  type Challenge,
+  type ChallengeInput,
+} from '../lib/types'
 
 export function ChallengeForm({
   desafio,
@@ -23,8 +29,35 @@ export function ChallengeForm({
     data_inicio: desafio?.data_inicio ?? hoje,
     data_fim: desafio?.data_fim ?? hoje,
     janelas: desafio?.janelas ?? [],
+    local: desafio?.local ?? null,
   })
   const [salvando, setSalvando] = useState(false)
+  const [buscandoLocal, setBuscandoLocal] = useState(false)
+  const [precisao, setPrecisao] = useState<number | null>(null)
+
+  // O organizador marca o ponto estando no lugar — bem mais simples do
+  // que pedir coordenada, e é o que ele já vai fazer numa aula.
+  const usarLocalAtual = async () => {
+    setBuscandoLocal(true)
+    try {
+      const p = await obterPosicao()
+      setPrecisao(p.precisao)
+      setForm((f) => ({
+        ...f,
+        local: {
+          nome: f.local?.nome ?? '',
+          lat: p.lat,
+          lng: p.lng,
+          raio_m: f.local?.raio_m ?? RAIO_LOCAL_PADRAO_M,
+        },
+      }))
+      toast('Local marcado onde você está agora 📍')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setBuscandoLocal(false)
+    }
+  }
 
   // Controle auxiliar pra montar/editar as janelas: escolhe os dias,
   // define um horário e aplica — cada espaço tem seu próprio horário,
@@ -80,6 +113,14 @@ export function ChallengeForm({
         'Configure pelo menos um dia com horário de check-in',
         'erro',
       )
+      return
+    }
+    if (form.local && form.local.lat === 0 && form.local.lng === 0) {
+      toast('Marque o local no botão "Marcar onde estou agora"', 'erro')
+      return
+    }
+    if (form.local && form.local.raio_m < 50) {
+      toast('O raio precisa ser de pelo menos 50 metros', 'erro')
       return
     }
     setSalvando(true)
@@ -271,6 +312,108 @@ export function ChallengeForm({
             Repita quantas vezes precisar — se um dia já tiver horário, o
             novo substitui.
           </p>
+        </div>
+
+        <div className="space-y-3 rounded-2xl bg-noite-950 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">📍 Exigir estar no local</p>
+              <p className="text-[11px] text-stone-500">
+                Só conta ponto quem tirar a foto ali. Bom para amarrar o
+                desafio ao salão da aula ou à casa da festa.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
+              aria-label="Exigir estar no local"
+              checked={form.local !== null}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  local: e.target.checked
+                    ? { nome: '', lat: 0, lng: 0, raio_m: RAIO_LOCAL_PADRAO_M }
+                    : null,
+                }))
+              }
+            />
+          </div>
+
+          {form.local && (
+            <>
+              <button
+                type="button"
+                className="btn-ghost w-full"
+                disabled={buscandoLocal}
+                onClick={() => void usarLocalAtual()}
+              >
+                {buscandoLocal
+                  ? 'Buscando GPS…'
+                  : '📍 Marcar onde estou agora'}
+              </button>
+
+              {form.local.lat === 0 && form.local.lng === 0 ? (
+                <p className="text-xs text-amber-400">
+                  Vá até o local e toque no botão acima. Sem isso o desafio
+                  não pode ser salvo com a trava ligada.
+                </p>
+              ) : (
+                <p className="text-[11px] text-stone-500">
+                  Ponto marcado: {form.local.lat.toFixed(5)},{' '}
+                  {form.local.lng.toFixed(5)}
+                  {precisao !== null && ` · GPS com ${Math.round(precisao)} m de precisão`}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="local-nome">
+                    Nome do lugar
+                  </label>
+                  <input
+                    id="local-nome"
+                    className="input"
+                    placeholder="Espaço Livre"
+                    value={form.local.nome ?? ''}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        local: f.local && { ...f.local, nome: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="local-raio">
+                    Raio (metros)
+                  </label>
+                  <input
+                    id="local-raio"
+                    type="number"
+                    min={50}
+                    max={5000}
+                    step={50}
+                    className="input"
+                    value={form.local.raio_m}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        local: f.local && {
+                          ...f.local,
+                          raio_m: Number(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-stone-500">
+                Raio muito curto reprova quem está no salão (o GPS erra
+                dezenas de metros dentro de prédio). 200 m costuma ser um
+                bom começo.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="flex gap-2">

@@ -100,6 +100,22 @@ export interface ChallengeJanela {
 }
 
 /**
+ * Trava de local: com ela, só conta ponto quem tirou a foto dentro do
+ * raio. Serve para amarrar o desafio ao salão da aula ou ao local da
+ * festa. Sem isso (local = null), vale de qualquer lugar.
+ */
+export interface ChallengeLocal {
+  /** Como o aluno vê o lugar ("Espaço Livre", "Rep do Zé"). */
+  nome: string | null
+  lat: number
+  lng: number
+  raio_m: number
+}
+
+/** Raio inicial sugerido: cobre um salão e o entorno imediato. */
+export const RAIO_LOCAL_PADRAO_M = 200
+
+/**
  * Desafio = competição de presença: quem somar mais check-ins válidos
  * dentro do período e da janela do dia (cada dia da semana pode ter
  * seu próprio horário) vence.
@@ -112,6 +128,8 @@ export interface Challenge {
   data_fim: string // "YYYY-MM-DD"
   /** No máximo uma janela por dia da semana. */
   janelas: ChallengeJanela[]
+  /** null = conta de qualquer lugar. */
+  local: ChallengeLocal | null
   criado_por: string | null
   participantes: number
   sou_membro: boolean
@@ -124,6 +142,7 @@ export interface ChallengeInput {
   data_inicio: string
   data_fim: string
   janelas: ChallengeJanela[]
+  local: ChallengeLocal | null
 }
 
 export interface RankingEntry {

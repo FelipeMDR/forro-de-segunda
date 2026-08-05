@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ForroApi } from './api'
 import { pontosNoDesafio } from './dates'
 import { extensionFor } from './image'
+import type { Coordenada } from './geo'
 import { synthEmail, telefonesIguais } from './phone'
 import { turmaLabel } from './types'
 import type {
@@ -478,7 +479,11 @@ export class SupabaseApi implements ForroApi {
     }
   }
 
-  async createCheckin(foto: Blob, legenda: string) {
+  async createCheckin(
+    foto: Blob,
+    legenda: string,
+    coords?: Coordenada | null,
+  ) {
     const uid = await this.requireUid()
     const path = `${uid}/${crypto.randomUUID()}.${extensionFor(foto)}`
     ok(
@@ -488,11 +493,16 @@ export class SupabaseApi implements ForroApi {
     )
     const foto_url = this.sb.storage.from('fotos').getPublicUrl(path).data
       .publicUrl
-    ok(
-      await this.sb
-        .from('checkins')
-        .insert({ user_id: uid, foto_url, legenda: legenda.trim() || null }),
-    )
+    // Via função: ela cria o check-in e decide, no servidor, em quais
+    // desafios a coordenada caiu dentro do raio. A coordenada não é
+    // guardada — some junto com a chamada.
+    const { error } = await this.sb.rpc('registrar_checkin', {
+      p_foto_url: foto_url,
+      p_legenda: legenda.trim() || null,
+      p_lat: coords?.lat ?? null,
+      p_lng: coords?.lng ?? null,
+    })
+    if (error) throw new Error(traduz(error.message))
   }
 
   async deleteCheckin(id: string) {
@@ -633,6 +643,16 @@ export class SupabaseApi implements ForroApi {
           hora_fim: horaCurta(j.hora_fim),
         }))
         .sort((a, b) => a.dia_semana - b.dia_semana),
+      // Ausente enquanto a migração 008 não roda — sem trava de local
+      local:
+        c.local_lat != null && c.local_lng != null
+          ? {
+              nome: (c.local_nome as string | null) ?? null,
+              lat: Number(c.local_lat),
+              lng: Number(c.local_lng),
+              raio_m: Number(c.local_raio_m),
+            }
+          : null,
       criado_por: c.criado_por as string | null,
       participantes:
         (c.participantes as Array<{ count: number }>)?.[0]?.count ?? 0,
@@ -673,6 +693,10 @@ export class SupabaseApi implements ForroApi {
       descricao: data.descricao || null,
       data_inicio: data.data_inicio,
       data_fim: data.data_fim,
+      local_nome: data.local?.nome || null,
+      local_lat: data.local?.lat ?? null,
+      local_lng: data.local?.lng ?? null,
+      local_raio_m: data.local?.raio_m ?? null,
     }
     let challengeId = data.id
     if (challengeId) {
@@ -762,19 +786,34 @@ export class SupabaseApi implements ForroApi {
     const checkins = ok(
       await this.sb
         .from('checkins')
-        .select('user_id, criado_em')
+        .select('id, user_id, criado_em')
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
         .in(
           'user_id',
           membros.map((m) => m.user_id),
         ),
-    ) as Array<{ user_id: string; criado_em: string }>
+    ) as Array<{ id: string; user_id: string; criado_em: string }>
+
+    // Desafio com trava de local: valem só os check-ins com veredito
+    // registrado. Vem a lista de ids aprovados — nenhuma coordenada
+    // trafega, que é o ponto do desenho (ver migração 008).
+    let aprovados: Set<string> | null = null
+    if (challenge.local) {
+      const rows = ok(
+        await this.sb
+          .from('checkin_locais')
+          .select('checkin_id')
+          .eq('challenge_id', challenge.id),
+      ) as Array<{ checkin_id: string }>
+      aprovados = new Set(rows.map((r) => r.checkin_id))
+    }
 
     // A janela (dias + horário) é avaliada no fuso local do usuário e
     // cada dia vale no máximo 1 ponto, mesmo com várias fotos
     const datasPor = new Map<string, Date[]>()
     for (const c of checkins) {
+      if (aprovados && !aprovados.has(c.id)) continue
       const lista = datasPor.get(c.user_id) ?? []
       lista.push(new Date(c.criado_em))
       datasPor.set(c.user_id, lista)

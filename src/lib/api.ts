@@ -1,3 +1,4 @@
+import type { Coordenada } from './geo'
 import type {
   AgendaEvent,
   AgendaEventInput,
@@ -63,7 +64,17 @@ export interface ForroApi {
   getFeed(): Promise<FeedItem[]>
   /** Notifica quando o feed muda (realtime). Retorna unsubscribe. */
   subscribeFeed(cb: () => void): () => void
-  createCheckin(foto: Blob, legenda: string): Promise<void>
+  /**
+   * `coords` só é usada para validar desafios com trava de local, e não
+   * é guardada em lugar nenhum — o que fica salvo é apenas em quais
+   * desafios a foto valeu. Null = aluno negou o GPS: a foto entra no
+   * feed, mas não valida desafio com local.
+   */
+  createCheckin(
+    foto: Blob,
+    legenda: string,
+    coords?: Coordenada | null,
+  ): Promise<void>
   deleteCheckin(id: string): Promise<void>
   toggleReaction(checkinId: string, tipo: string): Promise<void>
   getComments(checkinId: string): Promise<Comment[]>

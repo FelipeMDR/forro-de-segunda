@@ -10,6 +10,12 @@ import {
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
 import {
+  distanciaLegivel,
+  distanciaMetros,
+  obterPosicao,
+  type PosicaoObtida,
+} from '../lib/geo'
+import {
   esperaLegivel,
   limiteCheckin,
   LIMITE_POR_JANELA,
@@ -29,6 +35,9 @@ export function CheckinPage() {
   // Muda sozinho com o tempo (o respiro de 5 min vence), então precisa
   // de um tique para a tela destravar sem o aluno recarregar a página.
   const [agora, setAgora] = useState(() => new Date())
+  const [posicao, setPosicao] = useState<PosicaoObtida | null>(null)
+  const [erroLocal, setErroLocal] = useState<string | null>(null)
+  const [buscandoLocal, setBuscandoLocal] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setAgora(new Date()), 20_000)
@@ -85,6 +94,58 @@ export function CheckinPage() {
     return { aindaPontuam, jaPontuaram }
   }, [valendoAgora, meusCheckins])
 
+  // Desafios abertos agora que exigem estar no local
+  const comLocal = useMemo(
+    () => valendoAgora.filter((c) => c.local),
+    [valendoAgora],
+  )
+
+  // Só pede GPS se algum desafio realmente precisar — pedir permissão
+  // sem motivo é o tipo de coisa que faz o aluno negar pra sempre.
+  const buscarLocal = async () => {
+    setBuscandoLocal(true)
+    setErroLocal(null)
+    try {
+      setPosicao(await obterPosicao())
+    } catch (e) {
+      setErroLocal((e as Error).message)
+    } finally {
+      setBuscandoLocal(false)
+    }
+  }
+
+  useEffect(() => {
+    if (comLocal.length > 0 && !posicao && !erroLocal && !buscandoLocal) {
+      void buscarLocal()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comLocal.length])
+
+  /** Situação de cada desafio com local: dentro do raio ou não. */
+  const situacaoLocal = useMemo(
+    () =>
+      comLocal.map((c) => {
+        const distancia = posicao ? distanciaMetros(posicao, c.local!) : null
+        return {
+          desafio: c,
+          distancia,
+          dentro: distancia !== null && distancia <= c.local!.raio_m,
+        }
+      }),
+    [comLocal, posicao],
+  )
+
+  /** Dos que ainda pontuam, os que a localização não barra. */
+  const aindaPontuamAqui = useMemo(
+    () =>
+      aindaPontuam.filter(
+        (c) =>
+          !c.local ||
+          situacaoLocal.find((s) => s.desafio.id === c.id)?.dentro === true,
+      ),
+    [aindaPontuam, situacaoLocal],
+  )
+
   const aoCapturar = async (blob: Blob) => {
     try {
       const comprimida = await compressImage(blob)
@@ -102,11 +163,11 @@ export function CheckinPage() {
     if (!foto) return
     setEnviando(true)
     try {
-      await api.createCheckin(foto, legenda)
+      await api.createCheckin(foto, legenda, posicao)
       toast(
-        aindaPontuam.length > 0
-          ? `Check-in confirmado! Valeu ponto em ${aindaPontuam.length} ${
-              aindaPontuam.length === 1 ? 'desafio' : 'desafios'
+        aindaPontuamAqui.length > 0
+          ? `Check-in confirmado! Valeu ponto em ${aindaPontuamAqui.length} ${
+              aindaPontuamAqui.length === 1 ? 'desafio' : 'desafios'
             } 🎉`
           : jaPontuaram.length > 0
             ? 'Foto publicada! O ponto de hoje já tinha sido contado 😉'
@@ -124,10 +185,62 @@ export function CheckinPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
 
-      {aindaPontuam.length > 0 && (
+      {aindaPontuamAqui.length > 0 && (
         <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
           ✅ Valendo ponto agora:{' '}
-          <strong>{aindaPontuam.map((c) => c.titulo).join(', ')}</strong>
+          <strong>{aindaPontuamAqui.map((c) => c.titulo).join(', ')}</strong>
+        </div>
+      )}
+
+      {comLocal.length > 0 && (
+        <div className="rounded-2xl bg-white/5 px-4 py-3 text-sm">
+          {buscandoLocal && (
+            <p className="text-stone-400">📍 Conferindo onde você está…</p>
+          )}
+
+          {erroLocal && (
+            <div className="space-y-2">
+              <p className="text-amber-300">
+                📍 {erroLocal}. Estes desafios só contam ponto para quem
+                está no local:{' '}
+                <strong>{comLocal.map((c) => c.titulo).join(', ')}</strong>.
+                Você ainda pode postar, mas não vai marcar ponto neles.
+              </p>
+              <button className="btn-ghost" onClick={() => void buscarLocal()}>
+                Tentar de novo
+              </button>
+            </div>
+          )}
+
+          {posicao && (
+            <ul className="space-y-1.5">
+              {situacaoLocal.map(({ desafio, distancia, dentro }) => (
+                <li key={desafio.id} className="flex items-start gap-2">
+                  <span>{dentro ? '📍' : '🚫'}</span>
+                  <span className={dentro ? 'text-emerald-300' : 'text-amber-300'}>
+                    {dentro ? (
+                      <>
+                        Você está em{' '}
+                        <strong>
+                          {desafio.local?.nome || 'local do desafio'}
+                        </strong>{' '}
+                        — <strong>{desafio.titulo}</strong> conta ponto.
+                      </>
+                    ) : (
+                      <>
+                        Você está a{' '}
+                        <strong>{distanciaLegivel(distancia ?? 0)}</strong> de{' '}
+                        <strong>
+                          {desafio.local?.nome || 'local do desafio'}
+                        </strong>
+                        . <strong>{desafio.titulo}</strong> só conta ponto lá.
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

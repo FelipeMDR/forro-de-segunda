@@ -36,6 +36,10 @@ As aulas acontecem a semana toda — forró de segunda a segunda! 🎶
   organização cria um distintivo (emoji + título + descrição) e entrega pra
   quem quiser, por qualquer motivo — inclusive em lote pro topo do ranking
   de um desafio (top 1, top 3, top 5…)
+- **Trava de local 📍** — um desafio pode exigir presença física: só conta
+  ponto quem tirou a foto dentro do raio (o salão da aula, a casa da festa).
+  A coordenada do aluno **nunca é guardada** — é avaliada no servidor no
+  momento do check-in e só o veredito fica salvo
 - **Favoritos ⭐** — o aluno marca os próprios check-ins que quer guardar
   (até 12). Eles viram uma galeria no perfil e ficam **de fora da política
   de retenção**, que arquiva as demais fotos depois de 4 meses
