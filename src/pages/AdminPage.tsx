@@ -1153,11 +1153,18 @@ function SecaoTurmas({
     try {
       await api.saveAlunoCadastrado({
         ...novo,
-        turma: novo.turma || turmas[0]?.nome || '',
+        // Vazio = veterano sem turma no semestre, não "escolhe a
+        // primeira": inventar turma para quem não faz aula sujaria a
+        // chamada e a agenda dessa turma.
+        turma: novo.turma || null,
       })
       setNovo({ nome: '', telefone: '', turma: '', papel_danca: null })
       await carregar()
-      toast('Aluno adicionado à lista de chamada!')
+      toast(
+        novo.turma
+          ? 'Aluno adicionado à lista de chamada!'
+          : 'Adicionado sem turma — já pode criar conta no app 👍',
+      )
     } catch (err) {
       toast((err as Error).message, 'erro')
     }
@@ -1392,7 +1399,7 @@ function SecaoTurmas({
                 value={novo.turma}
                 onChange={(e) => setNovo({ ...novo, turma: e.target.value })}
               >
-                <option value="">Turma…</option>
+                <option value="">Sem turma (veterano)</option>
                 {turmas.map((t) => (
                   <option key={t.id} value={t.nome}>
                     {t.nome}
@@ -1451,7 +1458,7 @@ function SecaoTurmas({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{a.nome ?? '—'}</p>
                   <p className="text-xs text-tinta-500">
-                    {a.telefone} · {a.turma}
+                    {a.telefone} · {a.turma ?? 'sem turma'}
                     {a.papel_danca && ` · ${a.papel_danca}`}
                   </p>
                 </div>

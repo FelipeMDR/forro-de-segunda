@@ -498,10 +498,11 @@ export class DemoApi implements ForroApi {
       // veio na planilha de ingressos
       nome: matches[0]?.nome ?? convite?.nome ?? 'Dançarino(a)',
       avatar_url: null,
-      turmas: matches.map((m) => ({
-        turma: m.turma,
-        papel_danca: m.papel_danca,
-      })),
+      // Veterano sem turma entra sem vínculo (espelha handle_new_user,
+      // que filtra `a.turma is not null`)
+      turmas: matches
+        .filter((m): m is typeof m & { turma: string } => m.turma !== null)
+        .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       cargos: [],
       telefone: telefone.trim(),
       criado_em: new Date().toISOString(),
@@ -534,10 +535,11 @@ export class DemoApi implements ForroApi {
       id: uuid(),
       nome: nome.trim() || matches[0]?.nome || 'Organizador(a)',
       avatar_url: null,
-      turmas: matches.map((m) => ({
-        turma: m.turma,
-        papel_danca: m.papel_danca,
-      })),
+      // Veterano sem turma entra sem vínculo (espelha handle_new_user,
+      // que filtra `a.turma is not null`)
+      turmas: matches
+        .filter((m): m is typeof m & { turma: string } => m.turma !== null)
+        .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       cargos: [],
       telefone: telefone.trim() || null,
       criado_em: new Date().toISOString(),
@@ -593,6 +595,7 @@ export class DemoApi implements ForroApi {
         nome: autor?.nome ?? 'Alguém',
         avatar_url: autor?.avatar_url ?? null,
         turma: autor ? turmaLabel(autor.turmas) : null,
+        turmas: (autor?.turmas ?? []).map((t) => t.turma),
         cargos: autor?.cargos ?? [],
       },
       reacoes: this.db.reactions
@@ -1084,7 +1087,7 @@ export class DemoApi implements ForroApi {
     return [...this.db.alunos].sort(
       (a, b) =>
         (a.nome ?? '').localeCompare(b.nome ?? '') ||
-        a.turma.localeCompare(b.turma),
+        (a.turma ?? '').localeCompare(b.turma ?? ''),
     )
   }
 
@@ -1123,7 +1126,7 @@ export class DemoApi implements ForroApi {
       const jaExiste = this.db.alunos.some(
         (a) =>
           telefonesIguais(a.telefone, row.telefone) &&
-          a.turma.toLowerCase() === row.turma.toLowerCase(),
+          (a.turma ?? '').toLowerCase() === (row.turma ?? '').toLowerCase(),
       )
       if (jaExiste) {
         ignorados++

@@ -356,6 +356,7 @@ export class SupabaseApi implements ForroApi {
           nome: autor?.nome ?? 'Alguém',
           avatar_url: autor?.avatar_url ?? null,
           turma: turmaLabel(autor?.turmas ?? []),
+          turmas: (autor?.turmas ?? []).map((t) => t.turma),
           cargos: (autor?.cargos ?? []).map((x) => x.cargo),
         },
         reacoes: (c.reacoes as FeedItem['reacoes']) ?? [],
@@ -447,6 +448,7 @@ export class SupabaseApi implements ForroApi {
           nome: p?.nome ?? 'Alguém',
           avatar_url: p?.avatar_url ?? null,
           turma: turmaLabel(turmasPor.get(c.user_id) ?? []),
+          turmas: (turmasPor.get(c.user_id) ?? []).map((t) => t.turma),
           cargos: cargosPor.get(c.user_id) ?? [],
         },
         reacoes: reacoes
@@ -1133,7 +1135,7 @@ export class SupabaseApi implements ForroApi {
         !existentes.some(
           (e) =>
             telefonesIguais(e.telefone, r.telefone) &&
-            e.turma.toLowerCase() === r.turma.toLowerCase(),
+            (e.turma ?? '').toLowerCase() === (r.turma ?? '').toLowerCase(),
         ),
     )
     if (novos.length > 0) {

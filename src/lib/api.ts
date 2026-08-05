@@ -146,7 +146,8 @@ export interface ForroApi {
   saveAlunoCadastrado(a: {
     nome: string
     telefone: string
-    turma: string
+    /** null/'' = veterano sem turma no semestre. */
+    turma: string | null
     papel_danca: PapelDanca | null
   }): Promise<void>
   deleteAlunoCadastrado(id: string): Promise<void>
@@ -158,7 +159,7 @@ export interface ForroApi {
     rows: {
       nome: string
       telefone: string
-      turma: string
+      turma: string | null
       papel_danca: PapelDanca | null
     }[],
   ): Promise<{ importados: number; ignorados: number }>

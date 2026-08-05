@@ -56,7 +56,10 @@ export interface FeedItem {
   autor: {
     nome: string
     avatar_url: string | null
+    /** Rótulo pronto para exibir ("Avançado (condutor) · Inter"). */
     turma: string | null
+    /** Nomes crus das turmas — é por aqui que o filtro do feed casa. */
+    turmas: string[]
     cargos: string[]
   }
   reacoes: { tipo: string; user_id: string }[]
@@ -237,7 +240,11 @@ export interface AlunoCadastrado {
   id: string
   nome: string | null
   telefone: string
-  turma: string
+  /**
+   * null = veterano sem turma no semestre. A linha existe só para
+   * liberar o cadastro; a pessoa entra no app sem vínculo de turma.
+   */
+  turma: string | null
   papel_danca: PapelDanca | null
 }
 

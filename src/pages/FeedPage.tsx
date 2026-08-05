@@ -73,6 +73,7 @@ export function FeedPage() {
   const [eventos, setEventos] = useState<AgendaEvent[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
   const [erro, setErro] = useState<string | null>(null)
+  const [visao, setVisao] = useState<'todos' | 'turma'>('todos')
   const timer = useRef<ReturnType<typeof setTimeout>>()
 
   const carregar = useCallback(async () => {
@@ -122,10 +123,50 @@ export function FeedPage() {
     return proximasOcorrenciasAgenda(relevantes, feriados, agora).slice(0, 4)
   }, [eventos, feriados, profile])
 
+  const minhasTurmas = useMemo(
+    () => profile?.turmas.map((m) => m.turma) ?? [],
+    [profile],
+  )
+
+  // Filtra por turma em comum, não por turma exata: quem faz duas turmas
+  // vê as duas, e continua vendo quem divide qualquer uma delas.
+  const feedVisivel = useMemo(() => {
+    if (!feed || visao === 'todos') return feed
+    return feed.filter((item) =>
+      item.autor.turmas.some((t) => minhasTurmas.includes(t)),
+    )
+  }, [feed, visao, minhasTurmas])
+
   return (
     <div className="space-y-4">
       <InstallPrompt />
       <AgendaCard ocorrencias={agenda} />
+
+      {/* Sem turma no semestre (veterano) não há o que filtrar — o
+          seletor só apareceria para levar a uma lista vazia. */}
+      {minhasTurmas.length > 0 && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-preto/5 p-1">
+          {(
+            [
+              ['todos', 'Todo mundo'],
+              ['turma', minhasTurmas.length > 1 ? 'Minhas turmas' : 'Minha turma'],
+            ] as const
+          ).map(([v, rotulo]) => (
+            <button
+              key={v}
+              onClick={() => setVisao(v)}
+              aria-pressed={visao === v}
+              className={`rounded-lg py-2 text-sm font-bold transition ${
+                visao === v
+                  ? 'bg-papel text-tinta-900 shadow-sm'
+                  : 'text-tinta-500'
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      )}
 
       {erro ? (
         <ErrorState
@@ -133,20 +174,32 @@ export function FeedPage() {
           erro={erro}
           onRetry={() => void carregar()}
         />
-      ) : feed === null ? (
+      ) : feedVisivel === null ? (
         <Spinner texto="Carregando o feed…" />
-      ) : feed.length === 0 ? (
-        <EmptyState
-          emoji="💃"
-          titulo="Ainda não tem check-in por aqui"
-          texto="Seja a primeira pessoa a postar uma foto da aula!"
-        >
-          <Link to="/checkin" className="btn-primary">
-            Fazer check-in 📸
-          </Link>
-        </EmptyState>
+      ) : feedVisivel.length === 0 ? (
+        visao === 'turma' ? (
+          <EmptyState
+            emoji="🫂"
+            titulo="Nada da sua turma ainda"
+            texto={`Ninguém de ${minhasTurmas.join(' ou ')} postou por enquanto. Que tal ser a primeira pessoa?`}
+          >
+            <button className="btn-ghost" onClick={() => setVisao('todos')}>
+              Ver todo mundo
+            </button>
+          </EmptyState>
+        ) : (
+          <EmptyState
+            emoji="💃"
+            titulo="Ainda não tem check-in por aqui"
+            texto="Seja a primeira pessoa a postar uma foto da aula!"
+          >
+            <Link to="/checkin" className="btn-primary">
+              Fazer check-in 📸
+            </Link>
+          </EmptyState>
+        )
       ) : (
-        feed.map((item) => (
+        feedVisivel.map((item) => (
           <CheckinCard
             key={item.id}
             item={item}
