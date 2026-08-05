@@ -9,6 +9,11 @@ import {
   janelaDoCheckin,
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
+import {
+  esperaLegivel,
+  limiteCheckin,
+  LIMITE_POR_JANELA,
+} from '../lib/limites'
 import type { Challenge } from '../lib/types'
 
 export function CheckinPage() {
@@ -21,6 +26,19 @@ export function CheckinPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [legenda, setLegenda] = useState('')
   const [enviando, setEnviando] = useState(false)
+  // Muda sozinho com o tempo (o respiro de 5 min vence), então precisa
+  // de um tique para a tela destravar sem o aluno recarregar a página.
+  const [agora, setAgora] = useState(() => new Date())
+
+  useEffect(() => {
+    const t = setInterval(() => setAgora(new Date()), 20_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const limite = useMemo(
+    () => limiteCheckin(meusCheckins, agora),
+    [meusCheckins, agora],
+  )
 
   useEffect(() => {
     void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
@@ -129,6 +147,24 @@ export function CheckinPage() {
         </div>
       )}
 
+      {!limite.pode && limite.liberaEm && (
+        <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+          {limite.motivo === 'intervalo' ? (
+            <>
+              ⏳ Calma no pé! Dá pra postar de novo em{' '}
+              <strong>{esperaLegivel(limite.liberaEm, agora)}</strong>.
+            </>
+          ) : (
+            <>
+              ⏳ Você já postou {LIMITE_POR_JANELA} check-ins nas últimas
+              horas. Libera de novo em{' '}
+              <strong>{esperaLegivel(limite.liberaEm, agora)}</strong> — a
+              presença de hoje já está registrada 😉
+            </>
+          )}
+        </div>
+      )}
+
       {preview ? (
         <div className="card overflow-hidden">
           <img
@@ -150,16 +186,29 @@ export function CheckinPage() {
           </button>
         </div>
       ) : (
-        <>
-          <CameraCapture
-            onCapture={(b) => void aoCapturar(b)}
-            permitirFotoTeste={api.mode === 'demo'}
-          />
-          <p className="px-2 text-center text-xs text-stone-500">
-            A foto é tirada na hora, dentro do app — nada de foto antiga da
-            galeria 😉
-          </p>
-        </>
+        limite.pode && (
+          <>
+            <CameraCapture
+              onCapture={(b) => void aoCapturar(b)}
+              permitirFotoTeste={api.mode === 'demo'}
+            />
+            <p className="px-2 text-center text-xs text-stone-500">
+              A foto é tirada na hora, dentro do app — nada de foto antiga da
+              galeria 😉
+              {limite.restantes <= 2 && (
+                <>
+                  {' '}
+                  Você ainda pode postar{' '}
+                  <strong>
+                    {limite.restantes}{' '}
+                    {limite.restantes === 1 ? 'foto' : 'fotos'}
+                  </strong>{' '}
+                  nas próximas horas.
+                </>
+              )}
+            </p>
+          </>
+        )
       )}
 
       <div>
@@ -179,7 +228,7 @@ export function CheckinPage() {
 
       <button
         className="btn-primary w-full py-3.5 text-base"
-        disabled={!foto || enviando}
+        disabled={!foto || enviando || !limite.pode}
         onClick={() => void publicar()}
       >
         {enviando ? 'Publicando…' : 'Publicar check-in 🎉'}

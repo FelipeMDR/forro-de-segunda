@@ -1,6 +1,7 @@
 import type { ForroApi } from './api'
 import { addDays, pontosNoDesafio, proximaOcorrencia, toISODate } from './dates'
 import { blobToDataURL } from './image'
+import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import { normalizeTelefone, telefonesIguais } from './phone'
 import { CARGOS_PADRAO, LIMITE_FAVORITOS, turmaLabel } from './types'
 import type {
@@ -566,6 +567,19 @@ export class DemoApi implements ForroApi {
   }
 
   async createCheckin(foto: Blob, legenda: string) {
+    // Mesma trava do trigger em produção (migração 007)
+    const estado = limiteCheckin(
+      this.db.checkins
+        .filter((c) => c.user_id === this.uid())
+        .map((c) => new Date(c.criado_em)),
+    )
+    if (!estado.pode) {
+      throw new Error(
+        estado.motivo === 'intervalo'
+          ? 'Espere alguns minutos entre uma foto e outra 😉'
+          : `Você já postou ${LIMITE_POR_JANELA} check-ins nas últimas horas. Curte a festa que depois dá pra postar mais! 💃`,
+      )
+    }
     const row: CheckinRow = {
       id: uuid(),
       user_id: this.uid(),
