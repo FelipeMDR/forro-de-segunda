@@ -21,14 +21,6 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const LOTE = 100
 
 Deno.serve(async (req) => {
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  // Escape para projetos com o formato novo de chave (sb_secret_...), em
-  // que a chave do painel não é a mesma que a plataforma injeta aqui:
-  //   npx supabase secrets set LIMPEZA_TOKEN=algum-segredo-seu
-  const tokenProprio = Deno.env.get('LIMPEZA_TOKEN')
-
-  // Mensagens distintas de propósito: um 401 mudo não diz se faltou o
-  // cabeçalho ou se a chave está errada, e vira caça ao tesouro.
   const auth = req.headers.get('Authorization')
   if (!auth) {
     return new Response(
@@ -37,16 +29,13 @@ Deno.serve(async (req) => {
     )
   }
   const token = auth.replace(/^Bearer\s+/i, '').trim()
-  if (token !== serviceKey && (!tokenProprio || token !== tokenProprio)) {
-    return new Response(
-      'Chave não confere. Use a service_role (Settings > API Keys, a ' +
-        'marcada como secret) — não a anon/publishable. Se o seu projeto ' +
-        'usa chaves sb_secret_..., defina o secret LIMPEZA_TOKEN e use ele.',
-      { status: 401 },
-    )
-  }
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey)
+  // Quem autoriza é o Postgres, não uma comparação de string aqui: as
+  // funções de limpeza têm `grant execute` só para service_role, e o
+  // PostgREST confere a assinatura do token para decidir o papel. Assim
+  // vale qualquer formato de chave, e rotacionar a chave não quebra nada
+  // — chamada com a anon morre no "permission denied" do banco.
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, token)
   const simular = new URL(req.url).searchParams.get('simular') === '1'
 
   // Simulação usa a consulta somente-leitura: nada é marcado como
@@ -54,7 +43,18 @@ Deno.serve(async (req) => {
   const { data, error } = simular
     ? await supabase.rpc('fotos_orfas')
     : await supabase.rpc('preparar_limpeza_fotos')
-  if (error) return new Response(error.message, { status: 500 })
+  if (error) {
+    // "permission denied" = chamou com a anon/publishable em vez da
+    // service_role. É erro de quem chamou, não do servidor.
+    const semPermissao = /permission denied|must be owner/i.test(error.message)
+    return new Response(
+      semPermissao
+        ? 'Essa chave não tem permissão para a limpeza. Use a service_role ' +
+            '(Settings > API Keys, a marcada como secret).'
+        : error.message,
+      { status: semPermissao ? 403 : 500 },
+    )
+  }
 
   const caminhos = ((data ?? []) as Array<{ caminho: string }>)
     .map((r) => r.caminho)
