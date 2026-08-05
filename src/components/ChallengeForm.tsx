@@ -321,7 +321,7 @@ export function ChallengeForm({
             <div>
               <p className="text-sm font-bold">🎟️ Entrada só pela organização</p>
               <p className="text-[11px] text-stone-500">
-                Para evento pago: o aluno não entra sozinho. Depois de
+                Evento restrito: o aluno não entra sozinho. Depois de
                 salvar, adicione os participantes na página do desafio —
                 dá para importar a lista de ingressos por CSV.
               </p>
