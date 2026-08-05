@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { downloadCSV } from '../lib/csv'
 import { challengePhase, daysLeft, formatDate } from '../lib/dates'
+import { colocacoes } from '../lib/ranking'
 import { DIAS_ABREV, type Challenge, type RankingEntry } from '../lib/types'
 
 const MEDALHAS = ['🥇', '🥈', '🥉']
@@ -59,8 +60,12 @@ export function ChallengeDetailPage() {
 
   const fase = challengePhase(desafio)
   const restantes = daysLeft(desafio.data_fim)
-  const lider = ranking[0]
-  const minhaEntrada = ranking.find((r) => r.user_id === userId)
+  const classificacao = colocacoes(ranking)
+  const lider = classificacao[0]?.entrada
+  const minhaColocacao = classificacao.find(
+    (c) => c.entrada.user_id === userId,
+  )
+  const minhaEntrada = minhaColocacao?.entrada
 
   const entrarOuSair = async () => {
     setOcupado(true)
@@ -94,11 +99,11 @@ export function ChallengeDetailPage() {
     downloadCSV(
       `desafio-${desafio.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       ['Posição', 'Nome', 'Turma', 'Presenças'],
-      ranking.map((r, i) => [
-        String(i + 1),
-        r.nome,
-        r.turma ?? '',
-        String(r.pontos),
+      colocacoes(ranking).map(({ entrada, posicao }) => [
+        String(posicao),
+        entrada.nome,
+        entrada.turma ?? '',
+        String(entrada.pontos),
       ]),
     )
   }
@@ -175,6 +180,13 @@ export function ChallengeDetailPage() {
                 alcançar {lider.user_id === userId ? 'você mesmo' : lider.nome}{' '}
                 🏃
               </>
+            ) : minhaColocacao?.empatado ? (
+              // Empatado na frente não é "na frente" — é empate
+              <>
+                {' '}
+                — você está <strong>empatado em {minhaColocacao.posicao}º</strong>{' '}
+                🤝
+              </>
             ) : (
               <> — você está na frente! 👑</>
             )}
@@ -211,7 +223,7 @@ export function ChallengeDetailPage() {
           />
         ) : (
           <ol className="card divide-y divide-white/5">
-            {ranking.map((r, i) => (
+            {classificacao.map(({ entrada: r, posicao, empatado }) => (
               <li
                 key={r.user_id}
                 className={r.user_id === userId ? 'bg-brasa-500/5' : ''}
@@ -220,9 +232,10 @@ export function ChallengeDetailPage() {
                   to={`/perfil/${r.user_id}`}
                   className="flex items-center gap-3 px-4 py-3"
                 >
-                  <span className="w-7 text-center text-lg font-extrabold">
-                    {MEDALHAS[i] ?? (
-                      <span className="text-sm text-stone-500">{i + 1}º</span>
+                  {/* Empate divide a mesma posição — e a mesma medalha */}
+                  <span className="w-7 shrink-0 text-center text-lg font-extrabold">
+                    {MEDALHAS[posicao - 1] ?? (
+                      <span className="text-sm text-stone-500">{posicao}º</span>
                     )}
                   </span>
                   <Avatar nome={r.nome} url={r.avatar_url} tamanho={36} />
@@ -231,6 +244,9 @@ export function ChallengeDetailPage() {
                       {r.nome}
                       {r.user_id === userId && (
                         <span className="text-brasa-400"> (você)</span>
+                      )}
+                      {empatado && (
+                        <span className="text-stone-500"> · empate</span>
                       )}
                     </p>
                     {r.turma && (

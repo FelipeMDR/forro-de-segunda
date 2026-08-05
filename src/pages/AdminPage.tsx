@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext'
 import { combinaBusca } from '../lib/busca'
 import { downloadCSV } from '../lib/csv'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
+import { ateAPosicao } from '../lib/ranking'
 import {
   formatDate,
   formatRelative,
@@ -852,16 +853,23 @@ function PainelEntrega({
     setEntregando(true)
     try {
       const ranking = await api.getRanking(desafio)
-      const topUserIds = ranking.slice(0, topN).map((r) => r.user_id)
-      if (topUserIds.length === 0) {
+      // Respeita empate: cortar no índice escolheria um dos empatados
+      // por ordem alfabética, o que seria arbitrário e injusto.
+      const premiados = ateAPosicao(ranking, topN)
+      if (premiados.length === 0) {
         toast('Esse desafio ainda não tem ninguém no ranking', 'erro')
         return
       }
-      await api.concederDistintivo(distintivo.id, topUserIds)
+      await api.concederDistintivo(
+        distintivo.id,
+        premiados.map((r) => r.user_id),
+      )
       await carregarRecebedores()
       onConcedido()
       toast(
-        `Entregue para o top ${topUserIds.length} de "${desafio.titulo}"! 🏆`,
+        premiados.length > topN
+          ? `Entregue para ${premiados.length} pessoas — o top ${topN} de "${desafio.titulo}" tem empate 🤝`
+          : `Entregue para o top ${premiados.length} de "${desafio.titulo}"! 🏆`,
       )
     } catch (err) {
       toast((err as Error).message, 'erro')
