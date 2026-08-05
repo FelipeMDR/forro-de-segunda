@@ -110,6 +110,13 @@ export interface ChallengeLocal {
   lat: number
   lng: number
   raio_m: number
+  /**
+   * Quando a trava foi ligada (ISO). Check-in anterior a isso conta
+   * como sempre contou — ligar a regra no meio do desafio não pode
+   * confiscar ponto de quem já compareceu. O banco preenche sozinho
+   * (migração 009); o cliente não define.
+   */
+  desde: string | null
 }
 
 /** Raio inicial sugerido: cobre um salão e o entorno imediato. */

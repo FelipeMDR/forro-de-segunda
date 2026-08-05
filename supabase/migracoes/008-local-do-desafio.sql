@@ -126,9 +126,9 @@ grant execute on function public.registrar_checkin(text, text, double precision,
 -- ============================================================
 -- Depois de rodar: Project Settings > API > "Reload schema cache".
 --
--- A trava vale daqui pra frente: check-ins antigos não têm veredito
--- registrado, então ligar o local num desafio já em andamento zera os
--- pontos anteriores dele. Prefira ligar antes de começar.
+-- A trava vale daqui pra frente. RODE TAMBÉM A MIGRAÇÃO 009: sem ela,
+-- ligar o local num desafio em andamento zera os pontos já
+-- conquistados, porque os check-ins antigos não têm veredito.
 --
 -- Para definir o local pelo SQL (o normal é pelo formulário do desafio):
 --   update public.challenges

@@ -651,6 +651,7 @@ export class SupabaseApi implements ForroApi {
               lat: Number(c.local_lat),
               lng: Number(c.local_lng),
               raio_m: Number(c.local_raio_m),
+              desde: (c.local_desde as string | null) ?? null,
             }
           : null,
       criado_por: c.criado_por as string | null,
@@ -798,6 +799,11 @@ export class SupabaseApi implements ForroApi {
     // Desafio com trava de local: valem só os check-ins com veredito
     // registrado. Vem a lista de ids aprovados — nenhuma coordenada
     // trafega, que é o ponto do desenho (ver migração 008).
+    // Tudo que é anterior a `desde` continua valendo: ligar a trava no
+    // meio do desafio não pode zerar quem já compareceu (migração 009).
+    const travaDesde = challenge.local?.desde
+      ? new Date(challenge.local.desde).getTime()
+      : null
     let aprovados: Set<string> | null = null
     if (challenge.local) {
       const rows = ok(
@@ -813,7 +819,9 @@ export class SupabaseApi implements ForroApi {
     // cada dia vale no máximo 1 ponto, mesmo com várias fotos
     const datasPor = new Map<string, Date[]>()
     for (const c of checkins) {
-      if (aprovados && !aprovados.has(c.id)) continue
+      const anteriorATrava =
+        travaDesde !== null && new Date(c.criado_em).getTime() < travaDesde
+      if (aprovados && !anteriorATrava && !aprovados.has(c.id)) continue
       const lista = datasPor.get(c.user_id) ?? []
       lista.push(new Date(c.criado_em))
       datasPor.set(c.user_id, lista)

@@ -49,6 +49,7 @@ export function ChallengeForm({
           lat: p.lat,
           lng: p.lng,
           raio_m: f.local?.raio_m ?? RAIO_LOCAL_PADRAO_M,
+          desde: f.local?.desde ?? null, // quem define é o banco
         },
       }))
       toast('Local marcado onde você está agora 📍')
@@ -332,7 +333,13 @@ export function ChallengeForm({
                 setForm((f) => ({
                   ...f,
                   local: e.target.checked
-                    ? { nome: '', lat: 0, lng: 0, raio_m: RAIO_LOCAL_PADRAO_M }
+                    ? {
+                        nome: '',
+                        lat: 0,
+                        lng: 0,
+                        raio_m: RAIO_LOCAL_PADRAO_M,
+                        desde: null, // o banco preenche (migração 009)
+                      }
                     : null,
                 }))
               }

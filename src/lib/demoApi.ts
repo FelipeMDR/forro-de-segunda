@@ -761,7 +761,12 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
-        local: data.local,
+        // Espelha o trigger marca_local_desde (migração 009): o marco
+        // nasce quando a trava é ligada e é preservado depois.
+        local: data.local && {
+          ...data.local,
+          desde: c.local?.desde ?? new Date().toISOString(),
+        },
       })
     } else {
       this.db.challenges.push({
@@ -771,7 +776,10 @@ export class DemoApi implements ForroApi {
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
         janelas: data.janelas,
-        local: data.local,
+        local: data.local && {
+          ...data.local,
+          desde: new Date().toISOString(),
+        },
         criado_por: this.uid(),
       })
     }
@@ -819,8 +827,12 @@ export class DemoApi implements ForroApi {
             .filter(
               (c) =>
                 c.user_id === uid &&
-                // Com trava de local, valem só os que têm veredito
-                (!challenge.local || (c.locais ?? []).includes(challenge.id)),
+                // Com trava de local, valem só os que têm veredito —
+                // menos os anteriores à trava, que continuam valendo
+                (!challenge.local ||
+                  (challenge.local.desde !== null &&
+                    c.criado_em < challenge.local.desde) ||
+                  (c.locais ?? []).includes(challenge.id)),
             )
             .map((c) => new Date(c.criado_em)),
           challenge,
