@@ -91,8 +91,8 @@ export function CameraCapture({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const g = ctx.createLinearGradient(0, 0, 1080, 1350)
-    g.addColorStop(0, '#ff7a2f')
-    g.addColorStop(1, '#e64980')
+    g.addColorStop(0, '#DE5300')
+    g.addColorStop(1, '#024565')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, 1080, 1350)
     ctx.textAlign = 'center'
@@ -110,7 +110,7 @@ export function CameraCapture({
 
   if (erro) {
     return (
-      <div className="card flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-white/10 p-6 text-center text-stone-400">
+      <div className="card flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-preto/10 p-6 text-center text-tinta-600">
         <span className="text-5xl">📷</span>
         <p className="text-sm">{erro}</p>
         <button className="btn-ghost" onClick={() => void abrirCamera(facing)}>
@@ -134,12 +134,12 @@ export function CameraCapture({
         ref={videoRef}
         playsInline
         muted
-        className={`aspect-[4/5] w-full bg-noite-950 object-cover ${
+        className={`aspect-[4/5] w-full bg-fundo object-cover ${
           facing === 'user' ? '-scale-x-100' : ''
         }`}
       />
       {!pronta && (
-        <div className="absolute inset-0 flex items-center justify-center text-stone-500">
+        <div className="absolute inset-0 flex items-center justify-center text-tinta-500">
           <span className="animate-pulse text-3xl">📷</span>
         </div>
       )}
@@ -149,7 +149,7 @@ export function CameraCapture({
             setFacing((f) => (f === 'user' ? 'environment' : 'user'))
           }
           aria-label="Virar câmera"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-xl backdrop-blur transition active:scale-90"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-preto/10 text-xl backdrop-blur transition active:scale-90"
         >
           🔄
         </button>
@@ -157,7 +157,7 @@ export function CameraCapture({
           onClick={() => void capturar()}
           disabled={!pronta}
           aria-label="Tirar foto"
-          className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-white/25 backdrop-blur transition active:scale-90 disabled:opacity-40"
+          className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-preto/15 backdrop-blur transition active:scale-90 disabled:opacity-40"
         >
           <span className="block h-11 w-11 rounded-full bg-white" />
         </button>

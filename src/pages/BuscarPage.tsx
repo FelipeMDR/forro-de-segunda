@@ -99,7 +99,7 @@ export function BuscarPage() {
         )
       ) : (
         <>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-tinta-500">
             {termo ? (
               <>
                 {resultados.length}{' '}
@@ -107,12 +107,12 @@ export function BuscarPage() {
               </>
             ) : (
               <>
-                <strong className="text-stone-400">Equipe do projeto</strong> ·
+                <strong className="text-tinta-600">Equipe do projeto</strong> ·
                 digite para buscar qualquer aluno
               </>
             )}
           </p>
-          <ul className="card divide-y divide-white/5">
+          <ul className="card divide-y divide-preto/10">
             {resultados.map((p) => {
               const cargo = cargoPrincipal(p.cargos)
               const turmas = turmaLabel(p.turmas)
@@ -128,22 +128,22 @@ export function BuscarPage() {
                         <p className="truncate text-sm font-extrabold">
                           {p.nome}
                           {p.id === userId && (
-                            <span className="text-brasa-400"> (você)</span>
+                            <span className="text-brasa-700"> (você)</span>
                           )}
                         </p>
                         {cargo && (
-                          <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-300 ring-1 ring-brasa-500/30">
+                          <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-700 ring-1 ring-brasa-500/30">
                             {emojiCargo(cargo)} {cargo}
                           </span>
                         )}
                       </div>
                       {turmas && (
-                        <p className="truncate text-xs text-stone-500">
+                        <p className="truncate text-xs text-tinta-500">
                           {turmas}
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 text-stone-600">›</span>
+                    <span className="shrink-0 text-tinta-400">›</span>
                   </Link>
                 </li>
               )

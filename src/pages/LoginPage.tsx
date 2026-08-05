@@ -108,17 +108,17 @@ export function LoginPage() {
       }}
     >
       <div className="mb-8 flex flex-col items-center gap-4 text-center">
-        <div className="rounded-3xl bg-white px-6 py-5 shadow-xl">
-          <LogoWordmark largura={250} />
-        </div>
-        <p className="text-sm text-stone-400">
+        {/* Sem moldura branca: a arte é transparente e o fundo já é
+            claro, então a caixa só criaria um retângulo à toa */}
+        <LogoWordmark largura={260} prioridade />
+        <p className="text-sm text-tinta-600">
           Check-ins, desafios e ranking do Espaço Livre! 🎶
         </p>
       </div>
 
       <div className="card space-y-4 p-5">
         {api.mode === 'demo' && (
-          <div className="rounded-xl bg-brasa-500/10 px-3 py-2 text-xs text-brasa-300">
+          <div className="rounded-xl bg-brasa-500/10 px-3 py-2 text-xs text-brasa-700">
             <strong>Modo demonstração</strong> — dados só neste aparelho.
             Entrar: <strong>11 98888-0001</strong> / senha{' '}
             <strong>forro123</strong>. Primeira vez:{' '}
@@ -127,7 +127,7 @@ export function LoginPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-noite-950 p-1">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-fundo p-1">
           {(
             [
               ['entrar', 'Entrar'],
@@ -139,7 +139,7 @@ export function LoginPage() {
               type="button"
               onClick={() => trocarAba(t)}
               className={`rounded-lg py-2 text-sm font-bold transition ${
-                aba === t ? 'bg-noite-700 text-white' : 'text-stone-500'
+                aba === t ? 'bg-papel text-tinta-900 shadow-sm' : 'text-tinta-500'
               }`}
             >
               {rotulo}
@@ -182,7 +182,7 @@ export function LoginPage() {
           </form>
         ) : verificado === null ? (
           <form onSubmit={verificarTelefone} className="space-y-4">
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-tinta-600">
               Seu cadastro já está na lista de chamada da organização — é só
               confirmar seu telefone e criar uma senha.
             </p>
@@ -206,7 +206,7 @@ export function LoginPage() {
           </form>
         ) : (
           <form onSubmit={criarConta} className="space-y-4">
-            <p className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-300">
+            <p className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-700">
               {verificado.nome
                 ? `Achamos você na lista, ${verificado.nome.split(' ')[0]}! 🎉`
                 : 'Telefone encontrado na lista! 🎉'}{' '}
@@ -247,10 +247,10 @@ export function LoginPage() {
         )}
 
         {api.mode === 'demo' && (
-          <div className="border-t border-white/5 pt-3">
+          <div className="border-t border-preto/10 pt-3">
             <button
               type="button"
-              className="text-xs font-bold text-stone-500"
+              className="text-xs font-bold text-tinta-500"
               onClick={() => setOrgAberto((v) => !v)}
             >
               {orgAberto ? '▾' : '▸'} Criar conta de organizador(a) — demo
@@ -287,7 +287,7 @@ export function LoginPage() {
         )}
       </div>
 
-      <p className="mt-4 text-center text-xs text-stone-600">
+      <p className="mt-4 text-center text-xs text-tinta-400">
         Seu telefone não está na lista? Fale com a organização na aula ou no
         grupo do WhatsApp.
       </p>

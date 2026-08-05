@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={`max-w-sm rounded-xl px-4 py-2.5 text-sm font-bold shadow-xl ${
               t.tipo === 'erro'
                 ? 'bg-red-600 text-white'
-                : 'bg-noite-700 text-stone-100 border border-white/10'
+                : 'bg-preto/10 text-tinta-900 border border-preto/10'
             }`}
           >
             {t.texto}

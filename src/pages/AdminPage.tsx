@@ -134,7 +134,7 @@ function SecaoAgenda({
   return (
     <section className="card space-y-3 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           📅 Agenda
         </h2>
         <button
@@ -144,13 +144,13 @@ function SecaoAgenda({
           {aberto ? 'Fechar' : '+ Novo evento'}
         </button>
       </div>
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-tinta-500">
         Aulas semanais por turma e eventos como o Forró na Rep. Cada aluno vê
         na tela inicial só o que é da turma dele (ou de todos).
       </p>
 
       {aberto && (
-        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-noite-950 p-4">
+        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-fundo p-4">
           <div>
             <label className="label" htmlFor="ev-titulo">
               Título
@@ -275,9 +275,9 @@ function SecaoAgenda({
       {eventos === null ? (
         <Spinner />
       ) : eventos.length === 0 ? (
-        <p className="text-sm text-stone-500">Nenhum evento na agenda ainda.</p>
+        <p className="text-sm text-tinta-500">Nenhum evento na agenda ainda.</p>
       ) : (
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-preto/10">
           {eventos.map((e) => {
             const proxima = ocorrenciasEvento(e, feriados, new Date(), 1)[0]
             return (
@@ -287,7 +287,7 @@ function SecaoAgenda({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{e.titulo}</p>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-tinta-500">
                     {e.data
                       ? formatDate(e.data)
                       : `Toda ${DIAS_SEMANA[e.dia_semana ?? 0].toLowerCase()}`}
@@ -295,7 +295,7 @@ function SecaoAgenda({
                     {e.turma ? `turma ${e.turma}` : 'todas as turmas'}
                   </p>
                   {proxima?.cancelada && (
-                    <p className="text-xs font-bold text-red-400">
+                    <p className="text-xs font-bold text-red-600">
                       🚫 Próxima ocorrência cancelada
                       {proxima.motivoCancelamento
                         ? ` — ${proxima.motivoCancelamento}`
@@ -305,7 +305,7 @@ function SecaoAgenda({
                 </div>
                 <button
                   onClick={() => void excluir(e.id)}
-                  className="p-1.5 text-stone-600 hover:text-red-400"
+                  className="p-1.5 text-tinta-400 hover:text-red-600"
                   aria-label={`Remover ${e.titulo}`}
                 >
                   ✕
@@ -375,7 +375,7 @@ function SecaoFeriados({
   return (
     <section className="card space-y-3 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           🚫 Feriados e cancelamentos
         </h2>
         <button
@@ -385,14 +385,14 @@ function SecaoFeriados({
           {aberto ? 'Fechar' : '+ Novo'}
         </button>
       </div>
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-tinta-500">
         Cancela a aula recorrente daquele dia sem precisar apagar o evento da
         agenda. Os alunos veem "Cancelada" no lugar da aula normal, com o
         motivo e quando ela volta.
       </p>
 
       {aberto && (
-        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-noite-950 p-4">
+        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-fundo p-4">
           <div>
             <label className="label" htmlFor="fer-data">
               Data
@@ -445,11 +445,11 @@ function SecaoFeriados({
       )}
 
       {feriados.length === 0 ? (
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-tinta-500">
           Nenhum feriado ou cancelamento cadastrado.
         </p>
       ) : (
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-preto/10">
           {feriados.map((f) => (
             <div key={f.id} className="flex items-center gap-3 py-2.5">
               <span className="text-lg">🚫</span>
@@ -457,19 +457,19 @@ function SecaoFeriados({
                 <p className="truncate text-sm font-bold">
                   {formatDate(f.data)}
                   {f.data < hoje && (
-                    <span className="ml-1.5 text-[10px] font-normal text-stone-600">
+                    <span className="ml-1.5 text-[10px] font-normal text-tinta-400">
                       (passado)
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-tinta-500">
                   {f.motivo || 'Sem motivo informado'} ·{' '}
                   {f.turma ? `só turma ${f.turma}` : 'todas as turmas'}
                 </p>
               </div>
               <button
                 onClick={() => void excluir(f.id)}
-                className="p-1.5 text-stone-600 hover:text-red-400"
+                className="p-1.5 text-tinta-400 hover:text-red-600"
                 aria-label={`Remover cancelamento de ${formatDate(f.data)}`}
               >
                 ✕
@@ -517,10 +517,10 @@ function SecaoCargos({
 
   return (
     <section className="card space-y-3 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
         🎖️ Cargos do projeto
       </h2>
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-tinta-500">
         Aparecem em destaque no perfil de quem ocupa. Ao trocar a gestão,
         basta remover o cargo de uma pessoa e dar para outra.
       </p>
@@ -528,12 +528,12 @@ function SecaoCargos({
         {cargos.map((c) => (
           <span
             key={c.id}
-            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/15 px-3 py-1.5 text-xs font-bold text-brasa-300"
+            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/15 px-3 py-1.5 text-xs font-bold text-brasa-700"
           >
             {emojiCargo(c.nome)} {c.nome}
             <button
               onClick={() => void remover(c.id)}
-              className="text-brasa-300/60 hover:text-red-400"
+              className="text-brasa-700/60 hover:text-red-600"
               aria-label={`Remover cargo ${c.nome}`}
             >
               ✕
@@ -629,15 +629,15 @@ function SecaoDistintivos({
 
   return (
     <section className="card space-y-3 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
         🎖️ Distintivos personalizados{' '}
         {distintivos && distintivos.length > 0 && (
-          <span className="font-normal text-stone-600">
+          <span className="font-normal text-tinta-400">
             ({distintivos.length})
           </span>
         )}
       </h2>
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-tinta-500">
         Crie reconhecimentos e entregue pra quem você quiser, por qualquer
         motivo — não só vencer um desafio. Toque num distintivo pra ver quem
         já recebeu ou entregar pra mais gente.
@@ -658,13 +658,13 @@ function SecaoDistintivos({
       {distintivos === null ? (
         <Spinner />
       ) : distintivos.length === 0 ? (
-        <p className="text-sm text-stone-500">Nenhum distintivo criado ainda.</p>
+        <p className="text-sm text-tinta-500">Nenhum distintivo criado ainda.</p>
       ) : filtrados.length === 0 ? (
-        <p className="py-3 text-center text-sm text-stone-500">
+        <p className="py-3 text-center text-sm text-tinta-500">
           Nenhum distintivo encontrado com "{busca}".
         </p>
       ) : (
-        <div className="max-h-80 divide-y divide-white/5 overflow-y-auto rounded-xl bg-noite-950">
+        <div className="max-h-80 divide-y divide-preto/10 overflow-y-auto rounded-xl bg-fundo">
           {filtrados.map((d) => {
             const ativo = selecionadoId === d.id
             return (
@@ -674,14 +674,14 @@ function SecaoDistintivos({
                 onClick={() => setSelecionadoId(ativo ? null : d.id)}
                 aria-pressed={ativo}
                 className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
-                  ativo ? 'bg-brasa-500/15' : 'hover:bg-white/5'
+                  ativo ? 'bg-brasa-500/15' : 'hover:bg-preto/5'
                 }`}
               >
                 <span className="shrink-0 text-xl">{d.emoji}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{d.titulo}</p>
                   {d.descricao && (
-                    <p className="truncate text-[11px] text-stone-500">
+                    <p className="truncate text-[11px] text-tinta-500">
                       {d.descricao}
                     </p>
                   )}
@@ -689,13 +689,13 @@ function SecaoDistintivos({
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     d.concedidos > 0
-                      ? 'bg-brasa-500/20 text-brasa-300'
-                      : 'bg-white/5 text-stone-600'
+                      ? 'bg-brasa-500/20 text-brasa-700'
+                      : 'bg-preto/5 text-tinta-500'
                   }`}
                 >
                   {d.concedidos > 0 ? `${d.concedidos} 👤` : 'ninguém'}
                 </span>
-                <span className="shrink-0 text-stone-600">
+                <span className="shrink-0 text-tinta-400">
                   {ativo ? '▾' : '›'}
                 </span>
               </button>
@@ -713,7 +713,7 @@ function SecaoDistintivos({
       </button>
 
       {aberto && (
-        <form onSubmit={criar} className="space-y-3 rounded-xl bg-noite-950 p-4">
+        <form onSubmit={criar} className="space-y-3 rounded-xl bg-fundo p-4">
           <div className="flex gap-2">
             <input
               className="input w-20 text-center text-lg"
@@ -885,20 +885,20 @@ function PainelEntrega({
     : []
 
   return (
-    <div className="space-y-4 rounded-xl border border-brasa-500/20 bg-noite-950 p-4">
+    <div className="space-y-4 rounded-xl border border-brasa-500/20 bg-fundo p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-extrabold">
             {distintivo.emoji} {distintivo.titulo}
           </p>
           {distintivo.descricao && (
-            <p className="text-xs text-stone-500">{distintivo.descricao}</p>
+            <p className="text-xs text-tinta-500">{distintivo.descricao}</p>
           )}
         </div>
         <button
           type="button"
           onClick={onFechar}
-          className="shrink-0 text-stone-500 hover:text-white"
+          className="shrink-0 text-tinta-500 hover:text-tinta-900"
           aria-label="Fechar painel de entrega"
         >
           ✕
@@ -921,7 +921,7 @@ function PainelEntrega({
           ))}
         </select>
         {turmaEscolhida && (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-tinta-500">
             {alunosDaTurma.length === 0 ? (
               'Nenhum aluno com conta nessa turma ainda.'
             ) : novosDaTurma.length === 0 ? (
@@ -932,7 +932,7 @@ function PainelEntrega({
               )
             ) : (
               <>
-                <strong className="text-stone-300">
+                <strong className="text-tinta-700">
                   {novosDaTurma.length}
                 </strong>{' '}
                 de {alunosDaTurma.length} vão receber
@@ -1001,9 +1001,9 @@ function PainelEntrega({
           onChange={(e) => setBusca(e.target.value)}
         />
         {busca && (
-          <div className="max-h-40 divide-y divide-white/5 overflow-y-auto rounded-lg bg-noite-900">
+          <div className="max-h-40 divide-y divide-preto/10 overflow-y-auto rounded-lg bg-papel">
             {alunosFiltrados.length === 0 ? (
-              <p className="p-2 text-xs text-stone-500">
+              <p className="p-2 text-xs text-tinta-500">
                 Ninguém encontrado (ou já recebeu esse distintivo).
               </p>
             ) : (
@@ -1019,10 +1019,10 @@ function PainelEntrega({
                     )
                     setBusca('')
                   }}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/5"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-preto/5"
                 >
                   {p.nome}
-                  <span className="shrink-0 text-xs text-brasa-400">
+                  <span className="shrink-0 text-xs text-brasa-700">
                     + entregar
                   </span>
                 </button>
@@ -1041,9 +1041,9 @@ function PainelEntrega({
         {recebedores === null ? (
           <Spinner />
         ) : recebedores.length === 0 ? (
-          <p className="text-xs text-stone-500">Ninguém ainda.</p>
+          <p className="text-xs text-tinta-500">Ninguém ainda.</p>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-preto/10">
             {recebedores.map((r) => (
               <div
                 key={r.user_id}
@@ -1053,7 +1053,7 @@ function PainelEntrega({
                 <button
                   type="button"
                   onClick={() => void revogar(r.user_id)}
-                  className="shrink-0 text-xs font-bold text-stone-500 hover:text-red-400"
+                  className="shrink-0 text-xs font-bold text-tinta-500 hover:text-red-600"
                 >
                   revogar
                 </button>
@@ -1064,7 +1064,7 @@ function PainelEntrega({
       </div>
 
       {/* Apagar o distintivo do catálogo */}
-      <div className="border-t border-white/5 pt-3">
+      <div className="border-t border-preto/10 pt-3">
         {confirmandoExclusao ? (
           <button
             type="button"
@@ -1076,7 +1076,7 @@ function PainelEntrega({
         ) : (
           <button
             type="button"
-            className="text-xs font-bold text-stone-500 hover:text-red-400"
+            className="text-xs font-bold text-tinta-500 hover:text-red-600"
             onClick={() => setConfirmandoExclusao(true)}
           >
             🗑️ Apagar este distintivo do catálogo
@@ -1262,16 +1262,16 @@ function SecaoTurmas({
 
   return (
     <section className="card space-y-5 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
         🎓 Turmas
       </h2>
 
       {/* Turmas do semestre */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold text-stone-400">
+        <h3 className="text-xs font-bold text-tinta-600">
           Turmas do semestre
         </h3>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-tinta-500">
           Defina as turmas de cada semestre (ex.: Iniciante 01, Iniciante 02,
           Inter, AV). Elas aparecem em todos os cadastros e na agenda.
         </p>
@@ -1279,12 +1279,12 @@ function SecaoTurmas({
           {turmas.map((t) => (
             <span
               key={t.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-bold text-stone-200"
+              className="inline-flex items-center gap-1.5 rounded-full bg-preto/5 px-3 py-1.5 text-xs font-bold text-tinta-900"
             >
               {t.nome}
               <button
                 onClick={() => void removerTurma(t.id)}
-                className="text-stone-500 hover:text-red-400"
+                className="text-tinta-500 hover:text-red-600"
                 aria-label={`Remover turma ${t.nome}`}
               >
                 ✕
@@ -1307,7 +1307,7 @@ function SecaoTurmas({
       {/* Lista de chamada */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-stone-400">
+          <h3 className="text-xs font-bold text-tinta-600">
             Lista de chamada (telefone → turma)
           </h3>
           <div className="flex gap-1.5">
@@ -1325,7 +1325,7 @@ function SecaoTurmas({
             </button>
           </div>
         </div>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-tinta-500">
           É esta lista que libera o cadastro: o aluno cria a conta informando
           o telefone e já entra nas turmas certas. CSV com colunas{' '}
           <code>nome;telefone;turma;papel</code> (papel = Condutor/Conduzido,
@@ -1346,7 +1346,7 @@ function SecaoTurmas({
               📄 {importacao.linhas.length} aluno(s) prontos para importar
             </p>
             {importacao.avisos.length > 0 && (
-              <ul className="max-h-24 space-y-0.5 overflow-y-auto text-xs text-amber-300">
+              <ul className="max-h-24 space-y-0.5 overflow-y-auto text-xs text-amber-700">
                 {importacao.avisos.map((a, i) => (
                   <li key={i}>⚠️ {a}</li>
                 ))}
@@ -1371,7 +1371,7 @@ function SecaoTurmas({
         )}
 
         {aberto && (
-          <form onSubmit={adicionar} className="space-y-2 rounded-xl bg-noite-950 p-3">
+          <form onSubmit={adicionar} className="space-y-2 rounded-xl bg-fundo p-3">
             <input
               className="input"
               placeholder="Nome"
@@ -1418,7 +1418,7 @@ function SecaoTurmas({
                 ))}
               </select>
             </div>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-tinta-500">
               Para um aluno em mais de uma turma, adicione uma linha por turma
               (o mesmo telefone pode repetir).
             </p>
@@ -1439,25 +1439,25 @@ function SecaoTurmas({
         {alunos === null ? (
           <Spinner />
         ) : alunos.length === 0 ? (
-          <p className="text-sm text-stone-500">Lista vazia.</p>
+          <p className="text-sm text-tinta-500">Lista vazia.</p>
         ) : alunosFiltrados.length === 0 ? (
-          <p className="py-3 text-center text-sm text-stone-500">
+          <p className="py-3 text-center text-sm text-tinta-500">
             Ninguém encontrado com "{buscaLista}".
           </p>
         ) : (
-          <div className="max-h-56 divide-y divide-white/5 overflow-y-auto">
+          <div className="max-h-56 divide-y divide-preto/10 overflow-y-auto">
             {alunosFiltrados.map((a) => (
               <div key={a.id} className="flex items-center gap-2 py-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{a.nome ?? '—'}</p>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-tinta-500">
                     {a.telefone} · {a.turma}
                     {a.papel_danca && ` · ${a.papel_danca}`}
                   </p>
                 </div>
                 <button
                   onClick={() => void remover(a.id)}
-                  className="p-1.5 text-stone-600 hover:text-red-400"
+                  className="p-1.5 text-tinta-400 hover:text-red-600"
                   aria-label={`Remover ${a.nome ?? a.telefone}`}
                 >
                   ✕
@@ -1470,13 +1470,13 @@ function SecaoTurmas({
 
       {/* Alunos com conta */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold text-stone-400">
+        <h3 className="text-xs font-bold text-tinta-600">
           Alunos no app{' '}
-          <span className="font-normal text-stone-600">
+          <span className="font-normal text-tinta-400">
             ({perfis.length})
           </span>
         </h3>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-tinta-500">
           Um aluno pode estar em várias turmas com papéis diferentes (ex.:
           Condutor no Avançado e Conduzido no Intermediário). O aluno não
           consegue mudar as próprias turmas.
@@ -1491,11 +1491,11 @@ function SecaoTurmas({
         />
 
         {perfisFiltrados.length === 0 ? (
-          <p className="py-3 text-center text-sm text-stone-500">
+          <p className="py-3 text-center text-sm text-tinta-500">
             Ninguém encontrado com "{buscaApp}".
           </p>
         ) : (
-        <div className="max-h-80 divide-y divide-white/5 overflow-y-auto">
+        <div className="max-h-80 divide-y divide-preto/10 overflow-y-auto">
           {perfisFiltrados.map((p) => (
             <LinhaAlunoApp
               key={p.id}
@@ -1549,7 +1549,7 @@ function LinhaAlunoApp({
       <div className="min-w-0">
         <p className="truncate font-bold">{perfil.nome}</p>
         {perfil.telefone && (
-          <p className="text-xs text-stone-500">{perfil.telefone}</p>
+          <p className="text-xs text-tinta-500">{perfil.telefone}</p>
         )}
       </div>
 
@@ -1558,12 +1558,12 @@ function LinhaAlunoApp({
         {perfil.cargos.map((c) => (
           <span
             key={c}
-            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/20 px-2.5 py-1 text-[11px] font-bold text-brasa-300"
+            className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/20 px-2.5 py-1 text-[11px] font-bold text-brasa-700"
           >
             {emojiCargo(c)} {c}
             <button
               onClick={() => onRemoveCargo(c)}
-              className="text-brasa-300/60 hover:text-red-400"
+              className="text-brasa-700/60 hover:text-red-600"
               aria-label={`Tirar o cargo ${c} de ${perfil.nome}`}
             >
               ✕
@@ -1591,19 +1591,19 @@ function LinhaAlunoApp({
 
       <div className="flex flex-wrap gap-1.5">
         {perfil.turmas.length === 0 && (
-          <span className="text-xs text-stone-600">Sem turma</span>
+          <span className="text-xs text-tinta-400">Sem turma</span>
         )}
         {perfil.turmas.map((m) => (
           <span
             key={m.turma}
-            className="inline-flex items-center gap-1.5 rounded-full bg-verde-500/15 px-2.5 py-1 text-[11px] font-bold text-verde-400"
+            className="inline-flex items-center gap-1.5 rounded-full bg-verde-500/15 px-2.5 py-1 text-[11px] font-bold text-verde-800"
           >
             {m.papel_danca === 'Condutor(a)' && '🕺'}
             {m.papel_danca === 'Conduzido(a)' && '💃'}
             {m.turma}
             <button
               onClick={() => onRemove(m.turma)}
-              className="text-verde-400/60 hover:text-red-400"
+              className="text-verde-800/60 hover:text-red-600"
               aria-label={`Remover ${perfil.nome} da turma ${m.turma}`}
             >
               ✕
@@ -1766,7 +1766,7 @@ export function AdminPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-extrabold">Painel do organizador 🛠️</h1>
 
-      <div className="grid grid-cols-5 gap-1 rounded-xl bg-noite-950 p-1">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-fundo p-1">
         {ABAS_PAINEL.map((t) => (
           <button
             key={t.id}
@@ -1774,7 +1774,7 @@ export function AdminPage() {
             onClick={() => setAba(t.id)}
             aria-pressed={aba === t.id}
             className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-[10px] font-bold transition ${
-              aba === t.id ? 'bg-noite-700 text-white' : 'text-stone-500'
+              aba === t.id ? 'bg-papel text-tinta-900 shadow-sm' : 'text-tinta-500'
             }`}
           >
             <span className="relative text-base leading-none">
@@ -1818,10 +1818,10 @@ export function AdminPage() {
 
       {aba === 'frequencia' && (
       <section className="card space-y-4 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           📋 Frequência
         </h2>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-tinta-500">
           A coluna <strong>Ponto</strong> marca ✅ só no primeiro check-in
           válido de cada janela — vale 1 ponto por janela, mesmo com várias
           fotos ou se a janela virar a noite.
@@ -1850,28 +1850,28 @@ export function AdminPage() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-noite-950 py-2.5">
+              <div className="rounded-xl bg-fundo py-2.5">
                 <p className="text-lg font-extrabold">{presencas.length}</p>
-                <p className="text-[10px] font-bold uppercase text-stone-500">
+                <p className="text-[10px] font-bold uppercase text-tinta-500">
                   check-ins
                 </p>
               </div>
-              <div className="rounded-xl bg-noite-950 py-2.5">
+              <div className="rounded-xl bg-fundo py-2.5">
                 <p className="text-lg font-extrabold">{alunosUnicos}</p>
-                <p className="text-[10px] font-bold uppercase text-stone-500">
+                <p className="text-[10px] font-bold uppercase text-tinta-500">
                   alunos
                 </p>
               </div>
             </div>
 
             {presencas.length === 0 ? (
-              <p className="py-4 text-center text-sm text-stone-500">
+              <p className="py-4 text-center text-sm text-tinta-500">
                 Nenhum check-in neste mês.
               </p>
             ) : (
-              <div className="max-h-72 overflow-y-auto rounded-xl border border-white/5">
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-preto/10">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-noite-800 text-stone-400">
+                  <thead className="sticky top-0 bg-papel text-tinta-600">
                     <tr>
                       <th className="px-3 py-2">Data</th>
                       <th className="px-3 py-2">Nome</th>
@@ -1879,17 +1879,17 @@ export function AdminPage() {
                       <th className="px-3 py-2">Ponto</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-preto/10">
                     {presencas.map((p, i) => (
                       <tr key={i}>
-                        <td className="px-3 py-2 text-stone-400">
+                        <td className="px-3 py-2 text-tinta-600">
                           {new Date(p.data).toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: '2-digit',
                           })}
                         </td>
                         <td className="px-3 py-2 font-bold">{p.nome}</td>
-                        <td className="px-3 py-2 text-stone-400">{p.turma}</td>
+                        <td className="px-3 py-2 text-tinta-600">{p.turma}</td>
                         <td className="px-3 py-2">
                           {contaPonto(p.data) ? '✅' : '—'}
                         </td>
@@ -1906,16 +1906,16 @@ export function AdminPage() {
 
       {aba === 'denuncias' && (
       <section className="card space-y-3 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           🚩 Denúncias {reports.length > 0 && `(${reports.length})`}
         </h2>
         {reports.length === 0 ? (
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-tinta-500">
             Nenhuma denúncia pendente. Tudo em paz por aqui 🕊️
           </p>
         ) : (
           reports.map((r) => (
-            <div key={r.id} className="flex gap-3 rounded-xl bg-noite-950 p-3">
+            <div key={r.id} className="flex gap-3 rounded-xl bg-fundo p-3">
               {r.foto_url && (
                 <img
                   src={r.foto_url}
@@ -1927,7 +1927,7 @@ export function AdminPage() {
                 <p className="text-sm font-bold">
                   Post de {r.autor_nome ?? 'alguém'}
                 </p>
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-tinta-600">
                   {r.motivo ?? 'Sem motivo informado'} · por{' '}
                   {r.denunciante_nome ?? 'alguém'} ·{' '}
                   {formatRelative(r.criado_em)}

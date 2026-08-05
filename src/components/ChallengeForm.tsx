@@ -146,13 +146,13 @@ export function ChallengeForm({
       <form
         onSubmit={submeter}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl border-t border-white/10 bg-noite-900 p-5 sm:rounded-3xl sm:border"
+        className="max-h-[92dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl border-t border-preto/10 bg-papel p-5 sm:rounded-3xl sm:border"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
         <h2 className="text-lg font-extrabold">
           {desafio ? 'Editar desafio' : 'Novo desafio'}
         </h2>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-tinta-500">
           Desafio é competição: cada janela com check-in vale 1 ponto (várias
           fotos na mesma janela contam uma vez) — quem somar mais pontos
           vence. Cada dia da semana pode ter seu próprio horário, útil
@@ -217,7 +217,7 @@ export function ChallengeForm({
         <div>
           <span className="label">Horário de check-in por dia</span>
           {form.janelas.length === 0 ? (
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-tinta-500">
               Nenhum dia configurado ainda — monte abaixo.
             </p>
           ) : (
@@ -225,19 +225,19 @@ export function ChallengeForm({
               {form.janelas.map((j) => (
                 <div
                   key={j.dia_semana}
-                  className="flex items-center justify-between rounded-lg bg-noite-950 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg bg-fundo px-3 py-2 text-sm"
                 >
                   <span className="font-bold">{DIAS_ABREV[j.dia_semana]}</span>
-                  <span className="text-stone-400">
+                  <span className="text-tinta-600">
                     {j.hora_inicio}–{j.hora_fim}
                     {j.hora_fim < j.hora_inicio && (
-                      <span className="ml-1 text-sky-400">🌙 +1 dia</span>
+                      <span className="ml-1 text-azul-600">🌙 +1 dia</span>
                     )}
                   </span>
                   <button
                     type="button"
                     onClick={() => removerJanela(j.dia_semana)}
-                    className="text-stone-500 hover:text-red-400"
+                    className="text-tinta-500 hover:text-red-600"
                     aria-label={`Remover ${DIAS_ABREV[j.dia_semana]}`}
                   >
                     ✕
@@ -249,7 +249,7 @@ export function ChallengeForm({
         </div>
 
         {/* Montagem: escolhe dias + horário e aplica */}
-        <div className="space-y-3 rounded-xl bg-noite-950 p-3">
+        <div className="space-y-3 rounded-xl bg-fundo p-3">
           <span className="label">
             Marque os dias e defina o horário pra eles
           </span>
@@ -262,8 +262,8 @@ export function ChallengeForm({
                 aria-pressed={diasEscolhidos.includes(dia)}
                 className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
                   diasEscolhidos.includes(dia)
-                    ? 'bg-gradient-to-r from-brasa-400 to-brasa-600 text-white'
-                    : 'bg-white/5 text-stone-400'
+                    ? 'bg-gradient-to-r from-brasa-600 to-brasa-700 text-white'
+                    : 'bg-preto/5 text-tinta-600'
                 }`}
               >
                 {abrev}
@@ -297,7 +297,7 @@ export function ChallengeForm({
             </div>
           </div>
           {horaFim < horaInicio && (
-            <p className="text-xs text-sky-400">
+            <p className="text-xs text-azul-600">
               🌙 Vira a noite: abre às {horaInicio} e fecha às {horaFim} da
               madrugada seguinte. Mais de um check-in na mesma janela ainda
               vale só 1 ponto.
@@ -310,17 +310,17 @@ export function ChallengeForm({
           >
             Aplicar aos dias marcados
           </button>
-          <p className="text-[11px] text-stone-500">
+          <p className="text-[11px] text-tinta-500">
             Repita quantas vezes precisar — se um dia já tiver horário, o
             novo substitui.
           </p>
         </div>
 
-        <div className="space-y-3 rounded-2xl bg-noite-950 p-4">
+        <div className="space-y-3 rounded-2xl bg-fundo p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-bold">🎟️ Entrada só pela organização</p>
-              <p className="text-[11px] text-stone-500">
+              <p className="text-[11px] text-tinta-500">
                 Evento restrito: o aluno não entra sozinho. Depois de
                 salvar, adicione os participantes na página do desafio —
                 dá para importar a lista de ingressos por CSV.
@@ -338,11 +338,11 @@ export function ChallengeForm({
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl bg-noite-950 p-4">
+        <div className="space-y-3 rounded-2xl bg-fundo p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-bold">📍 Exigir estar no local</p>
-              <p className="text-[11px] text-stone-500">
+              <p className="text-[11px] text-tinta-500">
                 Só conta ponto quem tirar a foto ali. Bom para amarrar o
                 desafio ao salão da aula ou à casa da festa.
               </p>
@@ -383,12 +383,12 @@ export function ChallengeForm({
               </button>
 
               {form.local.lat === 0 && form.local.lng === 0 ? (
-                <p className="text-xs text-amber-400">
+                <p className="text-xs text-amber-700">
                   Vá até o local e toque no botão acima. Sem isso o desafio
                   não pode ser salvo com a trava ligada.
                 </p>
               ) : (
-                <p className="text-[11px] text-stone-500">
+                <p className="text-[11px] text-tinta-500">
                   Ponto marcado: {form.local.lat.toFixed(5)},{' '}
                   {form.local.lng.toFixed(5)}
                   {precisao !== null && ` · GPS com ${Math.round(precisao)} m de precisão`}
@@ -437,7 +437,7 @@ export function ChallengeForm({
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-stone-500">
+              <p className="text-[11px] text-tinta-500">
                 Raio muito curto reprova quem está no salão (o GPS erra
                 dezenas de metros dentro de prédio). 200 m costuma ser um
                 bom começo.

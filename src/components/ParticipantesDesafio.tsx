@@ -103,7 +103,7 @@ export function ParticipantesDesafio({
         <h3 className="text-sm font-bold">
           🎟️ Participantes ({participantes.length})
         </h3>
-        <p className="text-[11px] text-stone-500">
+        <p className="text-[11px] text-tinta-500">
           Este desafio é de entrada restrita: só quem você adicionar aqui
           participa.
         </p>
@@ -119,7 +119,7 @@ export function ParticipantesDesafio({
         {busca.trim() && (
           <ul className="mt-2 space-y-1">
             {candidatos.length === 0 ? (
-              <li className="px-1 text-xs text-stone-500">
+              <li className="px-1 text-xs text-tinta-500">
                 Ninguém novo com esse nome. Se a pessoa não tem conta,
                 importe pelo CSV — ela entra sozinha ao se cadastrar.
               </li>
@@ -127,7 +127,7 @@ export function ParticipantesDesafio({
               candidatos.map((p) => (
                 <li
                   key={p.id}
-                  className="flex items-center gap-2 rounded-xl bg-noite-950 px-3 py-2"
+                  className="flex items-center gap-2 rounded-xl bg-fundo px-3 py-2"
                 >
                   <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
                   <span className="min-w-0 flex-1 truncate text-sm">
@@ -168,14 +168,14 @@ export function ParticipantesDesafio({
         >
           📄 Importar lista de ingressos (CSV)
         </button>
-        <p className="mt-1 text-[11px] text-stone-500">
+        <p className="mt-1 text-[11px] text-tinta-500">
           Colunas: nome e telefone. Quem já tem conta entra na hora; quem
           não tem fica na espera e entra ao se cadastrar.
         </p>
       </div>
 
       {avisos.length > 0 && (
-        <ul className="space-y-1 rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+        <ul className="space-y-1 rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700">
           {avisos.slice(0, 8).map((a) => (
             <li key={a}>{a}</li>
           ))}
@@ -184,13 +184,13 @@ export function ParticipantesDesafio({
       )}
 
       {participantes.length > 0 && (
-        <ul className="divide-y divide-white/5 rounded-xl bg-noite-950">
+        <ul className="divide-y divide-preto/10 rounded-xl bg-fundo">
           {participantes.map((p) => (
             <li key={p.id} className="flex items-center gap-2 px-3 py-2">
               <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
               <span className="min-w-0 flex-1 truncate text-sm">{p.nome}</span>
               <button
-                className="shrink-0 px-2 text-xs font-bold text-red-400"
+                className="shrink-0 px-2 text-xs font-bold text-red-600"
                 disabled={ocupado}
                 onClick={() =>
                   void executar(async () => {
@@ -208,10 +208,10 @@ export function ParticipantesDesafio({
 
       {convidados.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wide text-stone-500">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-tinta-500">
             Esperando criar conta ({convidados.length})
           </h4>
-          <ul className="divide-y divide-white/5 rounded-xl bg-noite-950">
+          <ul className="divide-y divide-preto/10 rounded-xl bg-fundo">
             {convidados.map((c) => (
               <li
                 key={c.telefone}
@@ -220,12 +220,12 @@ export function ParticipantesDesafio({
                 <span className="text-lg">⏳</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{c.nome || 'Sem nome'}</p>
-                  <p className="text-[11px] text-stone-500">
+                  <p className="text-[11px] text-tinta-500">
                     {formatTelefone(c.telefone_exibicao ?? c.telefone)}
                   </p>
                 </div>
                 <button
-                  className="shrink-0 px-2 text-xs font-bold text-red-400"
+                  className="shrink-0 px-2 text-xs font-bold text-red-600"
                   disabled={ocupado}
                   onClick={() =>
                     void executar(async () => {
@@ -239,7 +239,7 @@ export function ParticipantesDesafio({
               </li>
             ))}
           </ul>
-          <p className="text-[11px] text-stone-500">
+          <p className="text-[11px] text-tinta-500">
             Elas entram no desafio sozinhas assim que criarem a conta com
             esse telefone.
           </p>

@@ -4,34 +4,62 @@
 @theme {
   --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* Noite junina: fundo escuro quente, tom de madeira/fogueira */
-  --color-noite-950: #171006;
-  --color-noite-900: #1d1409;
-  --color-noite-800: #2a1d0d;
-  --color-noite-700: #3a2913;
-  --color-noite-600: #52391c;
+  /*
+   * Paleta oficial da diretoria de comunicação. Os valores marcados
+   * "oficial" vêm do manual; os vizinhos (400/600) são derivados só
+   * para estado de hover e para dar contraste de texto sobre o branco —
+   * a cor oficial é sempre a 500.
+   */
 
-  /* Brasa: o laranja oficial dos cartazes do projeto */
-  --color-brasa-300: #ffd2a8;
-  --color-brasa-400: #fb9a45;
-  --color-brasa-500: #f26b21;
-  --color-brasa-600: #d64f0e;
+  /* Azul (SEGUNDA) — oficial #0391D5 */
+  --color-azul-300: #7cc6ee;
+  --color-azul-400: #2ba5e2;
+  --color-azul-500: #0391d5;
+  --color-azul-600: #0275ac;
+  --color-azul-700: #025a84;
 
-  /* Verde da marca (FORRÓ) */
-  --color-verde-300: #c4e69a;
-  --color-verde-400: #8cc63f;
-  --color-verde-500: #7dba2f;
-  --color-verde-600: #64a01f;
+  /* Verde (FORRÓ) — oficial #9BC22D */
+  --color-verde-300: #cbe288;
+  --color-verde-400: #b0d24a;
+  --color-verde-500: #9bc22d;
+  --color-verde-600: #7d9e23;
+  --color-verde-700: #5f791b;
+  --color-verde-800: #4a5f15;
 
-  /* Azul da marca (SEGUNDA) */
-  --color-azul-400: #3fa9f5;
-  --color-azul-500: #1b87c9;
-  --color-azul-600: #146ba3;
+  /* Laranja da bandana — oficial #DE5300 */
+  --color-brasa-300: #ffb98c;
+  --color-brasa-400: #f97316;
+  --color-brasa-500: #de5300;
+  --color-brasa-600: #b84500;
+  --color-brasa-700: #8f3600;
+
+  /* Azul-marinho — oficial #024565. Títulos e superfícies de apoio. */
+  --color-marinho-400: #0b7cad;
+  --color-marinho-500: #024565;
+  --color-marinho-600: #01344c;
+
+  /* Neutros — oficiais #000507 (preto) e #F5F4F2 (branco) */
+  --color-preto: #000507;
+  --color-fundo: #f5f4f2;
+  --color-papel: #ffffff;
+
+  /*
+   * Tinta: o preto oficial em graus de ênfase sobre fundo claro.
+   * Os valores foram medidos, não escolhidos a olho — todos passam de
+   * 4,5:1 sobre o fundo #F5F4F2 E sobre o branco dos cartões, que é o
+   * mínimo do WCAG AA para texto normal. Escala mais clara que isto
+   * some no claro, mesmo parecendo aceitável na tela do editor.
+   */
+  --color-tinta-900: #000507; /* 19,9:1 */
+  --color-tinta-700: #2c3134; /* 12,0:1 */
+  --color-tinta-600: #4a5155; /*  7,4:1 */
+  --color-tinta-500: #5c6367; /*  5,6:1 */
+  --color-tinta-400: #656c70; /*  4,9:1 */
 }
 
 @layer base {
   html {
-    background-color: var(--color-noite-950);
+    background-color: var(--color-fundo);
     /* Sem isso o iOS aumenta o texto sozinho ao girar a tela */
     -webkit-text-size-adjust: 100%;
     /*
@@ -48,7 +76,7 @@
     touch-action: pan-x pan-y;
   }
   body {
-    @apply bg-noite-950 text-stone-100 font-sans antialiased;
+    @apply bg-fundo text-tinta-900 font-sans antialiased;
     min-height: 100dvh;
   }
   /*
@@ -60,33 +88,33 @@
   input,
   textarea,
   select {
-    @apply text-stone-100;
+    @apply text-tinta-900;
     font-size: 16px;
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-noite-800/80 border border-white/5 shadow-lg shadow-black/20;
+    @apply rounded-2xl bg-papel border border-preto/10 shadow-sm shadow-preto/5;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-gradient-to-r from-brasa-400 to-brasa-600 text-white shadow-lg shadow-brasa-600/30;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-gradient-to-r from-brasa-600 to-brasa-700 text-white shadow-sm shadow-brasa-700/20;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-white/5 text-stone-200 border border-white/10;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-preto/5 text-tinta-700 border border-preto/10;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-red-600/20 text-red-400 border border-red-600/30;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-red-50 text-red-700 border border-red-200;
   }
   /* text-base (16px) e não text-sm: abaixo de 16px o iOS dá zoom
      automático ao focar o campo. Ver a regra de base acima. */
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-noite-900 px-3.5 py-2.5 text-base placeholder:text-stone-500 focus:border-brasa-400 focus:outline-none focus:ring-1 focus:ring-brasa-400;
+    @apply w-full rounded-xl border border-preto/15 bg-papel px-3.5 py-2.5 text-base placeholder:text-tinta-400 focus:border-azul-500 focus:outline-none focus:ring-1 focus:ring-azul-500;
   }
   .label {
-    @apply mb-1.5 block text-xs font-bold uppercase tracking-wide text-stone-400;
+    @apply mb-1.5 block text-xs font-bold uppercase tracking-wide text-tinta-600;
   }
 }

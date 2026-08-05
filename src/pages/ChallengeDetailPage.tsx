@@ -112,7 +112,7 @@ export function ChallengeDetailPage() {
   return (
     <div className="space-y-4">
       <button
-        className="text-sm font-bold text-stone-400"
+        className="text-sm font-bold text-tinta-600"
         onClick={() => navigate('/desafios')}
       >
         ← Desafios
@@ -124,10 +124,10 @@ export function ChallengeDetailPage() {
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
               fase === 'ativo'
-                ? 'bg-emerald-500/15 text-emerald-300'
+                ? 'bg-emerald-500/15 text-emerald-700'
                 : fase === 'futuro'
-                  ? 'bg-sky-500/15 text-sky-300'
-                  : 'bg-white/5 text-stone-500'
+                  ? 'bg-azul-500/10 text-azul-700'
+                  : 'bg-preto/5 text-tinta-500'
             }`}
           >
             {fase === 'ativo'
@@ -138,9 +138,9 @@ export function ChallengeDetailPage() {
           </span>
         </div>
         {desafio.descricao && (
-          <p className="text-sm text-stone-300">{desafio.descricao}</p>
+          <p className="text-sm text-tinta-700">{desafio.descricao}</p>
         )}
-        <div className="space-y-2 text-xs text-stone-500">
+        <div className="space-y-2 text-xs text-tinta-500">
           <p>
             📆 {formatDate(desafio.data_inicio)} –{' '}
             {formatDate(desafio.data_fim)} · 👥 {desafio.participantes}{' '}
@@ -151,7 +151,7 @@ export function ChallengeDetailPage() {
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pl-1">
               {desafio.janelas.map((j) => (
                 <p key={j.dia_semana}>
-                  <strong className="text-stone-300">
+                  <strong className="text-tinta-700">
                     {DIAS_ABREV[j.dia_semana]}
                   </strong>{' '}
                   {j.hora_inicio}–{j.hora_fim}
@@ -167,9 +167,9 @@ export function ChallengeDetailPage() {
         </div>
 
         {desafio.sou_membro && minhaEntrada && (
-          <div className="rounded-xl bg-noite-950 px-4 py-3 text-sm">
+          <div className="rounded-xl bg-fundo px-4 py-3 text-sm">
             Você tem{' '}
-            <strong className="text-brasa-400">
+            <strong className="text-brasa-700">
               {minhaEntrada.pontos}{' '}
               {minhaEntrada.pontos === 1 ? 'presença' : 'presenças'}
             </strong>
@@ -197,7 +197,7 @@ export function ChallengeDetailPage() {
         {/* Entrada restrita: quem entra é a organização, então nem o
             botão de entrar nem o de sair fazem sentido para o aluno */}
         {desafio.entrada_restrita ? (
-          <div className="rounded-xl bg-noite-950 px-4 py-3 text-sm text-stone-400">
+          <div className="rounded-xl bg-fundo px-4 py-3 text-sm text-tinta-600">
             🎟️{' '}
             {desafio.sou_membro ? (
               <>
@@ -231,7 +231,7 @@ export function ChallengeDetailPage() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
             Ranking
           </h2>
           {papel === 'organizador' && ranking.length > 0 && (
@@ -247,7 +247,7 @@ export function ChallengeDetailPage() {
             texto="Seja a primeira pessoa a participar!"
           />
         ) : (
-          <ol className="card divide-y divide-white/5">
+          <ol className="card divide-y divide-preto/10">
             {classificacao.map(({ entrada: r, posicao, empatado }) => (
               <li
                 key={r.user_id}
@@ -260,7 +260,7 @@ export function ChallengeDetailPage() {
                   {/* Empate divide a mesma posição — e a mesma medalha */}
                   <span className="w-7 shrink-0 text-center text-lg font-extrabold">
                     {MEDALHAS[posicao - 1] ?? (
-                      <span className="text-sm text-stone-500">{posicao}º</span>
+                      <span className="text-sm text-tinta-500">{posicao}º</span>
                     )}
                   </span>
                   <Avatar nome={r.nome} url={r.avatar_url} tamanho={36} />
@@ -268,19 +268,19 @@ export function ChallengeDetailPage() {
                     <p className="truncate text-sm font-bold">
                       {r.nome}
                       {r.user_id === userId && (
-                        <span className="text-brasa-400"> (você)</span>
+                        <span className="text-brasa-700"> (você)</span>
                       )}
                       {empatado && (
-                        <span className="text-stone-500"> · empate</span>
+                        <span className="text-tinta-500"> · empate</span>
                       )}
                     </p>
                     {r.turma && (
-                      <p className="truncate text-xs text-stone-500">
+                      <p className="truncate text-xs text-tinta-500">
                         {r.turma}
                       </p>
                     )}
                   </div>
-                  <span className="text-sm font-extrabold text-brasa-400">
+                  <span className="text-sm font-extrabold text-brasa-700">
                     {r.pontos} {r.pontos === 1 ? 'pt' : 'pts'}
                   </span>
                 </Link>
@@ -298,7 +298,7 @@ export function ChallengeDetailPage() {
 
       {papel === 'organizador' && (
         <section className="card space-y-2 p-4">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
             Organização
           </h2>
           <div className="flex gap-2">

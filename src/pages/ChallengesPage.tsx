@@ -38,22 +38,22 @@ function CartaoDesafio({ c }: { c: Challenge }) {
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-extrabold">{c.titulo}</h3>
         {c.sou_membro && (
-          <span className="shrink-0 rounded-full bg-brasa-500/15 px-2 py-1 text-[10px] font-bold text-brasa-300">
+          <span className="shrink-0 rounded-full bg-brasa-500/15 px-2 py-1 text-[10px] font-bold text-brasa-700">
             participando
           </span>
         )}
       </div>
-      <p className="mt-1 text-xs text-stone-400">
+      <p className="mt-1 text-xs text-tinta-600">
         {formatDate(c.data_inicio)} – {formatDate(c.data_fim)} ·{' '}
         {resumoJanelas(c)} · 👥 {c.participantes}
       </p>
       {fase === 'ativo' && (
-        <p className="mt-2 text-xs font-bold text-brasa-400">
+        <p className="mt-2 text-xs font-bold text-brasa-700">
           🔥 {restantes} {restantes === 1 ? 'dia restante' : 'dias restantes'}
         </p>
       )}
       {fase === 'futuro' && (
-        <p className="mt-2 text-xs font-bold text-stone-500">
+        <p className="mt-2 text-xs font-bold text-tinta-500">
           ⏳ Começa em {formatDate(c.data_inicio)}
         </p>
       )}
@@ -121,7 +121,7 @@ export function ChallengesPage() {
 
       {ativos.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
             Rolando agora
           </h2>
           {ativos.map((c) => (
@@ -132,7 +132,7 @@ export function ChallengesPage() {
 
       {futuros.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
             Em breve
           </h2>
           {futuros.map((c) => (
@@ -143,7 +143,7 @@ export function ChallengesPage() {
 
       {encerrados.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
             Encerrados
           </h2>
           {encerrados.map((c) => (

@@ -1,10 +1,16 @@
+/**
+ * Fundos das iniciais, todos com contraste >= 4.5:1 contra o texto
+ * branco (medido). As cores oficiais puras (500) não entram: o verde
+ * #9BC22D dá 2,07:1 e o azul #0391D5 dá 3,49:1 — iniciais brancas
+ * sumiriam neles.
+ */
 const CORES = [
   'bg-brasa-600',
-  'bg-verde-600',
+  'bg-verde-700',
   'bg-azul-600',
-  'bg-noite-600',
-  'bg-emerald-700',
-  'bg-sky-700',
+  'bg-marinho-500',
+  'bg-azul-700',
+  'bg-brasa-700',
 ]
 
 function corPara(nome: string): string {
@@ -29,7 +35,7 @@ export function Avatar({
         src={url}
         alt={nome}
         style={style}
-        className="shrink-0 rounded-full object-cover border border-white/10"
+        className="shrink-0 rounded-full object-cover border border-preto/10"
       />
     )
   }

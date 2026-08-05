@@ -62,15 +62,15 @@ export function InstallPrompt() {
     <div className="flex items-start gap-3 rounded-2xl border border-brasa-500/30 bg-brasa-500/10 px-4 py-3">
       <span className="text-2xl">📲</span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-brasa-300">
+        <p className="text-sm font-bold text-brasa-700">
           Instale o app na tela inicial
         </p>
         {evento ? (
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-tinta-600">
             Fica com ícone próprio e abre mais rápido.
           </p>
         ) : (
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-tinta-600">
             No iPhone: toque em <strong>Compartilhar</strong> (o quadradinho
             com a seta) e depois em <strong>Adicionar à Tela de Início</strong>.
             É assim que os lembretes funcionam no iOS.

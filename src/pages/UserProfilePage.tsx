@@ -88,7 +88,7 @@ export function UserProfilePage() {
   return (
     <div className="space-y-4">
       <button
-        className="text-sm font-bold text-stone-400"
+        className="text-sm font-bold text-tinta-600"
         onClick={() => navigate(-1)}
       >
         ← Voltar

@@ -18,7 +18,7 @@ function Item({
       end={to === '/'}
       className={({ isActive }) =>
         `flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-bold transition ${
-          isActive ? 'text-brasa-400' : 'text-stone-500'
+          isActive ? 'text-brasa-700' : 'text-tinta-500'
         }`
       }
     >
@@ -36,21 +36,18 @@ export function Layout() {
       {/* pt = safe area: no iPhone o app roda sob a barra de status
           (viewport-fit=cover + status bar translúcida) */}
       <header
-        className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/5 bg-noite-950/90 px-4 pb-3 backdrop-blur"
+        className="sticky top-0 z-30 flex items-center gap-2 border-b border-preto/10 bg-fundo/90 px-4 pb-3 backdrop-blur"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
       >
-        <Logo tamanho={30} />
-        <h1 className="text-lg font-extrabold tracking-tight">
-          <span className="text-[#8cc63f]">Forró</span>{' '}
-          <span className="text-sm font-bold text-stone-400">de</span>{' '}
-          <span className="text-[#3fa9f5]">Segunda</span>
-        </h1>
+        {/* A marca oficial já traz o nome escrito, então não há texto
+            ao lado: duas grafias do nome brigariam entre si. */}
+        <Logo altura={38} />
         <NavLink
           to="/buscar"
           aria-label="Buscar pessoas"
           className={({ isActive }) =>
             `ml-auto flex h-9 w-9 items-center justify-center rounded-full text-lg transition active:scale-90 ${
-              isActive ? 'bg-brasa-500/20 text-brasa-300' : 'hover:bg-white/5'
+              isActive ? 'bg-brasa-500/20 text-brasa-700' : 'hover:bg-preto/5'
             }`
           }
         >
@@ -70,7 +67,7 @@ export function Layout() {
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/5 bg-noite-900/95 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-preto/10 bg-papel/95 backdrop-blur"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="mx-auto flex w-full max-w-md items-center gap-1 px-3 py-1.5">
@@ -79,7 +76,7 @@ export function Layout() {
           <NavLink
             to="/checkin"
             aria-label="Fazer check-in"
-            className="mx-1 -mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brasa-400 to-brasa-600 text-2xl shadow-lg shadow-brasa-600/40 ring-4 ring-noite-950 transition active:scale-95"
+            className="mx-1 -mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brasa-500 to-brasa-700 text-2xl shadow-lg shadow-brasa-700/30 ring-4 ring-fundo transition active:scale-95"
           >
             📸
           </NavLink>

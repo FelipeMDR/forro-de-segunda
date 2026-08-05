@@ -20,7 +20,7 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
   const hoje = toISODate(new Date())
   return (
     <div className="card space-y-2.5 p-4">
-      <h2 className="text-xs font-bold uppercase tracking-wide text-stone-500">
+      <h2 className="text-xs font-bold uppercase tracking-wide text-tinta-500">
         📅 Agenda
       </h2>
       {ocorrencias.map(({ evento, quando, cancelada, motivoCancelamento }, i) => {
@@ -33,26 +33,26 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
             <div className="min-w-0 flex-1">
               <p
                 className={`truncate text-sm font-bold ${
-                  cancelada ? 'text-stone-500 line-through' : ''
+                  cancelada ? 'text-tinta-500 line-through' : ''
                 }`}
               >
                 {evento.titulo}
                 {evento.turma && (
-                  <span className="ml-1.5 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-stone-400 no-underline">
+                  <span className="ml-1.5 rounded-full bg-preto/5 px-2 py-0.5 text-[10px] font-bold text-tinta-600 no-underline">
                     {evento.turma}
                   </span>
                 )}
               </p>
               {cancelada ? (
-                <p className="text-xs text-red-400">
+                <p className="text-xs text-red-600">
                   Cancelada{motivoCancelamento ? ` — ${motivoCancelamento}` : ''}
                   {' · seria '}
                   {ehHoje ? 'hoje' : formatDateLong(quando)}
                 </p>
               ) : (
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-tinta-500">
                   {ehHoje ? (
-                    <strong className="text-brasa-400">Hoje</strong>
+                    <strong className="text-brasa-700">Hoje</strong>
                   ) : (
                     formatDateLong(quando)
                   )}

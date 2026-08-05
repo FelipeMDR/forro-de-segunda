@@ -186,21 +186,21 @@ export function CheckinPage() {
       <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
 
       {aindaPontuamAqui.length > 0 && (
-        <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
           ✅ Valendo ponto agora:{' '}
           <strong>{aindaPontuamAqui.map((c) => c.titulo).join(', ')}</strong>
         </div>
       )}
 
       {comLocal.length > 0 && (
-        <div className="rounded-2xl bg-white/5 px-4 py-3 text-sm">
+        <div className="rounded-2xl bg-preto/5 px-4 py-3 text-sm">
           {buscandoLocal && (
-            <p className="text-stone-400">📍 Conferindo onde você está…</p>
+            <p className="text-tinta-600">📍 Conferindo onde você está…</p>
           )}
 
           {erroLocal && (
             <div className="space-y-2">
-              <p className="text-amber-300">
+              <p className="text-amber-700">
                 📍 {erroLocal}. Estes desafios só contam ponto para quem
                 está no local:{' '}
                 <strong>{comLocal.map((c) => c.titulo).join(', ')}</strong>.
@@ -217,7 +217,7 @@ export function CheckinPage() {
               {situacaoLocal.map(({ desafio, distancia, dentro }) => (
                 <li key={desafio.id} className="flex items-start gap-2">
                   <span>{dentro ? '📍' : '🚫'}</span>
-                  <span className={dentro ? 'text-emerald-300' : 'text-amber-300'}>
+                  <span className={dentro ? 'text-emerald-800' : 'text-amber-700'}>
                     {dentro ? (
                       <>
                         Você está em{' '}
@@ -245,7 +245,7 @@ export function CheckinPage() {
       )}
 
       {jaPontuaram.length > 0 && (
-        <div className="rounded-2xl bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
+        <div className="rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
           👍 Você já pontuou nesta janela em{' '}
           <strong>{jaPontuaram.map((c) => c.titulo).join(', ')}</strong>. Vale
           1 ponto por janela, então esta foto entra no feed mas{' '}
@@ -254,14 +254,14 @@ export function CheckinPage() {
       )}
 
       {aindaPontuam.length === 0 && jaPontuaram.length === 0 && (
-        <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+        <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
           ⚠️ Nenhum desafio seu está com janela de check-in aberta agora. Você
           pode postar mesmo assim, mas a foto <strong>não marcará ponto</strong>.
         </div>
       )}
 
       {!limite.pode && limite.liberaEm && (
-        <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+        <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
           {limite.motivo === 'intervalo' ? (
             <>
               ⏳ Calma no pé! Dá pra postar de novo em{' '}
@@ -305,7 +305,7 @@ export function CheckinPage() {
               onCapture={(b) => void aoCapturar(b)}
               permitirFotoTeste={api.mode === 'demo'}
             />
-            <p className="px-2 text-center text-xs text-stone-500">
+            <p className="px-2 text-center text-xs text-tinta-500">
               A foto é tirada na hora, dentro do app — nada de foto antiga da
               galeria 😉
               {limite.restantes <= 2 && (

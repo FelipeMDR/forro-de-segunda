@@ -145,7 +145,7 @@ export function ProfilePage() {
           aria-label="Trocar foto de perfil"
         >
           <Avatar nome={profile.nome} url={profile.avatar_url} tamanho={88} />
-          <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-noite-700 text-sm ring-2 ring-noite-900">
+          <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-preto/10 text-sm ring-2 ring-papel">
             📷
           </span>
         </button>
@@ -178,7 +178,7 @@ export function ProfilePage() {
       />
 
       <div className="card space-y-4 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           Meus dados
         </h2>
         <div>
@@ -194,10 +194,10 @@ export function ProfilePage() {
         </div>
         <div>
           <span className="label">Telefone (seu login)</span>
-          <p className="rounded-xl border border-white/5 bg-noite-950 px-3.5 py-2.5 text-sm text-stone-400">
+          <p className="rounded-xl border border-preto/10 bg-fundo px-3.5 py-2.5 text-sm text-tinta-600">
             {profile.telefone ?? '—'}
           </p>
-          <p className="mt-1.5 text-xs text-stone-500">
+          <p className="mt-1.5 text-xs text-tinta-500">
             Telefone e turmas são gerenciados pela organização — fale com eles
             se algo mudou.
           </p>
@@ -216,12 +216,12 @@ export function ProfilePage() {
           <span className="text-2xl">🔔</span>
           <div className="flex-1">
             <p className="text-sm font-bold">Lembrete de aula</p>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-tinta-500">
               "Hoje tem forró!" direto no seu celular
             </p>
           </div>
           {pushAtivo ? (
-            <span className="text-xs font-bold text-verde-400">ativado ✓</span>
+            <span className="text-xs font-bold text-verde-800">ativado ✓</span>
           ) : (
             <button className="btn-ghost" onClick={() => void ativarPush()}>
               Ativar

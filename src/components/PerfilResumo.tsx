@@ -13,14 +13,14 @@ import {
 /** Turmas + papel na dança, em chips. */
 export function TurmaChips({ turmas }: { turmas: TurmaMembro[] }) {
   if (turmas.length === 0) {
-    return <p className="mt-1 text-xs text-stone-500">Turma ainda não definida</p>
+    return <p className="mt-1 text-xs text-tinta-500">Turma ainda não definida</p>
   }
   return (
     <div className="mt-1.5 flex flex-wrap justify-center gap-1.5">
       {turmas.map((m) => (
         <span
           key={m.turma}
-          className="inline-block rounded-full bg-verde-500/15 px-3 py-1 text-xs font-bold text-verde-400"
+          className="inline-block rounded-full bg-verde-500/15 px-3 py-1 text-xs font-bold text-verde-800"
         >
           {m.papel_danca === 'Condutor(a)' && '🕺 '}
           {m.papel_danca === 'Conduzido(a)' && '💃 '}
@@ -40,7 +40,7 @@ export function CargoChips({ cargos }: { cargos: string[] }) {
       {cargos.map((c) => (
         <span
           key={c}
-          className="inline-block rounded-full bg-brasa-500/20 px-3 py-1 text-xs font-extrabold text-brasa-300 ring-1 ring-brasa-500/30"
+          className="inline-block rounded-full bg-brasa-500/20 px-3 py-1 text-xs font-extrabold text-brasa-700 ring-1 ring-brasa-500/30"
         >
           {emojiCargo(c)} {c}
         </span>
@@ -51,16 +51,16 @@ export function CargoChips({ cargos }: { cargos: string[] }) {
 
 export function StatsRow({ stats }: { stats: PerfilStats | null }) {
   const itens: Array<[string, string, string]> = [
-    ['🔥 ' + (stats ? String(stats.streak) : '–'), 'semanas seguidas', 'text-brasa-400'],
+    ['🔥 ' + (stats ? String(stats.streak) : '–'), 'semanas seguidas', 'text-brasa-700'],
     [stats ? String(stats.presencas) : '–', 'presenças', ''],
     [stats ? String(stats.desafios) : '–', 'desafios', ''],
   ]
   return (
     <div className="grid w-full grid-cols-3 gap-2 pt-2">
       {itens.map(([valor, rotulo, cor]) => (
-        <div key={rotulo} className="rounded-2xl bg-noite-950 px-2 py-3 text-center">
+        <div key={rotulo} className="rounded-2xl bg-fundo px-2 py-3 text-center">
           <p className={`text-2xl font-extrabold ${cor}`}>{valor}</p>
-          <p className="text-[10px] font-bold uppercase text-stone-500">
+          <p className="text-[10px] font-bold uppercase text-tinta-500">
             {rotulo}
           </p>
         </div>
@@ -111,12 +111,12 @@ export function FavoritosGrid({
   return (
     <div className="card space-y-3 p-5">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
           ⭐ Favoritos{' '}
           {favoritos && favoritos.length > 0 && `(${favoritos.length})`}
         </h2>
         {mostrarLimite && favoritos && (
-          <span className="text-[10px] font-bold text-stone-600">
+          <span className="text-[10px] font-bold text-tinta-400">
             {favoritos.length}/{LIMITE_FAVORITOS}
           </span>
         )}
@@ -125,11 +125,11 @@ export function FavoritosGrid({
       {favoritos === null ? (
         <Spinner />
       ) : favoritos.length === 0 ? (
-        <p className="text-sm text-stone-500">{vazio}</p>
+        <p className="text-sm text-tinta-500">{vazio}</p>
       ) : (
         <>
           {onDesfavoritar && (
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-tinta-500">
               Toque numa foto para ver de perto ou tirar dos favoritos.
             </p>
           )}
@@ -138,7 +138,7 @@ export function FavoritosGrid({
               <button
                 key={f.id}
                 onClick={() => setAberto(f)}
-                className="overflow-hidden rounded-xl bg-noite-950"
+                className="overflow-hidden rounded-xl bg-fundo"
                 aria-label={
                   f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`
                 }
@@ -176,11 +176,11 @@ export function FavoritosGrid({
           )}
           <div className="text-center">
             {aberto.legenda && (
-              <p className="text-sm font-bold text-stone-100">
+              <p className="text-sm font-bold text-tinta-900">
                 {aberto.legenda}
               </p>
             )}
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-tinta-600">
               {formatRelative(aberto.criado_em)}
             </p>
           </div>
@@ -193,7 +193,7 @@ export function FavoritosGrid({
             {onDesfavoritar &&
               (confirmando ? (
                 <>
-                  <p className="max-w-xs text-center text-xs text-stone-400">
+                  <p className="max-w-xs text-center text-xs text-tinta-600">
                     A foto sai da galeria e volta a ser arquivada com as
                     outras depois de 4 meses.
                   </p>
@@ -232,25 +232,25 @@ export function BadgeGrid({
 }) {
   return (
     <div className="card space-y-3 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
         🎖️ Distintivos {badges && badges.length > 0 && `(${badges.length})`}
       </h2>
       {badges === null ? (
         <Spinner />
       ) : badges.length === 0 ? (
-        <p className="text-sm text-stone-500">{vazio}</p>
+        <p className="text-sm text-tinta-500">{vazio}</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {badges.map((b) => (
             <div
               key={b.id}
-              className="flex items-center gap-2.5 rounded-xl bg-noite-950 px-3 py-2.5"
+              className="flex items-center gap-2.5 rounded-xl bg-fundo px-3 py-2.5"
               title={b.descricao}
             >
               <span className="shrink-0 text-2xl">{b.emoji}</span>
               <div className="min-w-0">
                 <p className="text-xs font-extrabold leading-tight">{b.titulo}</p>
-                <p className="line-clamp-2 text-[10px] leading-tight text-stone-500">
+                <p className="line-clamp-2 text-[10px] leading-tight text-tinta-500">
                   {b.descricao}
                 </p>
               </div>

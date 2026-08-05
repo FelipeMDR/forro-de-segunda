@@ -101,25 +101,25 @@ export function CheckinCard({
               </p>
               {cargo && (
                 // Cargo em destaque: é o reconhecimento mais visível do app
-                <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-300 ring-1 ring-brasa-500/30">
+                <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-700 ring-1 ring-brasa-500/30">
                   {emojiCargo(cargo)} {cargo}
                 </span>
               )}
             </div>
-            <p className="truncate text-xs text-stone-500">
+            <p className="truncate text-xs text-tinta-500">
               {item.autor.turma ? `${item.autor.turma} · ` : ''}
               {formatRelative(item.criado_em)}
             </p>
           </div>
         </Link>
         {!contaPontos && (
-          <span className="shrink-0 rounded-full bg-white/5 px-2 py-1 text-[10px] font-bold text-stone-500">
+          <span className="shrink-0 rounded-full bg-preto/5 px-2 py-1 text-[10px] font-bold text-tinta-600">
             fora da janela
           </span>
         )}
         <div className="relative">
           <button
-            className="rounded-lg px-2 py-1 text-stone-500 hover:bg-white/5"
+            className="rounded-lg px-2 py-1 text-tinta-500 hover:bg-preto/5"
             aria-label="Mais opções"
             onClick={() => {
               setMenuAberto((v) => !v)
@@ -129,9 +129,9 @@ export function CheckinCard({
             ⋯
           </button>
           {menuAberto && (
-            <div className="absolute right-0 top-9 z-20 w-52 overflow-hidden rounded-xl border border-white/10 bg-noite-800 shadow-xl">
+            <div className="absolute right-0 top-9 z-20 w-52 overflow-hidden rounded-xl border border-preto/10 bg-papel shadow-xl">
               <button
-                className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-white/5"
+                className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
                 onClick={() => void denunciar()}
               >
                 🚩 Denunciar foto
@@ -139,14 +139,14 @@ export function CheckinCard({
               {podeExcluir &&
                 (confirmandoExclusao ? (
                   <button
-                    className="block w-full px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-white/5"
+                    className="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-preto/5"
                     onClick={() => void excluir()}
                   >
                     ⚠️ Confirmar exclusão?
                   </button>
                 ) : (
                   <button
-                    className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-white/5"
+                    className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
                     onClick={() => setConfirmandoExclusao(true)}
                   >
                     🗑️ Excluir check-in
@@ -162,19 +162,19 @@ export function CheckinCard({
           src={item.foto_url}
           alt={item.legenda ?? `Check-in de ${item.autor.nome}`}
           loading="lazy"
-          className="aspect-[4/5] w-full bg-noite-950 object-cover"
+          className="aspect-[4/5] w-full bg-fundo object-cover"
         />
       ) : (
         // Fotos antigas são apagadas pela política de retenção (4 meses);
         // o registro da presença continua valendo.
-        <div className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 bg-noite-950 text-stone-600">
+        <div className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 bg-fundo text-tinta-400">
           <span className="text-4xl">🎞️</span>
           <span className="text-xs">Foto arquivada — presença registrada</span>
         </div>
       )}
 
       {item.legenda && (
-        <p className="px-4 pt-3 text-sm text-stone-200">{item.legenda}</p>
+        <p className="px-4 pt-3 text-sm text-tinta-900">{item.legenda}</p>
       )}
 
       <footer className="flex items-center gap-1.5 px-3 py-2.5">
@@ -189,7 +189,7 @@ export function CheckinCard({
               className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm transition active:scale-90 ${
                 minha
                   ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
-                  : 'bg-white/5 hover:bg-white/10'
+                  : 'bg-preto/5 hover:bg-preto/10'
               }`}
             >
               <span>{tipo}</span>
@@ -199,7 +199,7 @@ export function CheckinCard({
         })}
         <button
           onClick={() => setComentariosAbertos(true)}
-          className="ml-auto flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
+          className="ml-auto flex items-center gap-1.5 rounded-full bg-preto/5 px-3 py-1.5 text-sm hover:bg-preto/10"
         >
           💬
           <span className="text-xs font-bold">{item.comentarios}</span>
@@ -219,7 +219,7 @@ export function CheckinCard({
             className={`rounded-full px-3 py-1.5 text-sm transition active:scale-90 ${
               item.favorito
                 ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
-                : 'bg-white/5 hover:bg-white/10'
+                : 'bg-preto/5 hover:bg-preto/10'
             }`}
           >
             {item.favorito ? '⭐' : '☆'}
