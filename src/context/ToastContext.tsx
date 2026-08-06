@@ -41,10 +41,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className={`max-w-sm rounded-xl px-4 py-2.5 text-sm font-bold shadow-xl ${
+            // Fundo sólido, não translúcido: o aviso passa por cima de
+            // fotos e listas, e com transparência o conteúdo de trás
+            // atravessava o texto. Escuro sobre o app claro para
+            // destacar sem precisar de cor de alerta.
+            className={`max-w-sm rounded-xl px-4 py-2.5 text-sm font-bold shadow-lg shadow-preto/20 ${
               t.tipo === 'erro'
                 ? 'bg-red-600 text-white'
-                : 'bg-preto/10 text-tinta-900 border border-preto/10'
+                : 'bg-marinho-500 text-white'
             }`}
           >
             {t.texto}

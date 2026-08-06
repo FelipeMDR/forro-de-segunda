@@ -10,6 +10,16 @@ import {
   type TurmaMembro,
 } from '../lib/types'
 
+/**
+ * Botões do visualizador de foto, que é o único fundo escuro do app.
+ * As classes .btn-* são do tema claro (texto escuro, fundo quase
+ * transparente) e sumiriam ali.
+ */
+const BOTAO_ESCURO =
+  'inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition-transform select-none active:scale-95 disabled:opacity-50'
+const BOTAO_ESCURO_PERIGO =
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-transform select-none active:scale-95 disabled:opacity-50'
+
 /** Turmas + papel na dança, em chips. */
 export function TurmaChips({ turmas }: { turmas: TurmaMembro[] }) {
   if (turmas.length === 0) {
@@ -174,13 +184,17 @@ export function FavoritosGrid({
               className="max-h-[60vh] w-auto max-w-full rounded-2xl object-contain"
             />
           )}
+          {/*
+            Este bloco é a única parte escura do app: a foto pede fundo
+            preto para não competir com as cores dela. Por isso os
+            textos e botões daqui NÃO usam as classes do tema claro
+            (.btn-ghost, text-tinta-*) — elas são escuras sobre escuro.
+          */}
           <div className="text-center">
             {aberto.legenda && (
-              <p className="text-sm font-bold text-tinta-900">
-                {aberto.legenda}
-              </p>
+              <p className="text-sm font-bold text-white">{aberto.legenda}</p>
             )}
-            <p className="text-xs text-tinta-600">
+            <p className="text-xs text-white/70">
               {formatRelative(aberto.criado_em)}
             </p>
           </div>
@@ -193,12 +207,12 @@ export function FavoritosGrid({
             {onDesfavoritar &&
               (confirmando ? (
                 <>
-                  <p className="max-w-xs text-center text-xs text-tinta-600">
+                  <p className="max-w-xs text-center text-xs text-white/70">
                     A foto sai da galeria e volta a ser arquivada com as
                     outras depois de 4 meses.
                   </p>
                   <button
-                    className="btn-danger"
+                    className={BOTAO_ESCURO_PERIGO}
                     disabled={removendo}
                     onClick={() => void desfavoritar()}
                   >
@@ -207,13 +221,13 @@ export function FavoritosGrid({
                 </>
               ) : (
                 <button
-                  className="btn-ghost"
+                  className={BOTAO_ESCURO}
                   onClick={() => setConfirmando(true)}
                 >
                   ⭐ Tirar dos favoritos
                 </button>
               ))}
-            <button className="btn-ghost" onClick={fechar}>
+            <button className={BOTAO_ESCURO} onClick={fechar}>
               Fechar
             </button>
           </div>
