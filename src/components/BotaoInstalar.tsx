@@ -22,6 +22,17 @@ function IconeCompartilhar({ tamanho = 26 }: { tamanho?: number }) {
   )
 }
 
+/** Botão "···" (Mais) da barra do Safari. */
+function IconeMais({ tamanho = 26 }: { tamanho?: number }) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden>
+      <circle cx="6" cy="12" r="1.8" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+      <circle cx="18" cy="12" r="1.8" fill="currentColor" />
+    </svg>
+  )
+}
+
 /** Ícone de "+" dentro de um quadrado, como no menu do Safari. */
 function IconeAdicionar({ tamanho = 26 }: { tamanho?: number }) {
   return (
@@ -98,8 +109,8 @@ function GuiaIOS({
               só o <strong>Safari</strong> faz isso no iPhone.
             </p>
             <ol className="mt-4 space-y-3">
-              <Passo numero={1} icone={<IconeCompartilhar />}>
-                Toque em <strong>Compartilhar</strong> aqui embaixo
+              <Passo numero={1} icone={<IconeMais />}>
+                Toque nos <strong>···</strong> deste navegador
               </Passo>
               <Passo numero={2}>
                 Escolha <strong>Abrir no Safari</strong>
@@ -116,22 +127,29 @@ function GuiaIOS({
         ) : (
           <>
             <p className="mt-2 text-sm text-tinta-600">
-              São três toques. O iPhone não deixa o app fazer isso
-              sozinho, mas é rapidinho:
+              O iPhone não deixa o app fazer isso sozinho, mas é
+              rapidinho:
             </p>
             <ol className="mt-4 space-y-3">
-              <Passo numero={1} icone={<IconeCompartilhar />}>
-                Toque no botão <strong>Compartilhar</strong>, na barra de
-                baixo do Safari
+              <Passo numero={1} icone={<IconeMais />}>
+                Toque nos <strong>···</strong> na barra de baixo do Safari
               </Passo>
-              <Passo numero={2} icone={<IconeAdicionar />}>
+              <Passo numero={2} icone={<IconeCompartilhar />}>
+                Toque em <strong>Compartilhar</strong>
+              </Passo>
+              <Passo numero={3} icone={<IconeAdicionar />}>
                 Role a lista e toque em{' '}
                 <strong>Adicionar à Tela de Início</strong>
               </Passo>
-              <Passo numero={3}>
+              <Passo numero={4}>
                 Confirme em <strong>Adicionar</strong>, no canto de cima
               </Passo>
             </ol>
+            <p className="mt-3 text-xs text-tinta-500">
+              Em alguns iPhones o ícone de Compartilhar aparece direto na
+              barra, sem os <strong>···</strong> — nesse caso, pule o
+              passo 1.
+            </p>
             <p className="mt-4 rounded-xl bg-verde-500/15 px-3 py-2 text-xs text-verde-800">
               Pronto! O Forró de Segunda vira um ícone na sua tela, junto
               com os outros apps.
@@ -195,27 +213,13 @@ export function BotaoInstalar({
 /**
  * Versão em cartão, para o perfil: é o lugar fixo onde a pessoa
  * encontra a instalação depois de ter dispensado o convite do feed.
- * Quando o app já está instalado, confirma em vez de sumir — assim
- * quem procurou entende que já está tudo certo.
+ * Some por completo quando o app já está instalado — quem abriu pelo
+ * ícone não precisa de aviso sobre isso.
  */
 export function CartaoInstalar() {
   const { jaInstalado, temPromptNativo, ios } = useInstalacao()
 
-  if (jaInstalado) {
-    return (
-      <div className="card flex items-center gap-3 p-5">
-        <span className="text-2xl">📲</span>
-        <div className="flex-1">
-          <p className="text-sm font-bold">App na tela inicial</p>
-          <p className="text-xs text-tinta-500">
-            Você já está usando o app instalado
-          </p>
-        </div>
-        <span className="text-xs font-bold text-verde-800">instalado ✓</span>
-      </div>
-    )
-  }
-
+  if (jaInstalado) return null
   if (!ios && !temPromptNativo) return null
 
   return (
