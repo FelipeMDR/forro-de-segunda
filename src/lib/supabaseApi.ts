@@ -610,12 +610,22 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('checkins')
-        .select('id, foto_url, legenda, criado_em')
+        .select(
+          'id, foto_url, legenda, criado_em, reacoes:reactions(tipo, user_id), comentarios:comments(count)',
+        )
         .eq('user_id', userId)
         .eq('favorito', true)
         .order('criado_em', { ascending: false }),
-    )
-    return data as CheckinFavorito[]
+    ) as unknown as Array<Record<string, unknown>>
+    return data.map((c) => ({
+      id: c.id as string,
+      foto_url: c.foto_url as string,
+      legenda: c.legenda as string | null,
+      criado_em: c.criado_em as string,
+      reacoes: (c.reacoes as CheckinFavorito['reacoes']) ?? [],
+      comentarios:
+        (c.comentarios as Array<{ count: number }>)?.[0]?.count ?? 0,
+    }))
   }
 
   async addMembroDesafio(challengeId: string, userId: string) {

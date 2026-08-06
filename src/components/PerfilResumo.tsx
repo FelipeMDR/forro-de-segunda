@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { CommentsSheet } from './CommentsSheet'
 import { Spinner } from './Spinner'
 import { formatRelative } from '../lib/dates'
 import type { PerfilStats } from '../lib/perfilStats'
 import {
   emojiCargo,
   LIMITE_FAVORITOS,
+  REACTION_TYPES,
   type Badge,
   type CheckinFavorito,
   type TurmaMembro,
@@ -90,6 +92,7 @@ export function FavoritosGrid({
   vazio,
   mostrarLimite = false,
   onDesfavoritar,
+  onMudou,
 }: {
   favoritos: CheckinFavorito[] | null
   vazio: string
@@ -97,14 +100,18 @@ export function FavoritosGrid({
   mostrarLimite?: boolean
   /** Só no próprio perfil: sem isso, a galeria é somente leitura. */
   onDesfavoritar?: (id: string) => Promise<void>
+  /** Recarrega a lista — a contagem de comentários muda ao comentar. */
+  onMudou?: () => void
 }) {
   const [aberto, setAberto] = useState<CheckinFavorito | null>(null)
   const [confirmando, setConfirmando] = useState(false)
   const [removendo, setRemovendo] = useState(false)
+  const [comentariosAbertos, setComentariosAbertos] = useState(false)
 
   const fechar = () => {
     setAberto(null)
     setConfirmando(false)
+    setComentariosAbertos(false)
   }
 
   const desfavoritar = async () => {
@@ -199,6 +206,37 @@ export function FavoritosGrid({
             </p>
           </div>
 
+          {/*
+            Reações e comentários da época da foto. Eles nunca foram
+            apagados — a retenção só remove o arquivo da imagem, não a
+            linha do check-in —, só não apareciam aqui.
+          */}
+          <div
+            className="flex flex-wrap items-center justify-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {REACTION_TYPES.map((tipo) => {
+              const n = aberto.reacoes.filter((r) => r.tipo === tipo).length
+              if (n === 0) return null
+              return (
+                <span
+                  key={tipo}
+                  className="flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-sm text-white"
+                >
+                  {tipo}
+                  <span className="text-xs font-bold">{n}</span>
+                </span>
+              )
+            })}
+            <button
+              className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-sm text-white"
+              onClick={() => setComentariosAbertos(true)}
+            >
+              💬
+              <span className="text-xs font-bold">{aberto.comentarios}</span>
+            </button>
+          </div>
+
           {/* stopPropagation: o clique no fundo fecha, nos botões não */}
           <div
             className="flex flex-col items-center gap-2"
@@ -231,6 +269,16 @@ export function FavoritosGrid({
               Fechar
             </button>
           </div>
+
+          {comentariosAbertos && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <CommentsSheet
+                checkinId={aberto.id}
+                onClose={() => setComentariosAbertos(false)}
+                onChanged={() => onMudou?.()}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -761,6 +761,11 @@ export class DemoApi implements ForroApi {
         foto_url: c.foto_url,
         legenda: c.legenda,
         criado_em: c.criado_em,
+        reacoes: this.db.reactions
+          .filter((r) => r.checkin_id === c.id)
+          .map((r) => ({ tipo: r.tipo, user_id: r.user_id })),
+        comentarios: this.db.comments.filter((x) => x.checkin_id === c.id)
+          .length,
       }))
   }
 

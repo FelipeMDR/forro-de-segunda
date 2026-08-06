@@ -175,6 +175,9 @@ export function ProfilePage() {
         favoritos={favoritos}
         mostrarLimite
         onDesfavoritar={desfavoritar}
+        onMudou={() => {
+          if (userId) void api.favoritosDe(userId).then(setFavoritos)
+        }}
         vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
       />
 
