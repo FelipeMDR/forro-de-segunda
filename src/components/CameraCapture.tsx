@@ -5,6 +5,30 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * (sem galeria), para evitar fotos antigas. Usa getUserMedia; exige
  * HTTPS (ou localhost) e permissão de câmera.
  */
+/**
+ * Desenha o quadro no canvas, espelhando quando a fonte está espelhada
+ * na tela.
+ *
+ * A câmera frontal é mostrada em espelho (como todo app de selfie faz —
+ * sem isso, mover a mão para a direita a faz ir para a esquerda na tela
+ * e enquadrar vira um exercício de paciência). Só que a captura vinha do
+ * quadro cru, sem espelho: a foto saía invertida em relação ao que a
+ * pessoa tinha acabado de ver. Aqui a foto passa a ser o que estava na
+ * tela.
+ */
+export function desenharQuadro(
+  ctx: CanvasRenderingContext2D,
+  fonte: CanvasImageSource,
+  largura: number,
+  espelhar: boolean,
+) {
+  if (espelhar) {
+    ctx.translate(largura, 0)
+    ctx.scale(-1, 1)
+  }
+  ctx.drawImage(fonte, 0, 0)
+}
+
 export function CameraCapture({
   onCapture,
   permitirFotoTeste = false,
@@ -77,7 +101,9 @@ export function CameraCapture({
     canvas.height = video.videoHeight
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    ctx.drawImage(video, 0, 0)
+    // Mesma condição do CSS do <video>: é isso que garante que a foto
+    // saia igual à pré-visualização.
+    desenharQuadro(ctx, video, canvas.width, facing === 'user')
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/jpeg', 0.9),
     )
