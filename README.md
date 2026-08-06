@@ -219,9 +219,14 @@ supabase/
   só escrevia na chamada, e re-importar um veterano não fazia nada); para
   quem não tem, troca a linha da chamada. As turmas do arquivo
   substituem as atuais pessoa a pessoa — quem não está no arquivo não é
-  tocado, então dá para importar uma turma por vez. Comparar arquivo ×
-  turmas atuais é o que distingue veterano de quem repete a turma; isso
-  vale para semestres consecutivos, não é histórico de matrícula.
+  tocado, então dá para importar uma turma por vez.
+- **Virar o semestre é explícito.** `encerrarSemestre()` esvazia
+  `profile_turmas` de todo mundo; depois as planilhas repovoam. Sem esse
+  passo, quem terminou o curso e não volta em planilha nenhuma ficaria
+  na turma do semestre passado para sempre, já que a substituição é
+  pessoa a pessoa. Ficar sem turma é um estado normal e suportado: o
+  veterano continua com conta, pontos, check-ins e distintivos, só não
+  pertence a uma turma.
 - **Cancelar a aula fecha a janela:** um cancelamento marcado como
   `suspende_desafios` tira o dia da conta de *todos* os desafios — sem
   isso, bastava aparecer no local numa noite sem forró para marcar

@@ -19,13 +19,7 @@ import {
   SEM_TURMA,
   type PessoaNaChamada,
 } from '../lib/chamada'
-import {
-  descreverMudanca,
-  planejarMatricula,
-  resumoMatricula,
-  ROTULO_STATUS,
-  type StatusMatricula,
-} from '../lib/matricula'
+import { planejarMatricula, turmasDaLinha } from '../lib/matricula'
 import { ateAPosicao } from '../lib/ranking'
 import {
   diasSuspensos,
@@ -332,17 +326,6 @@ function SecaoAgenda({
       )}
     </section>
   )
-}
-
-/**
- * Cor de cada situação na pré-visualização da matrícula. Fundos em /10
- * para o texto ficar acima de 4,5:1 sobre o papel.
- */
-const CHIP_STATUS: Record<StatusMatricula, string> = {
-  novo: 'bg-emerald-500/10 text-emerald-800',
-  aguardando: 'bg-amber-500/10 text-amber-800',
-  veterano: 'bg-azul-500/10 text-azul-700',
-  repetindo: 'bg-brasa-500/10 text-brasa-700',
 }
 
 const FERIADO_VAZIO: FeriadoInput = {
@@ -1178,6 +1161,7 @@ function SecaoTurmas({
     null,
   )
   const [limpandoChamada, setLimpandoChamada] = useState(false)
+  const [encerrando, setEncerrando] = useState(false)
 
   const carregar = useCallback(async () => {
     const [a, p] = await Promise.all([
@@ -1300,6 +1284,21 @@ function SecaoTurmas({
     }
   }
 
+  const encerrar = async () => {
+    try {
+      const n = await api.encerrarSemestre()
+      await carregar()
+      setEncerrando(false)
+      toast(
+        n === 0
+          ? 'Ninguém estava em turma nenhuma'
+          : `${n} aluno(s) ficaram sem turma. Agora importe a matrícula nova.`,
+      )
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
   const limparChamada = async () => {
     try {
       const n = await api.limparChamadaComConta()
@@ -1353,7 +1352,7 @@ function SecaoTurmas({
   const plano = importacao
     ? planejarMatricula(importacao.linhas, alunos ?? [], perfis)
     : []
-  const resumo = resumoMatricula(plano)
+  const comTurma = perfis.filter((p) => p.turmas.length > 0).length
 
   const perfisComTurmas = perfis.map((p) => ({
     perfil: p,
@@ -1432,6 +1431,48 @@ function SecaoTurmas({
           />
           <button className="btn-ghost shrink-0">+ Criar</button>
         </form>
+
+        {/* Vira o semestre: zera as turmas de todo mundo para a
+            matrícula nova entrar limpa. Quem terminou o curso e não
+            voltar em nenhuma planilha fica sem turma — continua com
+            conta, pontos e check-ins, só não pertence a uma turma. */}
+        {encerrando ? (
+          <div className="space-y-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-700">
+            <p>
+              Tirar os <strong>{comTurma}</strong> alunos do app das turmas
+              atuais? Contas, pontos, check-ins e distintivos{' '}
+              <strong>não são tocados</strong> — só o vínculo com a turma.
+            </p>
+            <p>
+              Faça isso ao virar o semestre, logo antes de importar a
+              matrícula nova. Até importar, o feed "Minha turma" fica vazio
+              para todo mundo.
+            </p>
+            <div className="flex gap-2">
+              <button
+                className="btn-danger flex-1 py-1.5 text-xs"
+                onClick={() => void encerrar()}
+              >
+                Encerrar o semestre
+              </button>
+              <button
+                className="btn-ghost flex-1 py-1.5 text-xs"
+                onClick={() => setEncerrando(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          comTurma > 0 && (
+            <button
+              className="btn-ghost w-full py-1.5 text-xs"
+              onClick={() => setEncerrando(true)}
+            >
+              🎓 Encerrar semestre — tirar todos das turmas ({comTurma})
+            </button>
+          )
+        )}
       </div>
 
       {/* Lista de chamada */}
@@ -1462,9 +1503,10 @@ function SecaoTurmas({
             Tirar alguém daqui não tira o acesso de quem já criou conta
           </strong>{' '}
           — a lista vale só na hora do cadastro, e por isso quem já entrou no
-          app não precisa continuar nela. A cada semestre, importe a planilha
-          inteira: quem já tem conta tem a turma trocada direto no perfil, e
-          quem ainda não tem entra aqui. CSV com colunas{' '}
+          app não precisa continuar nela. Ao virar o semestre: encerre o
+          semestre ali em cima e importe as planilhas novas. Quem já tem conta
+          tem a turma trocada direto no perfil; quem ainda não tem entra aqui.
+          CSV com colunas{' '}
           <code>nome;telefone;turma;papel</code> (papel = Condutor/Conduzido,
           opcional; com ou sem cabeçalho). Aluno em várias turmas = uma linha
           por turma.
@@ -1491,21 +1533,6 @@ function SecaoTurmas({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                ['novo', 'veterano', 'repetindo', 'aguardando'] as const
-              ).map((s) =>
-                resumo[s] > 0 ? (
-                  <span
-                    key={s}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${CHIP_STATUS[s]}`}
-                  >
-                    {resumo[s]} {ROTULO_STATUS[s]}
-                  </span>
-                ) : null,
-              )}
-            </div>
-
             {plano.length > 0 && (
               <div className="max-h-64 divide-y divide-preto/10 overflow-y-auto rounded-lg bg-papel px-3">
                 {plano.map((p) => (
@@ -1513,17 +1540,12 @@ function SecaoTurmas({
                     key={p.chave}
                     className="flex items-center gap-2 py-1.5 text-xs"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold">{p.nome ?? '—'}</p>
-                      <p className="truncate text-tinta-500">
-                        {descreverMudanca(p)}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CHIP_STATUS[p.status]}`}
-                    >
-                      {ROTULO_STATUS[p.status]}
-                    </span>
+                    <p className="min-w-0 flex-1 truncate font-bold">
+                      {p.nome ?? '—'}
+                    </p>
+                    <p className="shrink-0 text-tinta-500">
+                      {turmasDaLinha(p)}
+                    </p>
                   </div>
                 ))}
               </div>

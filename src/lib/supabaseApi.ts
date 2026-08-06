@@ -1214,6 +1214,15 @@ export class SupabaseApi implements ForroApi {
     return alvo.length
   }
 
+  async encerrarSemestre() {
+    const perfis = await this.listProfiles()
+    const comTurma = perfis.filter((p) => p.turmas.length > 0)
+    for (const lote of emLotes(comTurma.map((p) => p.id), 100)) {
+      ok(await this.sb.from('profile_turmas').delete().in('user_id', lote))
+    }
+    return comTurma.length
+  }
+
   async listPerfisPublicos(): Promise<PerfilPublico[]> {
     // Colunas nomeadas de propósito: `*` traria o telefone junto, e a
     // busca é usada por qualquer aluno.

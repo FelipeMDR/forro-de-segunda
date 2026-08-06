@@ -173,6 +173,16 @@ export interface ForroApi {
    * linhas já cumpriram o papel delas.
    */
   limparChamadaComConta(): Promise<number>
+  /**
+   * Fim de semestre: tira TODOS os alunos do app das turmas, sem tocar
+   * em contas, pontos ou check-ins. Serve para rodar antes de importar
+   * a matrícula nova — quem não voltar em nenhuma planilha simplesmente
+   * fica sem turma, que é a situação de quem terminou o curso e
+   * continua frequentando.
+   *
+   * Devolve quantas pessoas tinham turma.
+   */
+  encerrarSemestre(): Promise<number>
   listProfiles(): Promise<Profile[]>
   /** Adiciona um vínculo turma+papel a um aluno (organizador). */
   addTurmaAluno(

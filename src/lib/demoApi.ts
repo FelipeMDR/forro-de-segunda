@@ -1176,6 +1176,13 @@ export class DemoApi implements ForroApi {
     return antes - this.db.alunos.length
   }
 
+  async encerrarSemestre() {
+    const comTurma = this.db.profiles.filter((p) => p.turmas.length > 0)
+    for (const p of comTurma) p.turmas = []
+    this.persist()
+    return comTurma.length
+  }
+
   async listProfiles(): Promise<Profile[]> {
     return [...this.db.profiles].sort((a, b) => a.nome.localeCompare(b.nome))
   }
