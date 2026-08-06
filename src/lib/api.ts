@@ -1,4 +1,5 @@
 import type { Coordenada } from './geo'
+import type { PessoaMatricula } from './matricula'
 import type {
   AgendaEvent,
   AgendaEventInput,
@@ -152,17 +153,26 @@ export interface ForroApi {
   }): Promise<void>
   deleteAlunoCadastrado(id: string): Promise<void>
   /**
-   * Importação em lote da lista de chamada (CSV). Ignora combinações
-   * telefone+turma repetidas (o mesmo aluno pode ter várias turmas).
+   * Matrícula do semestre a partir do CSV.
+   *
+   * Substitui o antigo `importAlunos`, que só escrevia na lista de
+   * chamada — e por isso não fazia nada por quem já tinha conta, já que
+   * a chamada só é lida na criação do cadastro. Aqui cada pessoa vai
+   * para o lugar certo: quem tem conta tem as turmas do PERFIL
+   * trocadas; quem não tem, a linha da CHAMADA.
+   *
+   * Recebe o plano já montado (`planejarMatricula`) porque é exatamente
+   * o que o organizador conferiu na tela antes de confirmar.
    */
-  importAlunos(
-    rows: {
-      nome: string
-      telefone: string
-      turma: string | null
-      papel_danca: PapelDanca | null
-    }[],
-  ): Promise<{ importados: number; ignorados: number }>
+  matricularAlunos(
+    plano: PessoaMatricula[],
+  ): Promise<{ perfis: number; chamada: number }>
+  /**
+   * Tira da lista de chamada quem já criou conta. Não mexe no acesso
+   * nem nas turmas: a chamada só vale na hora do cadastro, então essas
+   * linhas já cumpriram o papel delas.
+   */
+  limparChamadaComConta(): Promise<number>
   listProfiles(): Promise<Profile[]>
   /** Adiciona um vínculo turma+papel a um aluno (organizador). */
   addTurmaAluno(

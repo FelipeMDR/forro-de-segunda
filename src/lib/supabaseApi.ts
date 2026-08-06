@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ForroApi } from './api'
 import { diasSuspensos, pontosNoDesafio } from './dates'
+import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import { normalizeTelefone, synthEmail, telefonesIguais } from './phone'
@@ -52,6 +53,19 @@ function traduz(msg: string): string {
     )
   }
   return msg
+}
+
+/**
+ * Fatia uma lista em lotes. Filtros `.in(...)` do PostgREST viajam na
+ * URL: com 300 alunos de uma vez o endereço passaria de 10 KB e
+ * apanharia de proxy pelo caminho.
+ */
+function emLotes<T>(itens: T[], tamanho: number): T[][] {
+  const lotes: T[][] = []
+  for (let i = 0; i < itens.length; i += tamanho) {
+    lotes.push(itens.slice(i, i + tamanho))
+  }
+  return lotes
 }
 
 /**
@@ -1141,37 +1155,63 @@ export class SupabaseApi implements ForroApi {
     ok(await this.sb.from('alunos_cadastrados').delete().eq('id', id))
   }
 
-  async importAlunos(
-    rows: {
-      nome: string
-      telefone: string
-      turma: string
-      papel_danca: PapelDanca | null
-    }[],
-  ) {
-    const existentes = await this.listAlunosCadastrados()
-    // Duplicado = mesmo telefone NA MESMA turma (multi-turma é permitido)
-    const novos = rows.filter(
-      (r) =>
-        !existentes.some(
-          (e) =>
-            telefonesIguais(e.telefone, r.telefone) &&
-            (e.turma ?? '').toLowerCase() === (r.turma ?? '').toLowerCase(),
-        ),
-    )
-    if (novos.length > 0) {
-      ok(
-        await this.sb.from('alunos_cadastrados').insert(
-          novos.map((r) => ({
-            nome: r.nome.trim() || null,
-            telefone: r.telefone.trim(),
-            turma: r.turma.trim(),
-            papel_danca: r.papel_danca,
+  async matricularAlunos(plano: PessoaMatricula[]) {
+    const comConta = plano.filter((p) => p.userId)
+    const semConta = plano.filter((p) => !p.userId)
+
+    // ---- Quem já tem conta: troca as turmas do perfil ----
+    // Apaga e reinsere em vez de comparar diferença: a planilha do
+    // semestre é a verdade, e "sumiu do arquivo" precisa mesmo sumir.
+    if (comConta.length > 0) {
+      for (const lote of emLotes(comConta.map((p) => p.userId!), 100)) {
+        ok(await this.sb.from('profile_turmas').delete().in('user_id', lote))
+      }
+      const vinculos = comConta.flatMap((p) =>
+        p.turmasNovas
+          .filter((t) => t.turma)
+          .map((t) => ({
+            user_id: p.userId!,
+            turma: t.turma!,
+            papel_danca: t.papel_danca,
           })),
-        ),
       )
+      if (vinculos.length > 0) {
+        ok(await this.sb.from('profile_turmas').insert(vinculos))
+      }
     }
-    return { importados: novos.length, ignorados: rows.length - novos.length }
+
+    // ---- Quem ainda não tem conta: troca a linha da chamada ----
+    const idsVelhos = semConta.flatMap((p) => p.linhasChamada.map((l) => l.id))
+    for (const lote of emLotes(idsVelhos, 100)) {
+      ok(await this.sb.from('alunos_cadastrados').delete().in('id', lote))
+    }
+    const linhas = semConta.flatMap((p) =>
+      p.turmasNovas.map((t) => ({
+        nome: p.nome,
+        telefone: p.telefone.trim(),
+        turma: t.turma,
+        papel_danca: t.papel_danca,
+      })),
+    )
+    if (linhas.length > 0) {
+      ok(await this.sb.from('alunos_cadastrados').insert(linhas))
+    }
+
+    return { perfis: comConta.length, chamada: semConta.length }
+  }
+
+  async limparChamadaComConta() {
+    const [alunos, perfis] = await Promise.all([
+      this.listAlunosCadastrados(),
+      this.listProfiles(),
+    ])
+    const alvo = alunos.filter((a) =>
+      perfis.some((p) => p.telefone && telefonesIguais(a.telefone, p.telefone)),
+    )
+    for (const lote of emLotes(alvo.map((a) => a.id), 100)) {
+      ok(await this.sb.from('alunos_cadastrados').delete().in('id', lote))
+    }
+    return alvo.length
   }
 
   async listPerfisPublicos(): Promise<PerfilPublico[]> {

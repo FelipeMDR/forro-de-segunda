@@ -1,4 +1,4 @@
-import { normalizeTelefone, telefonesIguais } from './phone'
+import { normalizeTelefone } from './phone'
 import type { AlunoCadastrado, Profile } from './types'
 
 /**
@@ -89,20 +89,4 @@ export function filtrarPorTurma<T extends { turmas: string[] }>(
 /** Quem está na chamada e ainda não criou conta no app. */
 export function semConta(pessoas: PessoaNaChamada[]): number {
   return pessoas.filter((p) => !p.temConta).length
-}
-
-/**
- * Perfis do app que não estão mais na chamada. Não perdem o acesso —
- * a chamada só libera a criação da conta —, mas somem da tela de
- * gestão, então vale saber que existem.
- */
-export function foraDaChamada(
-  perfis: Profile[],
-  alunos: AlunoCadastrado[],
-): Profile[] {
-  return perfis.filter(
-    (p) =>
-      !p.telefone ||
-      !alunos.some((a) => telefonesIguais(a.telefone, p.telefone!)),
-  )
 }

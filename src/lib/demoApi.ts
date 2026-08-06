@@ -9,6 +9,7 @@ import {
 import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
+import type { PessoaMatricula } from './matricula'
 import { normalizeTelefone, telefonesIguais } from './phone'
 import { CARGOS_PADRAO, LIMITE_FAVORITOS, turmaLabel } from './types'
 import type {
@@ -1129,37 +1130,50 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
-  async importAlunos(
-    rows: {
-      nome: string
-      telefone: string
-      turma: string
-      papel_danca: PapelDanca | null
-    }[],
-  ) {
-    let importados = 0
-    let ignorados = 0
-    for (const row of rows) {
-      const jaExiste = this.db.alunos.some(
-        (a) =>
-          telefonesIguais(a.telefone, row.telefone) &&
-          (a.turma ?? '').toLowerCase() === (row.turma ?? '').toLowerCase(),
-      )
-      if (jaExiste) {
-        ignorados++
-        continue
-      }
-      this.db.alunos.push({
-        id: uuid(),
-        nome: row.nome.trim() || null,
-        telefone: row.telefone.trim(),
-        turma: row.turma.trim(),
-        papel_danca: row.papel_danca,
-      })
-      importados++
+  async matricularAlunos(plano: PessoaMatricula[]) {
+    const comConta = plano.filter((p) => p.userId)
+    const semConta = plano.filter((p) => !p.userId)
+
+    // Quem tem conta: a planilha do semestre substitui as turmas do perfil
+    for (const p of comConta) {
+      const perfil = this.db.profiles.find((x) => x.id === p.userId)
+      if (!perfil) continue
+      perfil.turmas = p.turmasNovas
+        .filter((t) => t.turma)
+        .map((t) => ({ turma: t.turma!, papel_danca: t.papel_danca }))
     }
+
+    // Quem não tem: a linha da chamada é que muda
+    const idsVelhos = new Set(
+      semConta.flatMap((p) => p.linhasChamada.map((l) => l.id)),
+    )
+    this.db.alunos = this.db.alunos.filter((a) => !idsVelhos.has(a.id))
+    for (const p of semConta) {
+      for (const t of p.turmasNovas) {
+        this.db.alunos.push({
+          id: uuid(),
+          nome: p.nome,
+          telefone: p.telefone.trim(),
+          turma: t.turma,
+          papel_danca: t.papel_danca,
+        })
+      }
+    }
+
     this.persist()
-    return { importados, ignorados }
+    return { perfis: comConta.length, chamada: semConta.length }
+  }
+
+  async limparChamadaComConta() {
+    const antes = this.db.alunos.length
+    this.db.alunos = this.db.alunos.filter(
+      (a) =>
+        !this.db.profiles.some(
+          (p) => p.telefone && telefonesIguais(a.telefone, p.telefone),
+        ),
+    )
+    this.persist()
+    return antes - this.db.alunos.length
   }
 
   async listProfiles(): Promise<Profile[]> {

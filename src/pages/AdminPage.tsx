@@ -15,11 +15,17 @@ import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
 import {
   agruparChamada,
   filtrarPorTurma,
-  foraDaChamada,
   semConta,
   SEM_TURMA,
   type PessoaNaChamada,
 } from '../lib/chamada'
+import {
+  descreverMudanca,
+  planejarMatricula,
+  resumoMatricula,
+  ROTULO_STATUS,
+  type StatusMatricula,
+} from '../lib/matricula'
 import { ateAPosicao } from '../lib/ranking'
 import {
   diasSuspensos,
@@ -326,6 +332,17 @@ function SecaoAgenda({
       )}
     </section>
   )
+}
+
+/**
+ * Cor de cada situação na pré-visualização da matrícula. Fundos em /10
+ * para o texto ficar acima de 4,5:1 sobre o papel.
+ */
+const CHIP_STATUS: Record<StatusMatricula, string> = {
+  novo: 'bg-emerald-500/10 text-emerald-800',
+  aguardando: 'bg-amber-500/10 text-amber-800',
+  veterano: 'bg-azul-500/10 text-azul-700',
+  repetindo: 'bg-brasa-500/10 text-brasa-700',
 }
 
 const FERIADO_VAZIO: FeriadoInput = {
@@ -1160,6 +1177,7 @@ function SecaoTurmas({
   const [confirmandoRemocao, setConfirmandoRemocao] = useState<string | null>(
     null,
   )
+  const [limpandoChamada, setLimpandoChamada] = useState(false)
 
   const carregar = useCallback(async () => {
     const [a, p] = await Promise.all([
@@ -1261,16 +1279,17 @@ function SecaoTurmas({
   }
 
   const confirmarImportacao = async () => {
-    if (!importacao) return
+    if (plano.length === 0) return
     setImportando(true)
     try {
-      const { importados, ignorados } = await api.importAlunos(
-        importacao.linhas,
-      )
+      const { perfis: p, chamada } = await api.matricularAlunos(plano)
       toast(
-        `${importados} aluno(s) importado(s)` +
-          (ignorados > 0 ? `, ${ignorados} já estavam na lista` : '') +
-          ' ✅',
+        [
+          p > 0 && `${p} já no app tiveram a turma atualizada`,
+          chamada > 0 && `${chamada} entraram na lista de chamada`,
+        ]
+          .filter(Boolean)
+          .join(' · ') + ' ✅',
       )
       setImportacao(null)
       await carregar()
@@ -1278,6 +1297,21 @@ function SecaoTurmas({
       toast((err as Error).message, 'erro')
     } finally {
       setImportando(false)
+    }
+  }
+
+  const limparChamada = async () => {
+    try {
+      const n = await api.limparChamadaComConta()
+      await carregar()
+      setLimpandoChamada(false)
+      toast(
+        n === 0
+          ? 'Nada a limpar — ninguém na lista tem conta ainda'
+          : `${n} linha(s) removidas. O acesso de quem já tem conta continua igual.`,
+      )
+    } catch (err) {
+      toast((err as Error).message, 'erro')
     }
   }
 
@@ -1312,6 +1346,14 @@ function SecaoTurmas({
     combinaBusca(buscaLista, [p.nome, p.telefone, ...p.turmas]),
   )
   const faltamConta = semConta(pessoas)
+  const jaTemConta = pessoas.length - faltamConta
+
+  // O plano só existe enquanto há um arquivo escolhido; é ele que a
+  // tela mostra antes de confirmar e o que a API executa.
+  const plano = importacao
+    ? planejarMatricula(importacao.linhas, alunos ?? [], perfis)
+    : []
+  const resumo = resumoMatricula(plano)
 
   const perfisComTurmas = perfis.map((p) => ({
     perfil: p,
@@ -1327,7 +1369,6 @@ function SecaoTurmas({
         ...p.turmas.map((t) => t.turma),
       ]),
     )
-  const semChamada = foraDaChamada(perfis, alunos ?? []).length
 
   const darCargo = async (userId: string, cargo: string) => {
     if (!cargo) return
@@ -1420,8 +1461,10 @@ function SecaoTurmas({
           <strong className="text-tinta-600">
             Tirar alguém daqui não tira o acesso de quem já criou conta
           </strong>{' '}
-          — a lista vale só na hora do cadastro. Para mexer nas turmas de quem
-          já está no app, use "Alunos no app" logo abaixo. CSV com colunas{' '}
+          — a lista vale só na hora do cadastro, e por isso quem já entrou no
+          app não precisa continuar nela. A cada semestre, importe a planilha
+          inteira: quem já tem conta tem a turma trocada direto no perfil, e
+          quem ainda não tem entra aqui. CSV com colunas{' '}
           <code>nome;telefone;turma;papel</code> (papel = Condutor/Conduzido,
           opcional; com ou sem cabeçalho). Aluno em várias turmas = uma linha
           por turma.
@@ -1435,24 +1478,72 @@ function SecaoTurmas({
         />
 
         {importacao && (
-          <div className="space-y-2 rounded-xl border border-brasa-500/30 bg-brasa-500/5 p-3">
-            <p className="text-sm font-bold">
-              📄 {importacao.linhas.length} aluno(s) prontos para importar
-            </p>
+          <div className="space-y-3 rounded-xl border border-brasa-500/30 bg-brasa-500/5 p-3">
+            <div>
+              <p className="text-sm font-bold">
+                📄 Matrícula do semestre — {plano.length}{' '}
+                {plano.length === 1 ? 'pessoa' : 'pessoas'}
+              </p>
+              <p className="mt-0.5 text-xs text-tinta-600">
+                As turmas do arquivo <strong>substituem</strong> as de agora,
+                pessoa por pessoa. Quem não está no arquivo não é tocado — dá
+                para importar uma turma de cada vez.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                ['novo', 'veterano', 'repetindo', 'aguardando'] as const
+              ).map((s) =>
+                resumo[s] > 0 ? (
+                  <span
+                    key={s}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${CHIP_STATUS[s]}`}
+                  >
+                    {resumo[s]} {ROTULO_STATUS[s]}
+                  </span>
+                ) : null,
+              )}
+            </div>
+
+            {plano.length > 0 && (
+              <div className="max-h-64 divide-y divide-preto/10 overflow-y-auto rounded-lg bg-papel px-3">
+                {plano.map((p) => (
+                  <div
+                    key={p.chave}
+                    className="flex items-center gap-2 py-1.5 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold">{p.nome ?? '—'}</p>
+                      <p className="truncate text-tinta-500">
+                        {descreverMudanca(p)}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CHIP_STATUS[p.status]}`}
+                    >
+                      {ROTULO_STATUS[p.status]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {importacao.avisos.length > 0 && (
-              <ul className="max-h-24 space-y-0.5 overflow-y-auto text-xs text-amber-700">
+              <ul className="max-h-24 space-y-0.5 overflow-y-auto text-xs text-amber-800">
                 {importacao.avisos.map((a, i) => (
                   <li key={i}>⚠️ {a}</li>
                 ))}
               </ul>
             )}
+
             <div className="flex gap-2">
               <button
                 className="btn-primary flex-1 py-2 text-xs"
-                disabled={importando || importacao.linhas.length === 0}
+                disabled={importando || plano.length === 0}
                 onClick={() => void confirmarImportacao()}
               >
-                {importando ? 'Importando…' : 'Confirmar importação'}
+                {importando ? 'Matriculando…' : 'Confirmar matrícula'}
               </button>
               <button
                 className="btn-ghost flex-1 py-2 text-xs"
@@ -1564,6 +1655,40 @@ function SecaoTurmas({
                 <> · {faltamConta} ainda sem conta no app</>
               )}
             </p>
+
+            {/* Depois de alguns semestres a chamada acumula gente que já
+                tem conta e não precisa mais estar ali. */}
+            {jaTemConta > 0 &&
+              (limpandoChamada ? (
+                <div className="space-y-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-700">
+                  <p>
+                    Tirar da lista as <strong>{jaTemConta}</strong> pessoas que
+                    já criaram conta? Elas continuam com o mesmo acesso e as
+                    mesmas turmas — a chamada só é lida na hora do cadastro.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-danger flex-1 py-1.5 text-xs"
+                      onClick={() => void limparChamada()}
+                    >
+                      Limpar {jaTemConta}
+                    </button>
+                    <button
+                      className="btn-ghost flex-1 py-1.5 text-xs"
+                      onClick={() => setLimpandoChamada(false)}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="btn-ghost w-full py-1.5 text-xs"
+                  onClick={() => setLimpandoChamada(true)}
+                >
+                  🧹 Tirar da lista quem já tem conta ({jaTemConta})
+                </button>
+              ))}
 
             {pessoasFiltradas.length === 0 ? (
               <p className="py-3 text-center text-sm text-tinta-500">
@@ -1702,7 +1827,6 @@ function SecaoTurmas({
             <> de {perfis.length}</>
           )}{' '}
           {perfis.length === 1 ? 'aluno' : 'alunos'}
-          {semChamada > 0 && <> · {semChamada} fora da lista de chamada</>}
         </p>
 
         {perfisFiltrados.length === 0 ? (

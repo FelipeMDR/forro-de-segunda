@@ -211,6 +211,17 @@ supabase/
   O projeto funciona a semana toda, com espaços diferentes tendo horários
   de início diferentes, então segunda pode abrir às 18h e quarta às 20h
   dentro do mesmo desafio.
+- **Chamada libera o cadastro; matrícula move as turmas.** A
+  `alunos_cadastrados` só é lida por `handle_new_user`, na criação da
+  conta — daí a lista não controlar acesso e não fazer sentido guardar
+  nela quem já entrou. A importação de CSV é a **matrícula do semestre**:
+  para quem já tem conta ela troca `profile_turmas` direto (antes o CSV
+  só escrevia na chamada, e re-importar um veterano não fazia nada); para
+  quem não tem, troca a linha da chamada. As turmas do arquivo
+  substituem as atuais pessoa a pessoa — quem não está no arquivo não é
+  tocado, então dá para importar uma turma por vez. Comparar arquivo ×
+  turmas atuais é o que distingue veterano de quem repete a turma; isso
+  vale para semestres consecutivos, não é histórico de matrícula.
 - **Cancelar a aula fecha a janela:** um cancelamento marcado como
   `suspende_desafios` tira o dia da conta de *todos* os desafios — sem
   isso, bastava aparecer no local numa noite sem forró para marcar
