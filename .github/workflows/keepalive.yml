@@ -1,8 +1,9 @@
 # Impede que o projeto Supabase (free tier) seja pausado após 7 dias
 # sem atividade: faz um "ping" no banco toda quinta-feira.
 #
-# Configure nos Secrets do repositório (Settings > Secrets > Actions):
-#   SUPABASE_URL       — ex.: https://xyzabc.supabase.co
+# Configure nos Secrets do repositório
+# (Settings > Secrets and variables > Actions > New repository secret):
+#   SUPABASE_URL       — ex.: https://xyzabc.supabase.co (sem barra no fim)
 #   SUPABASE_ANON_KEY  — a anon/public key do projeto
 name: Supabase keep-alive
 
@@ -15,14 +16,54 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping no banco
-        run: |
-          curl --fail -s -X POST \
-            "$SUPABASE_URL/rest/v1/rpc/ping" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{}'
+      # Sem esta conferência, secret ausente vira só "exit code 3" do
+      # curl (URL malformada) — que não diz a ninguém o que fazer.
+      - name: Conferir os secrets
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          faltando=""
+          [ -z "$SUPABASE_URL" ] && faltando="$faltando SUPABASE_URL"
+          [ -z "$SUPABASE_ANON_KEY" ] && faltando="$faltando SUPABASE_ANON_KEY"
+          if [ -n "$faltando" ]; then
+            echo "::error::Faltam secrets no repositório:$faltando"
+            echo "Configure em Settings > Secrets and variables > Actions."
+            echo "SUPABASE_URL  = a URL do projeto (https://xxxx.supabase.co)"
+            echo "SUPABASE_ANON_KEY = a chave anon/public do Supabase."
+            exit 1
+          fi
+          case "$SUPABASE_URL" in
+            https://*) ;;
+            *)
+              echo "::error::SUPABASE_URL precisa começar com https://"
+              exit 1
+              ;;
+          esac
+
+      - name: Ping no banco
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          # Tira a barra final, se houver: ".../co/" viraria ".../co//rest"
+          url="${SUPABASE_URL%/}"
+          codigo=$(curl -s -o resposta.txt -w '%{http_code}' \
+            -X POST "$url/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          saida=$?
+          if [ $saida -ne 0 ]; then
+            echo "::error::Não consegui falar com o Supabase (curl saiu $saida)."
+            exit 1
+          fi
+          echo "HTTP $codigo"
+          cat resposta.txt
+          echo
+          if [ "$codigo" != "200" ]; then
+            echo "::error::O ping respondeu HTTP $codigo. 401 costuma ser chave errada; 404, a função ping ausente (ela está em supabase/schema.sql)."
+            exit 1
+          fi
+          echo "Banco acordado 👍"
