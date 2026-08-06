@@ -1,5 +1,11 @@
 import type { ForroApi } from './api'
-import { addDays, pontosNoDesafio, proximaOcorrencia, toISODate } from './dates'
+import {
+  addDays,
+  diasSuspensos,
+  pontosNoDesafio,
+  proximaOcorrencia,
+  toISODate,
+} from './dates'
 import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
@@ -108,7 +114,7 @@ interface DB {
   }[]
 }
 
-const DB_KEY = 'fds-demo-db-v8'
+const DB_KEY = 'fds-demo-db-v9'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -303,6 +309,7 @@ function seed(): DB {
           data: toISODate(proximaSegunda),
           motivo: 'Feriado nacional (exemplo)',
           turma: null,
+          suspende_desafios: true,
         },
       ]
     : []
@@ -402,6 +409,7 @@ export class DemoApi implements ForroApi {
         'fds-demo-db-v5',
         'fds-demo-db-v6',
         'fds-demo-db-v7',
+        'fds-demo-db-v8',
       ]) {
         localStorage.removeItem(k)
       }
@@ -960,6 +968,8 @@ export class DemoApi implements ForroApi {
     const memberIds = this.db.members
       .filter((m) => m.challenge_id === challenge.id)
       .map((m) => m.user_id)
+    // Aula cancelada = sem janela naquele dia, ninguém pontua
+    const suspensos = diasSuspensos(this.db.feriados)
     return memberIds
       .map((uid) => {
         const p = this.db.profiles.find((x) => x.id === uid)
@@ -978,6 +988,7 @@ export class DemoApi implements ForroApi {
             )
             .map((c) => new Date(c.criado_em)),
           challenge,
+          suspensos,
         )
         return {
           user_id: uid,
@@ -1028,6 +1039,7 @@ export class DemoApi implements ForroApi {
       data: f.data,
       motivo: f.motivo.trim() || null,
       turma: f.turma,
+      suspende_desafios: f.suspende_desafios,
     })
     this.persist()
   }

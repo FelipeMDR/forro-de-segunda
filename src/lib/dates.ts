@@ -43,8 +43,37 @@ function parseTime(hhmm: string): number {
 }
 
 /**
+ * Dias (ISO) em que os desafios estão suspensos — vem dos cancelamentos
+ * marcados como "sem forró nesse dia". Passe o resultado adiante para
+ * `janelaDoCheckin` e companhia.
+ *
+ * Não filtra por turma de propósito: desafio não pertence a turma
+ * nenhuma. Quem decide é a organização, no próprio cancelamento.
+ */
+export function diasSuspensos(feriados: Feriado[]): Set<string> {
+  return new Set(
+    feriados.filter((f) => f.suspende_desafios).map((f) => f.data),
+  )
+}
+
+/** Cancelamento que fechou os desafios naquele dia, se houver. */
+export function suspensaoDoDia(
+  dataISO: string,
+  feriados: Feriado[],
+): Feriado | null {
+  return (
+    feriados.find((f) => f.suspende_desafios && f.data === dataISO) ?? null
+  )
+}
+
+/**
  * Dia (ISO) em que começou a janela do desafio que contém o instante
  * `d`, ou null se `d` não cai em nenhuma janela.
+ *
+ * Dias suspensos (aula cancelada) não têm janela: contam como se o
+ * desafio não acontecesse ali. Como a checagem é feita sobre o dia em
+ * que a janela ABRIU, uma janela que vira a noite é suspensa inteira —
+ * a madrugada seguinte não escapa da regra.
  *
  * Cada dia da semana pode ter sua própria janela (espaços diferentes
  * têm horários diferentes de aula), então percorre `c.janelas` até
@@ -56,10 +85,14 @@ function parseTime(hhmm: string): number {
  * É essa data — não a do relógio no momento do check-in — que deve ser
  * usada para checar o período do desafio e o limite de 1 ponto por janela.
  */
-export function janelaDoCheckin(d: Date, c: Challenge): string | null {
+export function janelaDoCheckin(
+  d: Date,
+  c: Challenge,
+  suspensos?: ReadonlySet<string>,
+): string | null {
   const minutos = d.getHours() * 60 + d.getMinutes()
   const dentroDoPeriodo = (dia: string) =>
-    dia >= c.data_inicio && dia <= c.data_fim
+    dia >= c.data_inicio && dia <= c.data_fim && !suspensos?.has(dia)
 
   for (const j of c.janelas) {
     const inicio = parseTime(j.hora_inicio)
@@ -92,17 +125,22 @@ export function janelaDoCheckin(d: Date, c: Challenge): string | null {
 }
 
 /** True se o instante `d` cai na janela do desafio (período + dia + horário). */
-export function contaParaDesafio(d: Date, c: Challenge): boolean {
-  return janelaDoCheckin(d, c) !== null
+export function contaParaDesafio(
+  d: Date,
+  c: Challenge,
+  suspensos?: ReadonlySet<string>,
+): boolean {
+  return janelaDoCheckin(d, c, suspensos) !== null
 }
 
 /** Desafios para os quais um check-in feito em `criadoEm` marca ponto. */
 export function desafiosQueContam(
   criadoEm: string | Date,
   desafios: Challenge[],
+  suspensos?: ReadonlySet<string>,
 ): Challenge[] {
   const d = typeof criadoEm === 'string' ? new Date(criadoEm) : criadoEm
-  return desafios.filter((c) => contaParaDesafio(d, c))
+  return desafios.filter((c) => contaParaDesafio(d, c, suspensos))
 }
 
 /**
@@ -110,13 +148,39 @@ export function desafiosQueContam(
  * várias fotos na mesma janela (mesmo se ela cruzar a meia-noite) rende
  * só um ponto — o feed aceita todas, o ranking conta a janela.
  */
-export function pontosNoDesafio(datas: Date[], c: Challenge): number {
+export function pontosNoDesafio(
+  datas: Date[],
+  c: Challenge,
+  suspensos?: ReadonlySet<string>,
+): number {
   const janelas = new Set<string>()
   for (const d of datas) {
-    const j = janelaDoCheckin(d, c)
+    const j = janelaDoCheckin(d, c, suspensos)
     if (j) janelas.add(j)
   }
   return janelas.size
+}
+
+/**
+ * Cancelamentos que realmente afetam um desafio: dentro do período dele
+ * e num dia da semana em que ele teria janela. Um cancelamento de terça
+ * não interessa a um desafio que só vale na segunda, e mostrá-lo na tela
+ * só faria o aluno duvidar do que vale.
+ */
+export function suspensoesDoDesafio(
+  c: Challenge,
+  feriados: Feriado[],
+): Feriado[] {
+  const dias = new Set(c.janelas.map((j) => j.dia_semana))
+  return feriados
+    .filter(
+      (f) =>
+        f.suspende_desafios &&
+        f.data >= c.data_inicio &&
+        f.data <= c.data_fim &&
+        dias.has(new Date(`${f.data}T12:00:00`).getDay()),
+    )
+    .sort((a, b) => a.data.localeCompare(b.data))
 }
 
 /** Dias distintos com pelo menos um check-in (usado nos distintivos). */

@@ -8,10 +8,20 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { downloadCSV } from '../lib/csv'
-import { challengePhase, daysLeft, formatDate } from '../lib/dates'
+import {
+  challengePhase,
+  daysLeft,
+  formatDate,
+  suspensoesDoDesafio,
+} from '../lib/dates'
 import { ParticipantesDesafio } from '../components/ParticipantesDesafio'
 import { colocacoes } from '../lib/ranking'
-import { DIAS_ABREV, type Challenge, type RankingEntry } from '../lib/types'
+import {
+  DIAS_ABREV,
+  type Challenge,
+  type Feriado,
+  type RankingEntry,
+} from '../lib/types'
 
 const MEDALHAS = ['🥇', '🥈', '🥉']
 
@@ -22,6 +32,7 @@ export function ChallengeDetailPage() {
   const navigate = useNavigate()
   const [desafio, setDesafio] = useState<Challenge | null | undefined>()
   const [ranking, setRanking] = useState<RankingEntry[]>([])
+  const [feriados, setFeriados] = useState<Feriado[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -33,6 +44,7 @@ export function ChallengeDetailPage() {
       setErro(null)
       const c = await api.getChallenge(id)
       setDesafio(c)
+      setFeriados(await api.listFeriados().catch(() => [] as Feriado[]))
       if (c) setRanking(await api.getRanking(c))
     } catch (e) {
       console.error('[desafio] falha ao carregar', e)
@@ -61,6 +73,7 @@ export function ChallengeDetailPage() {
 
   const fase = challengePhase(desafio)
   const restantes = daysLeft(desafio.data_fim)
+  const suspensoes = suspensoesDoDesafio(desafio, feriados)
   const classificacao = colocacoes(ranking)
   const lider = classificacao[0]?.entrada
   const minhaColocacao = classificacao.find(
@@ -160,6 +173,21 @@ export function ChallengeDetailPage() {
               ))}
             </div>
           </div>
+          {suspensoes.length > 0 && (
+            <div>
+              <p className="mb-1">🚫 Sem forró (não conta ponto):</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pl-1">
+                {suspensoes.map((f) => (
+                  <p key={f.id}>
+                    <strong className="text-tinta-700">
+                      {formatDate(f.data)}
+                    </strong>
+                    {f.motivo && ` · ${f.motivo}`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
           <p>
             🎯 <strong>1 ponto por janela</strong> — postar mais de uma foto
             na mesma janela não pontua de novo

@@ -211,6 +211,13 @@ supabase/
   O projeto funciona a semana toda, com espaços diferentes tendo horários
   de início diferentes, então segunda pode abrir às 18h e quarta às 20h
   dentro do mesmo desafio.
+- **Cancelar a aula fecha a janela:** um cancelamento marcado como
+  `suspende_desafios` tira o dia da conta de *todos* os desafios — sem
+  isso, bastava aparecer no local numa noite sem forró para marcar
+  presença. Não é automático porque nem todo feriado fecha o espaço (pode
+  ser justo a noite do Forró na Rep), e a decisão vive no cancelamento,
+  não no desafio. Como a suspensão é checada sobre o dia em que a janela
+  *abriu*, uma janela que vira a noite cai inteira.
 - **Ponto = presença; ranking = competição.** Sem meta fixa: vence quem
   somar mais presenças no período. O horário do check-in usado na conta é o
   do servidor (`criado_em`), o aluno não consegue burlar pelo relógio.

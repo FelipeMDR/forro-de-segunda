@@ -231,12 +231,23 @@ export interface Feriado {
   data: string // "YYYY-MM-DD"
   motivo: string | null
   turma: string | null
+  /**
+   * Fecha também a janela dos desafios nesse dia. Sem isso, cancelar a
+   * aula só avisava na agenda: quem aparecesse no salão marcava presença
+   * num dia em que não houve forró.
+   *
+   * É uma escolha do cancelamento, e não uma consequência automática,
+   * porque nem todo cancelamento fecha o espaço — um feriado que suspende
+   * as aulas pode ser exatamente a noite do Forró na Rep.
+   */
+  suspende_desafios: boolean
 }
 
 export interface FeriadoInput {
   data: string
   motivo: string
   turma: string | null
+  suspende_desafios: boolean
 }
 
 /**

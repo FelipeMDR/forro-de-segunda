@@ -14,6 +14,7 @@ import { downloadCSV } from '../lib/csv'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
 import { ateAPosicao } from '../lib/ranking'
 import {
+  diasSuspensos,
   formatDate,
   formatRelative,
   janelaDoCheckin,
@@ -323,6 +324,9 @@ const FERIADO_VAZIO: FeriadoInput = {
   data: '',
   motivo: '',
   turma: null,
+  // Cancelar a aula de todo mundo quase sempre quer dizer que não vai
+  // ter forró — então já vem marcado, e desmarcar é a exceção.
+  suspende_desafios: true,
 }
 
 /**
@@ -349,7 +353,11 @@ function SecaoFeriados({
     setSalvando(true)
     try {
       await api.saveFeriado(form)
-      toast('Cancelamento adicionado! Os alunos já veem na agenda. 🚫')
+      toast(
+        form.suspende_desafios
+          ? 'Cancelamento adicionado! Os desafios não contam ponto nesse dia. 🚫'
+          : 'Cancelamento adicionado! Os alunos já veem na agenda. 🚫',
+      )
       setForm({ ...FERIADO_VAZIO })
       setAberto(false)
       onChanged()
@@ -388,7 +396,8 @@ function SecaoFeriados({
       <p className="text-xs text-tinta-500">
         Cancela a aula recorrente daquele dia sem precisar apagar o evento da
         agenda. Os alunos veem "Cancelada" no lugar da aula normal, com o
-        motivo e quando ela volta.
+        motivo e quando ela volta — e, se o dia for marcado como sem forró,
+        os desafios também não contam ponto nele.
       </p>
 
       {aberto && (
@@ -426,9 +435,13 @@ function SecaoFeriados({
               id="fer-turma"
               className="input"
               value={form.turma ?? ''}
-              onChange={(e) =>
-                setForm({ ...form, turma: e.target.value || null })
-              }
+              onChange={(e) => {
+                const turma = e.target.value || null
+                // Cancelar só uma turma normalmente não fecha o espaço:
+                // as outras continuam dançando ali. Cancelar todas,
+                // sim. O organizador ainda pode mudar no campo abaixo.
+                setForm({ ...form, turma, suspende_desafios: turma === null })
+              }}
             >
               <option value="">Todas as turmas</option>
               {turmas.map((t) => (
@@ -438,6 +451,24 @@ function SecaoFeriados({
               ))}
             </select>
           </div>
+          <label className="flex items-start gap-2.5 rounded-xl bg-papel p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brasa-600"
+              checked={form.suspende_desafios}
+              onChange={(e) =>
+                setForm({ ...form, suspende_desafios: e.target.checked })
+              }
+            />
+            <span className="text-xs text-tinta-600">
+              <strong className="text-tinta-700">
+                Não vai ter forró nesse dia
+              </strong>{' '}
+              — fecha também a janela dos desafios: quem aparecer no local
+              não marca presença nem ponto. Desmarque se o espaço continua
+              aberto (ex.: feriado sem aula, mas com festa à noite).
+            </span>
+          </label>
           <button className="btn-primary w-full" disabled={salvando}>
             Cancelar aula(s) nessa data
           </button>
@@ -464,7 +495,10 @@ function SecaoFeriados({
                 </p>
                 <p className="text-xs text-tinta-500">
                   {f.motivo || 'Sem motivo informado'} ·{' '}
-                  {f.turma ? `só turma ${f.turma}` : 'todas as turmas'}
+                  {f.turma ? `só turma ${f.turma}` : 'todas as turmas'} ·{' '}
+                  {f.suspende_desafios
+                    ? 'desafios fechados'
+                    : 'desafios valendo'}
                 </p>
               </div>
               <button
@@ -1732,13 +1766,16 @@ export function AdminPage() {
   // um check-in às 23h e outro à 01h contam como a MESMA janela.
   // `presencas` vem do mais novo para o mais antigo, então percorre ao
   // contrário para marcar o mais antigo de cada janela.
+  // Dia cancelado não tem janela: a foto entrou no feed, mas não vale
+  // presença — a planilha precisa dizer o mesmo que o ranking.
+  const suspensos = diasSuspensos(feriados)
   const chavesVistas = new Set<string>()
   const pontuados = new Set<string>()
   for (const p of [...(presencas ?? [])].reverse()) {
     const d = new Date(p.data)
     const chaves = desafios
       .map((c) => {
-        const janela = janelaDoCheckin(d, c)
+        const janela = janelaDoCheckin(d, c, suspensos)
         return janela ? `${p.nome}|${c.id}|${janela}` : null
       })
       .filter((k): k is string => k !== null)

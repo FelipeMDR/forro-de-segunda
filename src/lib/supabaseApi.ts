@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ForroApi } from './api'
-import { pontosNoDesafio } from './dates'
+import { diasSuspensos, pontosNoDesafio } from './dates'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import { normalizeTelefone, synthEmail, telefonesIguais } from './phone'
@@ -956,9 +956,16 @@ export class SupabaseApi implements ForroApi {
       lista.push(new Date(c.criado_em))
       datasPor.set(c.user_id, lista)
     }
+    // Dias em que a aula foi cancelada não têm janela: não houve forró,
+    // então ninguém pontua (migração 012). A tabela é pequena e o
+    // ranking é uma tela só — não vale um cache aqui.
+    const suspensos = diasSuspensos(
+      await this.listFeriados().catch(() => [] as Feriado[]),
+    )
+
     const pontos = new Map<string, number>()
     for (const [uid, datas] of datasPor) {
-      pontos.set(uid, pontosNoDesafio(datas, challenge))
+      pontos.set(uid, pontosNoDesafio(datas, challenge, suspensos))
     }
 
     return membros
@@ -1015,6 +1022,9 @@ export class SupabaseApi implements ForroApi {
       data: f.data as string,
       motivo: (f.motivo as string) ?? null,
       turma: (f.turma as string) ?? null,
+      // Sem a migração 012 a coluna não existe: o cancelamento volta a
+      // valer só como aviso na agenda, que era o comportamento antigo.
+      suspende_desafios: f.suspende_desafios === true,
     }))
   }
 
@@ -1024,6 +1034,7 @@ export class SupabaseApi implements ForroApi {
         data: f.data,
         motivo: f.motivo.trim() || null,
         turma: f.turma,
+        suspende_desafios: f.suspende_desafios,
       }),
     )
   }

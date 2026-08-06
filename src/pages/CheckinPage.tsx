@@ -6,7 +6,9 @@ import { useToast } from '../context/ToastContext'
 import {
   challengePhase,
   desafiosQueContam,
+  diasSuspensos,
   janelaDoCheckin,
+  suspensaoDoDia,
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
 import {
@@ -20,13 +22,14 @@ import {
   limiteCheckin,
   LIMITE_POR_JANELA,
 } from '../lib/limites'
-import type { Challenge } from '../lib/types'
+import type { Challenge, Feriado } from '../lib/types'
 
 export function CheckinPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [desafios, setDesafios] = useState<Challenge[]>([])
+  const [feriados, setFeriados] = useState<Feriado[]>([])
   const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
   const [foto, setFoto] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -51,6 +54,7 @@ export function CheckinPage() {
 
   useEffect(() => {
     void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
+    void api.listFeriados().then(setFeriados).catch(() => setFeriados([]))
     if (userId) {
       void api
         .checkinsDe(userId)
@@ -65,15 +69,31 @@ export function CheckinPage() {
     }
   }, [preview])
 
-  // Desafios (que eu participo) cuja janela está aberta agora
-  const valendoAgora = useMemo(
-    () =>
-      desafiosQueContam(
-        new Date(),
-        desafios.filter((c) => c.sou_membro && challengePhase(c) === 'ativo'),
-      ),
+  const suspensos = useMemo(() => diasSuspensos(feriados), [feriados])
+
+  const meusAtivos = useMemo(
+    () => desafios.filter((c) => c.sou_membro && challengePhase(c) === 'ativo'),
     [desafios],
   )
+
+  // Desafios (que eu participo) cuja janela está aberta agora
+  const valendoAgora = useMemo(
+    () => desafiosQueContam(new Date(), meusAtivos, suspensos),
+    [meusAtivos, suspensos],
+  )
+
+  // Hoje a janela existiria, mas a aula foi cancelada. Sem isso o aluno
+  // veria só "nenhum desafio com janela aberta" e acharia que é bug —
+  // ele está no lugar certo, na hora certa, e não tem forró.
+  const suspensaoAgora = useMemo(() => {
+    if (valendoAgora.length > 0) return null
+    const agora = new Date()
+    for (const c of desafiosQueContam(agora, meusAtivos)) {
+      const dia = janelaDoCheckin(agora, c)
+      if (dia && suspensos.has(dia)) return suspensaoDoDia(dia, feriados)
+    }
+    return null
+  }, [valendoAgora, meusAtivos, suspensos, feriados])
 
   // Cada janela vale 1 ponto por desafio: separa os que ainda vão pontuar
   // agora dos que já pontuaram nesta janela. Usa a janela (não a data do
@@ -84,15 +104,15 @@ export function CheckinPage() {
     const aindaPontuam: Challenge[] = []
     const jaPontuaram: Challenge[] = []
     for (const c of valendoAgora) {
-      const janelaAtual = janelaDoCheckin(agora, c)
+      const janelaAtual = janelaDoCheckin(agora, c, suspensos)
       const jaContou =
         janelaAtual !== null &&
-        meusCheckins.some((d) => janelaDoCheckin(d, c) === janelaAtual)
+        meusCheckins.some((d) => janelaDoCheckin(d, c, suspensos) === janelaAtual)
       if (jaContou) jaPontuaram.push(c)
       else aindaPontuam.push(c)
     }
     return { aindaPontuam, jaPontuaram }
-  }, [valendoAgora, meusCheckins])
+  }, [valendoAgora, meusCheckins, suspensos])
 
   // Desafios abertos agora que exigem estar no local
   const comLocal = useMemo(
@@ -171,7 +191,9 @@ export function CheckinPage() {
             } 🎉`
           : jaPontuaram.length > 0
             ? 'Foto publicada! O ponto de hoje já tinha sido contado 😉'
-            : 'Foto publicada! (nenhum desafio com janela aberta agora)',
+            : suspensaoAgora
+              ? 'Foto publicada! Como a aula de hoje foi cancelada, ela não conta ponto 🚫'
+              : 'Foto publicada! (nenhum desafio com janela aberta agora)',
       )
       navigate('/')
     } catch (e) {
@@ -253,12 +275,23 @@ export function CheckinPage() {
         </div>
       )}
 
-      {aindaPontuam.length === 0 && jaPontuaram.length === 0 && (
-        <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
-          ⚠️ Nenhum desafio seu está com janela de check-in aberta agora. Você
-          pode postar mesmo assim, mas a foto <strong>não marcará ponto</strong>.
-        </div>
-      )}
+      {aindaPontuam.length === 0 &&
+        jaPontuaram.length === 0 &&
+        (suspensaoAgora ? (
+          <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
+            🚫 <strong>Hoje não tem forró</strong>
+            {suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''} — a
+            aula foi cancelada, então <strong>nenhum desafio conta ponto</strong>{' '}
+            nesta data. Você pode postar mesmo assim, mas não entra na
+            presença.
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
+            ⚠️ Nenhum desafio seu está com janela de check-in aberta agora. Você
+            pode postar mesmo assim, mas a foto{' '}
+            <strong>não marcará ponto</strong>.
+          </div>
+        ))}
 
       {!limite.pode && limite.liberaEm && (
         <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700">

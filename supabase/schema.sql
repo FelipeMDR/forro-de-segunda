@@ -120,11 +120,15 @@ create table if not exists public.events (
 -- data específica (ex.: feriado nacional, professor ausente).
 -- turma = null → cancela a aula de TODAS as turmas nesse dia;
 -- com turma definida, cancela só a aula daquela turma.
+-- suspende_desafios = true → não teve forró: os desafios também não
+-- contam ponto nessa data. É escolha do cancelamento, porque nem todo
+-- feriado fecha o espaço (pode ser justo a noite do Forró na Rep).
 create table if not exists public.feriados (
   id uuid primary key default gen_random_uuid(),
   data date not null,
   motivo text,
   turma text,
+  suspende_desafios boolean not null default true,
   criado_em timestamptz not null default now()
 );
 
