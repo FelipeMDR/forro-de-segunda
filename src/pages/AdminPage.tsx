@@ -12,6 +12,14 @@ import { useToast } from '../context/ToastContext'
 import { combinaBusca } from '../lib/busca'
 import { downloadCSV } from '../lib/csv'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
+import {
+  agruparChamada,
+  filtrarPorTurma,
+  foraDaChamada,
+  semConta,
+  SEM_TURMA,
+  type PessoaNaChamada,
+} from '../lib/chamada'
 import { ateAPosicao } from '../lib/ranking'
 import {
   diasSuspensos,
@@ -1147,6 +1155,11 @@ function SecaoTurmas({
   const [importando, setImportando] = useState(false)
   const [buscaLista, setBuscaLista] = useState('')
   const [buscaApp, setBuscaApp] = useState('')
+  const [turmaLista, setTurmaLista] = useState('')
+  const [turmaApp, setTurmaApp] = useState('')
+  const [confirmandoRemocao, setConfirmandoRemocao] = useState<string | null>(
+    null,
+  )
 
   const carregar = useCallback(async () => {
     const [a, p] = await Promise.all([
@@ -1213,6 +1226,29 @@ function SecaoTurmas({
     }
   }
 
+  /**
+   * Tira a pessoa inteira da chamada (todas as turmas dela). Pede
+   * confirmação porque agora um clique pode apagar várias linhas — e
+   * avisa que quem já tem conta continua entrando, que é a parte que
+   * mais surpreende.
+   */
+  const removerPessoa = async (pessoa: PessoaNaChamada) => {
+    try {
+      for (const linha of pessoa.linhas) {
+        await api.deleteAlunoCadastrado(linha.id)
+      }
+      await carregar()
+      setConfirmandoRemocao(null)
+      toast(
+        pessoa.temConta
+          ? 'Tirado da lista de chamada. A conta no app continua ativa — para tirar das turmas, use "Alunos no app" abaixo.'
+          : 'Tirado da lista de chamada.',
+      )
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
   const escolherArquivo = async (file: File | undefined) => {
     if (!file) return
     const texto = await file.text()
@@ -1269,17 +1305,29 @@ function SecaoTurmas({
     }
   }
 
-  const alunosFiltrados = (alunos ?? []).filter((a) =>
-    combinaBusca(buscaLista, [a.nome, a.telefone, a.turma]),
+  // Uma linha por pessoa, não por (pessoa, turma): quem faz três turmas
+  // ocupava três linhas e o mesmo nome se repetia pela tela toda.
+  const pessoas = agruparChamada(alunos ?? [], perfis)
+  const pessoasFiltradas = filtrarPorTurma(pessoas, turmaLista).filter((p) =>
+    combinaBusca(buscaLista, [p.nome, p.telefone, ...p.turmas]),
   )
-  const perfisFiltrados = perfis.filter((p) =>
-    combinaBusca(buscaApp, [
-      p.nome,
-      p.telefone,
-      ...p.cargos,
-      ...p.turmas.map((t) => t.turma),
-    ]),
-  )
+  const faltamConta = semConta(pessoas)
+
+  const perfisComTurmas = perfis.map((p) => ({
+    perfil: p,
+    turmas: p.turmas.map((t) => t.turma),
+  }))
+  const perfisFiltrados = filtrarPorTurma(perfisComTurmas, turmaApp)
+    .map((x) => x.perfil)
+    .filter((p) =>
+      combinaBusca(buscaApp, [
+        p.nome,
+        p.telefone,
+        ...p.cargos,
+        ...p.turmas.map((t) => t.turma),
+      ]),
+    )
+  const semChamada = foraDaChamada(perfis, alunos ?? []).length
 
   const darCargo = async (userId: string, cargo: string) => {
     if (!cargo) return
@@ -1368,7 +1416,12 @@ function SecaoTurmas({
         </div>
         <p className="text-xs text-tinta-500">
           É esta lista que libera o cadastro: o aluno cria a conta informando
-          o telefone e já entra nas turmas certas. CSV com colunas{' '}
+          o telefone e já entra nas turmas certas.{' '}
+          <strong className="text-tinta-600">
+            Tirar alguém daqui não tira o acesso de quem já criou conta
+          </strong>{' '}
+          — a lista vale só na hora do cadastro. Para mexer nas turmas de quem
+          já está no app, use "Alunos no app" logo abaixo. CSV com colunas{' '}
           <code>nome;telefone;turma;papel</code> (papel = Condutor/Conduzido,
           opcional; com ou sem cabeçalho). Aluno em várias turmas = uma linha
           por turma.
@@ -1468,75 +1521,198 @@ function SecaoTurmas({
         )}
 
         {alunos && alunos.length > 6 && (
-          <input
-            className="input"
-            type="search"
-            placeholder="🔎 Buscar por nome ou telefone…"
-            value={buscaLista}
-            onChange={(e) => setBuscaLista(e.target.value)}
-          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className="input"
+              type="search"
+              placeholder="🔎 Buscar por nome ou telefone…"
+              value={buscaLista}
+              onChange={(e) => setBuscaLista(e.target.value)}
+            />
+            <select
+              className="input sm:w-52"
+              aria-label="Filtrar a chamada por turma"
+              value={turmaLista}
+              onChange={(e) => setTurmaLista(e.target.value)}
+            >
+              <option value="">Todas as turmas</option>
+              {turmas.map((t) => (
+                <option key={t.id} value={t.nome}>
+                  {t.nome}
+                </option>
+              ))}
+              <option value={SEM_TURMA}>Sem turma (veteranos)</option>
+            </select>
+          </div>
         )}
 
         {alunos === null ? (
           <Spinner />
         ) : alunos.length === 0 ? (
           <p className="text-sm text-tinta-500">Lista vazia.</p>
-        ) : alunosFiltrados.length === 0 ? (
-          <p className="py-3 text-center text-sm text-tinta-500">
-            Ninguém encontrado com "{buscaLista}".
-          </p>
         ) : (
-          <div className="max-h-56 divide-y divide-preto/10 overflow-y-auto">
-            {alunosFiltrados.map((a) => (
-              <div key={a.id} className="flex items-center gap-2 py-2 text-sm">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold">{a.nome ?? '—'}</p>
-                  <p className="text-xs text-tinta-500">
-                    {a.telefone} · {a.turma ?? 'sem turma'}
-                    {a.papel_danca && ` · ${a.papel_danca}`}
-                  </p>
-                </div>
-                <button
-                  onClick={() => void remover(a.id)}
-                  className="p-1.5 text-tinta-400 hover:text-red-600"
-                  aria-label={`Remover ${a.nome ?? a.telefone}`}
-                >
-                  ✕
-                </button>
+          <>
+            <p className="text-xs text-tinta-500">
+              <strong className="text-tinta-700">
+                {pessoasFiltradas.length}
+              </strong>
+              {pessoasFiltradas.length !== pessoas.length && (
+                <> de {pessoas.length}</>
+              )}{' '}
+              {pessoas.length === 1 ? 'pessoa' : 'pessoas'}
+              {faltamConta > 0 && (
+                <> · {faltamConta} ainda sem conta no app</>
+              )}
+            </p>
+
+            {pessoasFiltradas.length === 0 ? (
+              <p className="py-3 text-center text-sm text-tinta-500">
+                Ninguém encontrado
+                {buscaLista && <> com "{buscaLista}"</>}
+                {turmaLista && <> nesse filtro</>}.
+              </p>
+            ) : (
+              <div className="max-h-[28rem] divide-y divide-preto/10 overflow-y-auto">
+                {pessoasFiltradas.map((p) => (
+                  <div key={p.chave} className="py-2.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1.5 truncate font-bold">
+                          {p.nome ?? '—'}
+                          {/* Fundo em /10 e não /15: mais escuro que isso
+                              o texto âmbar cai para 4,48:1, abaixo do
+                              mínimo de 4,5:1 para texto pequeno. */}
+                          {!p.temConta && (
+                            <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                              sem conta
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-tinta-500">{p.telefone}</p>
+                      </div>
+                      <button
+                        onClick={() => setConfirmandoRemocao(p.chave)}
+                        className="p-1.5 text-tinta-400 hover:text-red-600"
+                        aria-label={`Tirar ${p.nome ?? p.telefone} da chamada`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Uma etiqueta por turma; o ✕ da etiqueta tira só
+                        aquela turma, o ✕ da linha tira a pessoa toda */}
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {p.linhas.map((linha) => (
+                        <span
+                          key={linha.id}
+                          className="inline-flex items-center gap-1 rounded-full bg-preto/5 px-2 py-0.5 text-[11px] text-tinta-700"
+                        >
+                          {linha.turma ?? 'sem turma'}
+                          {linha.papel_danca &&
+                            ` · ${linha.papel_danca === 'Condutor(a)' ? 'cond.' : 'conduz.'}`}
+                          <button
+                            onClick={() => void remover(linha.id)}
+                            className="text-tinta-500 hover:text-red-600"
+                            aria-label={`Tirar ${p.nome ?? p.telefone} de ${linha.turma ?? 'sem turma'}`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    {confirmandoRemocao === p.chave && (
+                      <div className="mt-2 space-y-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-700">
+                        <p>
+                          Tirar <strong>{p.nome ?? p.telefone}</strong> da
+                          chamada
+                          {p.linhas.length > 1 && (
+                            <> ({p.linhas.length} turmas)</>
+                          )}
+                          ?
+                          {p.temConta && (
+                            <>
+                              {' '}
+                              A conta no app <strong>continua ativa</strong> —
+                              a chamada só libera o cadastro. Para tirar das
+                              turmas, use "Alunos no app" abaixo.
+                            </>
+                          )}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn-danger flex-1 py-1.5 text-xs"
+                            onClick={() => void removerPessoa(p)}
+                          >
+                            Tirar da chamada
+                          </button>
+                          <button
+                            className="btn-ghost flex-1 py-1.5 text-xs"
+                            onClick={() => setConfirmandoRemocao(null)}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Alunos com conta */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold text-tinta-600">
-          Alunos no app{' '}
-          <span className="font-normal text-tinta-400">
-            ({perfis.length})
-          </span>
-        </h3>
+        <h3 className="text-xs font-bold text-tinta-600">Alunos no app</h3>
         <p className="text-xs text-tinta-500">
           Um aluno pode estar em várias turmas com papéis diferentes (ex.:
           Condutor no Avançado e Conduzido no Intermediário). O aluno não
           consegue mudar as próprias turmas.
         </p>
 
-        <input
-          className="input"
-          type="search"
-          placeholder="🔎 Buscar por nome ou telefone…"
-          value={buscaApp}
-          onChange={(e) => setBuscaApp(e.target.value)}
-        />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            className="input"
+            type="search"
+            placeholder="🔎 Buscar por nome ou telefone…"
+            value={buscaApp}
+            onChange={(e) => setBuscaApp(e.target.value)}
+          />
+          <select
+            className="input sm:w-52"
+            aria-label="Filtrar os alunos do app por turma"
+            value={turmaApp}
+            onChange={(e) => setTurmaApp(e.target.value)}
+          >
+            <option value="">Todas as turmas</option>
+            {turmas.map((t) => (
+              <option key={t.id} value={t.nome}>
+                {t.nome}
+              </option>
+            ))}
+            <option value={SEM_TURMA}>Sem turma (veteranos)</option>
+          </select>
+        </div>
+
+        <p className="text-xs text-tinta-500">
+          <strong className="text-tinta-700">{perfisFiltrados.length}</strong>
+          {perfisFiltrados.length !== perfis.length && (
+            <> de {perfis.length}</>
+          )}{' '}
+          {perfis.length === 1 ? 'aluno' : 'alunos'}
+          {semChamada > 0 && <> · {semChamada} fora da lista de chamada</>}
+        </p>
 
         {perfisFiltrados.length === 0 ? (
           <p className="py-3 text-center text-sm text-tinta-500">
-            Ninguém encontrado com "{buscaApp}".
+            Ninguém encontrado
+            {buscaApp && <> com "{buscaApp}"</>}
+            {turmaApp && <> nesse filtro</>}.
           </p>
         ) : (
-        <div className="max-h-80 divide-y divide-preto/10 overflow-y-auto">
+        <div className="max-h-[28rem] divide-y divide-preto/10 overflow-y-auto">
           {perfisFiltrados.map((p) => (
             <LinhaAlunoApp
               key={p.id}
