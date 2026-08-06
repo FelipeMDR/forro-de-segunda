@@ -11,6 +11,7 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeBadges } from '../lib/badges'
+import { CartaoInstalar } from '../components/BotaoInstalar'
 import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
@@ -210,6 +211,10 @@ export function ProfilePage() {
           Salvar alterações
         </button>
       </div>
+
+      {/* Lugar fixo para instalar: o convite do feed é dispensável, e
+          quem dispensou não tinha mais como voltar atrás. */}
+      <CartaoInstalar />
 
       {pushSupported() && (
         <div className="card flex items-center gap-3 p-5">
