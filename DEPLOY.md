@@ -179,6 +179,21 @@ explica no erro, se alguém tentar).
 Enquanto não cadastrarem, você destrava em Supabase → **Authentication →
 Users** → clique no usuário → **Reset password**.
 
+⚠️ **Se der `Email address "a…@alunos.forrodesegunda.app" is invalid`:**
+esse é o endereço interno que o app inventava para o login por telefone —
+o domínio nunca existiu, e o Supabase passou a recusá-lo. Ele aparece ao
+*trocar* o e-mail, porque a troca também confirma no endereço atual.
+
+Resolva pelo painel, uma vez por conta antiga: **Authentication → Users** →
+clique na pessoa → edite o **e-mail** para o endereço real dela → salve.
+Depois ela entra com esse e-mail e usa "esqueci minha senha" normalmente.
+São poucas contas (só as criadas antes desta mudança) e o problema não volta:
+cadastros novos já nascem com e-mail de verdade.
+
+Se preferir tentar pelo app antes, desligue **Authentication → Providers →
+Email → "Secure email change"** — sem ele o Supabase confirma só no endereço
+novo, e a troca passa a funcionar de dentro do app.
+
 **"Posso mudar minha turma?"**
 Não — turma e papel são definidos pela organização, no Painel.
 

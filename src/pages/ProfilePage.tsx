@@ -83,6 +83,8 @@ function SegurancaCard() {
           <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
           novidade, então hoje, se você esquecer a senha, só a organização
           consegue te destravar. Com um e-mail aqui, você resolve sozinho.
+          Se der erro ao salvar, fale com a organização: contas bem antigas
+          precisam de um ajuste que só ela faz.
         </p>
       )}
 

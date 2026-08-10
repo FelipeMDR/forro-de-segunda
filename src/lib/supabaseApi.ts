@@ -44,6 +44,16 @@ function traduz(msg: string): string {
       'A senha precisa ter pelo menos 6 caracteres',
   }
   if (mapa[msg]) return mapa[msg]
+  // O domínio do endereço sintético nunca existiu de verdade, e o
+  // Supabase passou a validar isso. Quem tem conta antiga esbarra nele
+  // ao trocar o e-mail, porque a troca confirma no endereço atual.
+  if (/alunos\.forrodesegunda\.app.*invalid/i.test(msg)) {
+    return (
+      'Sua conta usa o endereço interno antigo, que o Supabase não aceita ' +
+      'mais. A organização resolve em Authentication > Users, trocando seu ' +
+      'e-mail por lá — depois é só entrar com ele.'
+    )
+  }
   // Tabela/coluna nova que ainda não foi criada no banco em produção
   if (msg.includes('schema cache') || /column .* does not exist/.test(msg)) {
     return (
@@ -164,11 +174,16 @@ export class SupabaseApi implements ForroApi {
         'Telefone não encontrado na lista de alunos. Fale com a organização!',
       )
     }
-    // O e-mail informado vira o e-mail da conta — é para ele que o link
-    // de "esqueci minha senha" vai. Sem e-mail, cai no sintético e a
-    // conta nasce sem recuperação (dá para cadastrar depois no perfil).
+    // Nada de cair no endereço sintético quando o e-mail vem vazio:
+    // aquele domínio não existe de verdade, e o Supabase passou a
+    // recusá-lo. A conta nasceria quebrada — melhor não deixar criar.
+    if (!email.trim()) {
+      throw new Error('Informe um e-mail para poder recuperar a senha depois')
+    }
+    // O e-mail informado vira o e-mail da conta: é com ele que a pessoa
+    // entra e é para ele que vai o link de "esqueci minha senha".
     const { data, error } = await this.sb.auth.signUp({
-      email: email.trim() || synthEmail(telefone),
+      email: email.trim(),
       password: senha,
       options: { data: { telefone } },
     })
