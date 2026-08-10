@@ -10,9 +10,13 @@ export function LoginPage() {
   const toast = useToast()
   const [aba, setAba] = useState<'entrar' | 'primeira'>('entrar')
   const [telefone, setTelefone] = useState('')
+  const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  // Recuperação de senha: null = fechado; string = e-mail digitado
+  const [recuperando, setRecuperando] = useState<string | null>(null)
+  const [enviado, setEnviado] = useState(false)
   // Fluxo "primeira vez": null = ainda não verificou o telefone
   const [verificado, setVerificado] = useState<{
     nome: string | null
@@ -28,6 +32,22 @@ export function LoginPage() {
     setVerificado(null)
     setSenha('')
     setConfirmar('')
+    setEmail('')
+    setRecuperando(null)
+    setEnviado(false)
+  }
+
+  const pedirRecuperacao = async (e: FormEvent) => {
+    e.preventDefault()
+    setOcupado(true)
+    try {
+      await api.solicitarResetSenha(recuperando ?? '')
+      setEnviado(true)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setOcupado(false)
+    }
   }
 
   const entrar = async (e: FormEvent) => {
@@ -79,7 +99,7 @@ export function LoginPage() {
     }
     setOcupado(true)
     try {
-      await api.signUpTelefone(telefone, senha)
+      await api.signUpTelefone(telefone, email, senha)
     } catch (err) {
       toast((err as Error).message, 'erro')
     } finally {
@@ -147,17 +167,81 @@ export function LoginPage() {
           ))}
         </div>
 
-        {aba === 'entrar' ? (
+        {aba === 'entrar' && recuperando !== null ? (
+          enviado ? (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-800">
+                <p>
+                  Se existir uma conta com esse e-mail, o link para criar uma
+                  senha nova já está a caminho. 📬
+                </p>
+                <p className="mt-2">
+                  Não achou? Olhe no spam. O link vale por pouco tempo — se
+                  expirar, é só pedir de novo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost w-full"
+                onClick={() => {
+                  setRecuperando(null)
+                  setEnviado(false)
+                }}
+              >
+                Voltar para entrar
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={pedirRecuperacao} className="space-y-4">
+              <p className="text-sm text-tinta-600">
+                Digite o e-mail que você cadastrou e a gente manda um link
+                para criar uma senha nova.
+              </p>
+              <div>
+                <label className="label" htmlFor="rec-email">
+                  E-mail
+                </label>
+                <input
+                  id="rec-email"
+                  type="email"
+                  className="input"
+                  placeholder="voce@email.com"
+                  value={recuperando}
+                  onChange={(e) => setRecuperando(e.target.value)}
+                  required
+                />
+              </div>
+              <button className="btn-primary w-full" disabled={ocupado}>
+                {ocupado ? 'Enviando…' : 'Enviar link de recuperação'}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost w-full"
+                onClick={() => setRecuperando(null)}
+              >
+                Voltar
+              </button>
+              <p className="text-xs text-tinta-500">
+                Não cadastrou e-mail, ou não lembra qual usou? Fale com a
+                organização na aula ou no grupo do WhatsApp.
+              </p>
+            </form>
+          )
+        ) : aba === 'entrar' ? (
           <form onSubmit={entrar} className="space-y-4">
             <div>
+              {/* Aceita os dois: quem cadastrou e-mail entra por ele,
+                  quem não cadastrou segue no telefone de sempre */}
               <label className="label" htmlFor="telefone">
-                Telefone (com DDD)
+                Telefone ou e-mail
               </label>
               <input
                 id="telefone"
-                type="tel"
+                type="text"
+                inputMode="email"
+                autoComplete="username"
                 className="input"
-                placeholder="Ex.: 11 91234-5678"
+                placeholder="11 91234-5678 ou voce@email.com"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 required
@@ -170,6 +254,7 @@ export function LoginPage() {
               <input
                 id="senha"
                 type="password"
+                autoComplete="current-password"
                 className="input"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
@@ -178,6 +263,15 @@ export function LoginPage() {
             </div>
             <button className="btn-primary w-full" disabled={ocupado}>
               Entrar na dança 💃
+            </button>
+            <button
+              type="button"
+              className="w-full text-center text-sm font-bold text-tinta-600 underline"
+              onClick={() =>
+                setRecuperando(telefone.includes('@') ? telefone : '')
+              }
+            >
+              Esqueci minha senha
             </button>
           </form>
         ) : verificado === null ? (
@@ -210,8 +304,27 @@ export function LoginPage() {
               {verificado.nome
                 ? `Achamos você na lista, ${verificado.nome.split(' ')[0]}! 🎉`
                 : 'Telefone encontrado na lista! 🎉'}{' '}
-              Agora crie sua senha.
+              Agora é só criar seu acesso.
             </p>
+            <div>
+              <label className="label" htmlFor="cad-email">
+                E-mail
+              </label>
+              <input
+                id="cad-email"
+                type="email"
+                className="input"
+                placeholder="voce@email.com"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <p className="mt-1.5 text-xs text-tinta-500">
+                É por ele que você recupera a senha se esquecer — e dá para
+                entrar no app pelo telefone ou pelo e-mail, como preferir.
+              </p>
+            </div>
             <div>
               <label className="label" htmlFor="senha">
                 Senha (mín. 6 caracteres)

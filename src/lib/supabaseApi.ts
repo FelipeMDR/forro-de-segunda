@@ -4,7 +4,7 @@ import { diasSuspensos, pontosNoDesafio } from './dates'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
-import { normalizeTelefone, synthEmail, telefonesIguais } from './phone'
+import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { turmaLabel } from './types'
 import type {
   AgendaEvent,
@@ -130,15 +130,33 @@ export class SupabaseApi implements ForroApi {
     }
   }
 
-  async signInTelefone(telefone: string, senha: string) {
+  /**
+   * Descobre com que e-mail aquele telefone entra. Quem nunca cadastrou
+   * e-mail continua no sintético, que dá para calcular aqui mesmo; para
+   * os demais, quem sabe é o banco (migração 013).
+   */
+  private async emailDeLogin(telefone: string): Promise<string> {
+    const { data, error } = await this.sb.rpc('email_de_login', {
+      tel: telefone,
+    })
+    // Sem a migração 013 a função não existe: cai no sintético, que é
+    // exatamente o comportamento antigo.
+    if (error || !data) return synthEmail(telefone)
+    return data as string
+  }
+
+  async signInTelefone(identificador: string, senha: string) {
+    const email = ehEmail(identificador)
+      ? identificador.trim()
+      : await this.emailDeLogin(identificador)
     const { error } = await this.sb.auth.signInWithPassword({
-      email: synthEmail(telefone),
+      email,
       password: senha,
     })
     if (error) throw new Error(traduz(error.message))
   }
 
-  async signUpTelefone(telefone: string, senha: string) {
+  async signUpTelefone(telefone: string, email: string, senha: string) {
     const { existe, jaTemConta } = await this.telefoneNaLista(telefone)
     if (jaTemConta) {
       throw new Error('Este telefone já tem conta — use a aba Entrar')
@@ -148,10 +166,11 @@ export class SupabaseApi implements ForroApi {
         'Telefone não encontrado na lista de alunos. Fale com a organização!',
       )
     }
-    // O trigger handle_new_user busca nome e turma na lista de chamada
-    // a partir do telefone dos metadados.
+    // O e-mail informado vira o e-mail da conta — é para ele que o link
+    // de "esqueci minha senha" vai. Sem e-mail, cai no sintético e a
+    // conta nasce sem recuperação (dá para cadastrar depois no perfil).
     const { data, error } = await this.sb.auth.signUp({
-      email: synthEmail(telefone),
+      email: email.trim() || synthEmail(telefone),
       password: senha,
       options: { data: { telefone } },
     })
@@ -160,6 +179,41 @@ export class SupabaseApi implements ForroApi {
       throw new Error(
         'O Supabase está exigindo confirmação de e-mail — desative em Authentication > Providers > Email > "Confirm email" (ver README)',
       )
+    }
+  }
+
+  async solicitarResetSenha(email: string) {
+    const { error } = await this.sb.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/nova-senha`,
+    })
+    // Erro de e-mail inexistente é engolido de propósito: a tela não
+    // pode virar um verificador de quem é do projeto. Falha de rede ou
+    // de limite de envio, essa sim, precisa aparecer.
+    if (error && !/user not found/i.test(error.message)) {
+      throw new Error(traduz(error.message))
+    }
+  }
+
+  async definirNovaSenha(senha: string) {
+    const { error } = await this.sb.auth.updateUser({ password: senha })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async trocarSenha(senha: string) {
+    await this.definirNovaSenha(senha)
+  }
+
+  async trocarEmail(email: string) {
+    const { error } = await this.sb.auth.updateUser({ email: email.trim() })
+    if (error) throw new Error(traduz(error.message))
+    // O gatilho da migração 013 copia para profiles.email; se ele ainda
+    // não existir, ao menos a tela do painel não fica mentindo.
+    const uid = await this.getSessionUserId()
+    if (uid) {
+      await this.sb
+        .from('profiles')
+        .update({ email: email.trim() })
+        .eq('id', uid)
     }
   }
 
@@ -182,6 +236,7 @@ export class SupabaseApi implements ForroApi {
       nome: data.nome as string,
       avatar_url: (data.avatar_url as string) ?? null,
       telefone: (data.telefone as string) ?? null,
+      email: (data.email as string) ?? null,
       criado_em: data.criado_em as string,
       turmas: (data.turmas as TurmaMembro[]) ?? [],
       cargos: ((data.cargos as Array<{ cargo: string }>) ?? []).map(
@@ -1235,7 +1290,11 @@ export class SupabaseApi implements ForroApi {
         .order('nome'),
     ) as unknown as Array<Record<string, unknown>>
     return data.map((p) => {
-      const { telefone: _ignorado, ...publico } = this.mapProfile(p)
+      const {
+        telefone: _semTelefone,
+        email: _semEmail,
+        ...publico
+      } = this.mapProfile(p)
       return publico
     })
   }

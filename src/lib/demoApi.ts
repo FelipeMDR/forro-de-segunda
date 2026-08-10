@@ -10,7 +10,7 @@ import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
-import { normalizeTelefone, telefonesIguais } from './phone'
+import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import { CARGOS_PADRAO, LIMITE_FAVORITOS, turmaLabel } from './types'
 import type {
   AgendaEvent,
@@ -159,6 +159,9 @@ function seed(): DB {
     turmas,
     cargos,
     telefone,
+    // Contas de exemplo nascem sem e-mail, como as contas antigas de
+    // produção: dá para exercitar o "cadastre seu e-mail" do perfil.
+    email: null,
     criado_em: addDays(now, -7 * semanas).toISOString(),
   })
 
@@ -476,18 +479,61 @@ export class DemoApi implements ForroApi {
     }
   }
 
-  async signInTelefone(telefone: string, senha: string) {
-    const norm = normalizeTelefone(telefone)
-    const p = this.db.profiles.find(
-      (x) => x.telefone && telefonesIguais(x.telefone, telefone),
-    )
-    if (!p || this.db.senhas[norm] !== senha) {
-      throw new Error('Telefone ou senha incorretos')
+  async signInTelefone(identificador: string, senha: string) {
+    const id = identificador.trim()
+    const p = ehEmail(id)
+      ? this.db.profiles.find(
+          (x) => x.email && x.email.toLowerCase() === id.toLowerCase(),
+        )
+      : this.db.profiles.find(
+          (x) => x.telefone && telefonesIguais(x.telefone, id),
+        )
+    // A senha é guardada pelo telefone, que é a chave estável do demo
+    const chave = p?.telefone ? normalizeTelefone(p.telefone) : ''
+    if (!p || this.db.senhas[chave] !== senha) {
+      throw new Error(
+        ehEmail(id) ? 'E-mail ou senha incorretos' : 'Telefone ou senha incorretos',
+      )
     }
     this.iniciarSessao(p.id)
   }
 
-  async signUpTelefone(telefone: string, senha: string) {
+  async solicitarResetSenha(email: string) {
+    // Sem servidor de e-mail no demo: o link seria impossível de
+    // entregar, então a tela só confirma o envio como em produção.
+    console.info('[demo] link de recuperação iria para', email)
+  }
+
+  async definirNovaSenha(senha: string) {
+    await this.trocarSenha(senha)
+  }
+
+  async trocarSenha(senha: string) {
+    const uid = localStorage.getItem(SESSION_KEY)
+    const p = this.db.profiles.find((x) => x.id === uid)
+    if (!p?.telefone) throw new Error('Entre na conta primeiro')
+    this.db.senhas[normalizeTelefone(p.telefone)] = senha
+    this.persist()
+  }
+
+  async trocarEmail(email: string) {
+    const uid = localStorage.getItem(SESSION_KEY)
+    const p = this.db.profiles.find((x) => x.id === uid)
+    if (!p) throw new Error('Entre na conta primeiro')
+    const novo = email.trim()
+    if (
+      novo &&
+      this.db.profiles.some(
+        (x) => x.id !== p.id && x.email?.toLowerCase() === novo.toLowerCase(),
+      )
+    ) {
+      throw new Error('Esse e-mail já está em outra conta')
+    }
+    p.email = novo || null
+    this.persist()
+  }
+
+  async signUpTelefone(telefone: string, email: string, senha: string) {
     const { existe, jaTemConta } = await this.telefoneNaLista(telefone)
     if (jaTemConta) {
       throw new Error('Este telefone já tem conta — use a aba Entrar')
@@ -514,6 +560,7 @@ export class DemoApi implements ForroApi {
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       cargos: [],
       telefone: telefone.trim(),
+      email: email.trim() || null,
       criado_em: new Date().toISOString(),
     }
     this.db.profiles.push(profile)
@@ -551,6 +598,7 @@ export class DemoApi implements ForroApi {
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       cargos: [],
       telefone: telefone.trim() || null,
+      email: null,
       criado_em: new Date().toISOString(),
     }
     this.db.profiles.push(profile)

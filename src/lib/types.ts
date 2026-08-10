@@ -23,15 +23,20 @@ export interface Profile {
   /** Cargos no projeto (Presidência, Professor(a)…) — só a organização define. */
   cargos: string[]
   telefone: string | null
+  /**
+   * E-mail de recuperação de senha. null = conta antiga que ainda usa o
+   * e-mail sintético e por isso não consegue recuperar a senha sozinha.
+   */
+  email: string | null
   criado_em: string
 }
 
 /**
- * Perfil como os outros alunos podem ver: sem telefone. A busca de
- * perfis usa este formato justamente para o número de ninguém sair
- * trafegando para o aparelho de todo mundo.
+ * Perfil como os outros alunos podem ver: sem telefone e sem e-mail. A
+ * busca de perfis usa este formato justamente para o contato de ninguém
+ * sair trafegando para o aparelho de todo mundo.
  */
-export type PerfilPublico = Omit<Profile, 'telefone'>
+export type PerfilPublico = Omit<Profile, 'telefone' | 'email'>
 
 /** Rótulo compacto das turmas de alguém (feed, ranking, chamada). */
 export function turmaLabel(turmas: TurmaMembro[]): string | null {

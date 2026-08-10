@@ -45,3 +45,19 @@ export function formatTelefone(t: string): string {
 export function synthEmail(telefone: string): string {
   return `a${normalizeTelefone(telefone)}@alunos.forrodesegunda.app`
 }
+
+/**
+ * O que a pessoa digitou no login é um e-mail (e não um telefone)?
+ *
+ * Grosseiro de propósito: quem decide se o endereço presta é o
+ * Supabase. Aqui só interessa saber por qual caminho seguir, e
+ * telefone nenhum tem arroba.
+ */
+export function ehEmail(v: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+}
+
+/** Endereço sintético, que existe só para o login antigo funcionar. */
+export function ehEmailSintetico(email: string | null): boolean {
+  return !!email && email.endsWith('@alunos.forrodesegunda.app')
+}

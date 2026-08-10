@@ -10,6 +10,10 @@ create table if not exists public.profiles (
   nome text not null,
   avatar_url text,
   telefone text,
+  -- Cópia do e-mail de auth.users (só o real, nunca o sintético): o app
+  -- não lê auth.users, e o painel precisa saber quem já pode recuperar
+  -- a senha. Ver migração 013.
+  email text,
   criado_em timestamptz not null default now()
 );
 
@@ -276,6 +280,36 @@ begin
 end;
 $$;
 grant execute on function public.telefone_na_lista(text) to anon, authenticated;
+
+-- E-mail com que aquele telefone entra no Supabase. Chamada ANTES do
+-- login (anon): quem cadastrou e-mail real tem esse endereço como
+-- e-mail da conta, então sem isto não daria mais para entrar digitando
+-- o telefone. Ver migração 013 para o que isso expõe.
+create or replace function public.email_de_login(tel text)
+returns text
+language plpgsql stable security definer
+set search_path = public
+as $$
+declare
+  uid uuid;
+  mail text;
+begin
+  if length(normalizar_telefone(tel)) < 8 then
+    return null;
+  end if;
+  select id into uid from profiles
+  where telefone is not null
+    and normalizar_telefone(telefone) = normalizar_telefone(tel)
+  limit 1;
+  if uid is null then
+    return null;
+  end if;
+  select email into mail from auth.users where id = uid;
+  return mail;
+end;
+$$;
+revoke all on function public.email_de_login(text) from public;
+grant execute on function public.email_de_login(text) to anon, authenticated;
 
 -- Cria perfil + papel no cadastro; nome e turma vêm da lista de chamada
 -- (o e-mail é sintético, derivado do telefone — ver lib/phone.ts)

@@ -24,9 +24,20 @@ fazer isso, por isso o passo a passo abaixo é bem mastigado.
 4. ⚠️ **Passo que não pode ser pulado:** menu lateral → **Authentication** →
    **Sign In / Providers** → **Email** → **desligue "Confirm email"** →
    **Save**.
-   *Por quê:* o login é por telefone + senha e usa um e-mail interno que não
-   recebe mensagem. Com essa opção ligada, ninguém consegue entrar.
-5. Menu lateral → **Project Settings** (engrenagem) → **API**. Deixe essa
+   *Por quê:* o login é por telefone + senha. Com essa opção ligada, o
+   cadastro trava esperando uma confirmação que ninguém vai clicar.
+5. ⚠️ **Para o "esqueci minha senha" funcionar** (pode fazer depois do
+   Passo 4, quando já souber o endereço do app):
+   - **Authentication → URL Configuration**: em *Site URL* ponha
+     `https://<seu-app>.vercel.app`, e em *Redirect URLs* acrescente
+     `https://<seu-app>.vercel.app/nova-senha`. Sem isso o link do e-mail
+     não abre o app.
+   - **Project Settings → Authentication → SMTP Settings**: configure um
+     servidor de e-mail próprio (Resend, Brevo e similares têm plano
+     gratuito). O servidor embutido do Supabase é só para testes e limita a
+     pouquíssimos e-mails por hora — com 300 alunos ele barra os envios e a
+     recuperação passa a falhar em silêncio.
+6. Menu lateral → **Project Settings** (engrenagem) → **API**. Deixe essa
    aba aberta, você vai copiar dois valores no Passo 3:
    - **Project URL** (algo como `https://abcdefgh.supabase.co`)
    - **anon public** key (um texto bem comprido)
@@ -155,9 +166,14 @@ Se aparecer a mensagem de "conexão segura", é porque abriram por um link
 errado — tem que ser o endereço `https://...vercel.app`.
 
 **"Esqueci minha senha"**
-Ainda não há recuperação automática (não pedimos e-mail). Você resolve em
-Supabase → **Authentication → Users** → clique no usuário → **Reset
-password**.
+Quem cadastrou e-mail resolve sozinho: na tela de login, **Esqueci minha
+senha** → digita o e-mail → recebe um link para criar outra.
+
+Quem criou conta **antes** dessa novidade nasceu sem e-mail e ainda não
+consegue. Peça para essas pessoas cadastrarem o e-mail em **Perfil → Acesso
+e senha** — o app já cobra isso com um aviso. Enquanto não cadastrarem, você
+destrava em Supabase → **Authentication → Users** → clique no usuário →
+**Reset password**.
 
 **"Posso mudar minha turma?"**
 Não — turma e papel são definidos pela organização, no Painel.

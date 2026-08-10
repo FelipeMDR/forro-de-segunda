@@ -17,6 +17,138 @@ import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
 import type { Badge, CheckinFavorito } from '../lib/types'
 
+/**
+ * E-mail de recuperação e troca de senha.
+ *
+ * O e-mail é o que torna possível recuperar a senha sozinho: sem ele o
+ * link do "esqueci minha senha" não teria para onde ir. Contas criadas
+ * antes da migração 013 nasceram sem e-mail, então o cartão cobra o
+ * cadastro em vez de só oferecer.
+ */
+function SegurancaCard() {
+  const { api, profile, refreshProfile } = useAuth()
+  const toast = useToast()
+  const [email, setEmail] = useState(profile?.email ?? '')
+  const [senha, setSenha] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [salvandoEmail, setSalvandoEmail] = useState(false)
+  const [salvandoSenha, setSalvandoSenha] = useState(false)
+
+  useEffect(() => {
+    setEmail(profile?.email ?? '')
+  }, [profile])
+
+  if (!profile) return null
+  const semEmail = !profile.email
+
+  const salvarEmail = async () => {
+    setSalvandoEmail(true)
+    try {
+      await api.trocarEmail(email)
+      await refreshProfile()
+      toast('E-mail salvo! Agora dá para recuperar a senha por ele 📬')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setSalvandoEmail(false)
+    }
+  }
+
+  const salvarSenha = async () => {
+    if (senha !== confirmar) {
+      toast('As senhas não conferem', 'erro')
+      return
+    }
+    setSalvandoSenha(true)
+    try {
+      await api.trocarSenha(senha)
+      setSenha('')
+      setConfirmar('')
+      toast('Senha alterada! 🔑')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setSalvandoSenha(false)
+    }
+  }
+
+  return (
+    <div className="card space-y-4 p-5">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
+        Acesso e senha
+      </h2>
+
+      {semEmail && (
+        <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-xs text-amber-800">
+          <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
+          novidade, então hoje, se você esquecer a senha, só a organização
+          consegue te destravar. Com um e-mail aqui, você resolve sozinho.
+        </p>
+      )}
+
+      <div>
+        <label className="label" htmlFor="perfil-email">
+          E-mail para recuperar a senha
+        </label>
+        <input
+          id="perfil-email"
+          type="email"
+          className="input"
+          placeholder="voce@email.com"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <p className="mt-1.5 text-xs text-tinta-500">
+          Depois de cadastrar, dá para entrar no app com o telefone ou com o
+          e-mail — o que for mais fácil de lembrar.
+        </p>
+        <button
+          className="btn-ghost mt-2 w-full"
+          disabled={salvandoEmail || !email.trim() || email === profile.email}
+          onClick={() => void salvarEmail()}
+        >
+          {salvandoEmail ? 'Salvando…' : 'Salvar e-mail'}
+        </button>
+      </div>
+
+      <div className="border-t border-preto/10 pt-4">
+        <label className="label" htmlFor="perfil-senha">
+          Nova senha (mín. 6 caracteres)
+        </label>
+        <input
+          id="perfil-senha"
+          type="password"
+          className="input"
+          autoComplete="new-password"
+          minLength={6}
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+        />
+        <label className="label mt-3" htmlFor="perfil-senha-2">
+          Confirmar nova senha
+        </label>
+        <input
+          id="perfil-senha-2"
+          type="password"
+          className="input"
+          autoComplete="new-password"
+          minLength={6}
+          value={confirmar}
+          onChange={(e) => setConfirmar(e.target.value)}
+        />
+        <button
+          className="btn-ghost mt-2 w-full"
+          disabled={salvandoSenha || senha.length < 6}
+          onClick={() => void salvarSenha()}
+        >
+          {salvandoSenha ? 'Salvando…' : 'Trocar senha'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ProfilePage() {
   const { api, userId, profile, refreshProfile } = useAuth()
   const toast = useToast()
@@ -214,6 +346,8 @@ export function ProfilePage() {
           Salvar alterações
         </button>
       </div>
+
+      <SegurancaCard />
 
       {/* Lugar fixo para instalar: o convite do feed é dispensável, e
           quem dispensou não tinha mais como voltar atrás. */}

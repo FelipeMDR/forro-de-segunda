@@ -39,13 +39,41 @@ export interface ForroApi {
   // ---- Autenticação (telefone + senha) ----
   getSessionUserId(): Promise<string | null>
   onAuthChange(cb: (userId: string | null) => void): () => void
-  /** Entra com telefone + senha. */
-  signInTelefone(telefone: string, senha: string): Promise<void>
+  /**
+   * Entra com telefone **ou** e-mail + senha.
+   *
+   * Aceita os dois porque quem cadastra um e-mail real passa a ter esse
+   * endereço como e-mail da conta no Supabase — e é o e-mail da conta
+   * que o app entrega ao GoTrue. Quem nunca cadastrou continua no
+   * e-mail sintético derivado do telefone. Ver migração 013.
+   */
+  signInTelefone(identificador: string, senha: string): Promise<void>
   /**
    * Primeiro acesso: cria a conta se o telefone estiver na lista de
    * chamada. Nome e turma vêm da lista automaticamente.
+   *
+   * O e-mail vira o e-mail da conta e é o único jeito de recuperar a
+   * senha depois — sem ele, o link de recuperação não teria para onde
+   * ir. Vazio = conta sem recuperação (contas antigas ficam assim até
+   * a pessoa cadastrar um e-mail no perfil).
    */
-  signUpTelefone(telefone: string, senha: string): Promise<void>
+  signUpTelefone(
+    telefone: string,
+    email: string,
+    senha: string,
+  ): Promise<void>
+  /**
+   * Dispara o e-mail de recuperação de senha. Não diz se a conta
+   * existe: responder isso transformaria a tela num verificador de
+   * quem é do projeto.
+   */
+  solicitarResetSenha(email: string): Promise<void>
+  /** Define a senha nova (na sessão aberta pelo link do e-mail). */
+  definirNovaSenha(senha: string): Promise<void>
+  /** Troca a senha de quem está logado. */
+  trocarSenha(senha: string): Promise<void>
+  /** Cadastra ou troca o e-mail de recuperação de quem está logado. */
+  trocarEmail(email: string): Promise<void>
   /** Consulta pré-cadastro: o telefone está na lista? Já tem conta? */
   telefoneNaLista(
     telefone: string,

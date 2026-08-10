@@ -11,6 +11,7 @@ import { ChallengesPage } from './pages/ChallengesPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
+import { NovaSenhaPage } from './pages/NovaSenhaPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { UserProfilePage } from './pages/UserProfilePage'
 
@@ -34,6 +35,10 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Fora do RequireAuth: quem chega pelo link do e-mail pode
+                cair aqui antes de o token virar sessão, e ser mandado
+                para o login perderia o token que veio na URL. */}
+            <Route path="/nova-senha" element={<NovaSenhaPage />} />
             <Route
               element={
                 <RequireAuth>
