@@ -100,8 +100,8 @@ function SegurancaCard() {
           onChange={(e) => setEmail(e.target.value)}
         />
         <p className="mt-1.5 text-xs text-tinta-500">
-          Depois de cadastrar, dá para entrar no app com o telefone ou com o
-          e-mail — o que for mais fácil de lembrar.
+          Atenção: depois de cadastrar, é <strong>com o e-mail</strong> que
+          você entra no app — o telefone deixa de valer no login.
         </p>
         <button
           className="btn-ghost mt-2 w-full"

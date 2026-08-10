@@ -230,10 +230,8 @@ export function LoginPage() {
         ) : aba === 'entrar' ? (
           <form onSubmit={entrar} className="space-y-4">
             <div>
-              {/* Aceita os dois: quem cadastrou e-mail entra por ele,
-                  quem não cadastrou segue no telefone de sempre */}
               <label className="label" htmlFor="telefone">
-                Telefone ou e-mail
+                E-mail
               </label>
               <input
                 id="telefone"
@@ -241,11 +239,17 @@ export function LoginPage() {
                 inputMode="email"
                 autoComplete="username"
                 className="input"
-                placeholder="11 91234-5678 ou voce@email.com"
+                placeholder="voce@email.com"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 required
               />
+              {/* Contas criadas antes do e-mail ainda entram pelo
+                  número. Some sozinho conforme elas migram. */}
+              <p className="mt-1.5 text-xs text-tinta-500">
+                Tem conta antiga e ainda não cadastrou e-mail? Entre com o
+                telefone, como sempre.
+              </p>
             </div>
             <div>
               <label className="label" htmlFor="senha">
@@ -321,8 +325,8 @@ export function LoginPage() {
                 required
               />
               <p className="mt-1.5 text-xs text-tinta-500">
-                É por ele que você recupera a senha se esquecer — e dá para
-                entrar no app pelo telefone ou pelo e-mail, como preferir.
+                É com ele que você vai entrar no app, e é por ele que você
+                recupera a senha se esquecer.
               </p>
             </div>
             <div>

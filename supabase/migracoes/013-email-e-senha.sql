@@ -9,13 +9,14 @@
 -- o vazio. Não era questão de configurar: não havia endereço.
 --
 -- Agora quem se cadastra informa um e-mail real, e é ele que vira o
--- e-mail da conta. Como isso é justamente o campo que o app usava para
--- entrar, o login passa a aceitar telefone OU e-mail — e é para o caso
--- do telefone que existe a função email_de_login abaixo.
+-- e-mail da conta — que é também o identificador do login. Ou seja: a
+-- partir daqui entra-se com E-MAIL + senha.
 --
--- Contas antigas continuam com o e-mail sintético e entrando pelo
--- telefone, sem nenhuma quebra. Elas ganham recuperação de senha
--- quando a pessoa cadastrar um e-mail no perfil.
+-- Contas antigas continuam com o e-mail sintético e por isso continuam
+-- entrando pelo telefone, sem nenhuma quebra: aquele endereço é
+-- calculado a partir do número, não consultado. Elas migram para o
+-- e-mail quando a pessoa cadastrar um no perfil — e é só a partir daí
+-- que ganham recuperação de senha.
 --
 -- Rode no SQL Editor. Pode rodar mais de uma vez.
 -- ============================================================
@@ -98,48 +99,20 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- Login por telefone
+-- Nada de traduzir telefone em e-mail
 -- ------------------------------------------------------------
-/**
- * E-mail com que aquele telefone entra no Supabase.
- *
- * É chamada ANTES do login (papel anon), porque quem vai entrar ainda
- * não tem sessão: o app recebe o endereço e o entrega ao GoTrue junto
- * com a senha. Sem isto, quem cadastrou um e-mail real não conseguiria
- * mais entrar digitando o telefone.
- *
- * O QUE ISSO EXPÕE: quem souber o telefone de alguém descobre o e-mail
- * de login dessa pessoa. É um passo a mais do que a telefone_na_lista
- * já fazia (ela devolve o NOME de qualquer telefone da lista). Se um
- * dia isso incomodar, o caminho é o login passar a ser só por e-mail —
- * aí esta função deixa de existir.
- */
-create or replace function public.email_de_login(tel text)
-returns text
-language plpgsql stable security definer
-set search_path = public
-as $$
-declare
-  uid uuid;
-  mail text;
-begin
-  if length(normalizar_telefone(tel)) < 8 then
-    return null;
-  end if;
-  select id into uid from profiles
-  where telefone is not null
-    and normalizar_telefone(telefone) = normalizar_telefone(tel)
-  limit 1;
-  if uid is null then
-    return null;
-  end if;
-  select email into mail from auth.users where id = uid;
-  return mail;
-end;
-$$;
-
-revoke all on function public.email_de_login(text) from public;
-grant execute on function public.email_de_login(text) to anon, authenticated;
+-- Uma versão desta migração criou email_de_login(tel), que devolvia o
+-- e-mail de login de um telefone para o app poder entrar pelos dois.
+-- Ela precisaria ser pública (quem vai entrar ainda não tem sessão), e
+-- viraria uma forma de qualquer um transformar telefone em e-mail —
+-- justo no app onde o telefone foi tirado dos perfis públicos.
+--
+-- O login passou a ser por e-mail, e a função deixou de existir. Contas
+-- antigas continuam entrando pelo telefone porque o e-mail sintético é
+-- CALCULADO a partir dele (a<dígitos>@alunos.forrodesegunda.app), sem
+-- perguntar nada ao banco. Este drop é só para o caso de você ter
+-- rodado a versão antiga.
+drop function if exists public.email_de_login(text);
 
 -- ------------------------------------------------------------
 -- Mantém profiles.email em dia quando a pessoa troca o e-mail

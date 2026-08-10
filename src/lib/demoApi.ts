@@ -481,18 +481,31 @@ export class DemoApi implements ForroApi {
 
   async signInTelefone(identificador: string, senha: string) {
     const id = identificador.trim()
-    const p = ehEmail(id)
+    const porEmail = ehEmail(id)
+    const p = porEmail
       ? this.db.profiles.find(
           (x) => x.email && x.email.toLowerCase() === id.toLowerCase(),
         )
-      : this.db.profiles.find(
-          (x) => x.telefone && telefonesIguais(x.telefone, id),
+      : // Espelha a produção: quem cadastrou e-mail perdeu o endereço
+        // sintético, então o telefone não acha mais a conta
+        this.db.profiles.find(
+          (x) => !x.email && x.telefone && telefonesIguais(x.telefone, id),
         )
     // A senha é guardada pelo telefone, que é a chave estável do demo
     const chave = p?.telefone ? normalizeTelefone(p.telefone) : ''
     if (!p || this.db.senhas[chave] !== senha) {
+      if (
+        !porEmail &&
+        this.db.profiles.some(
+          (x) => x.email && x.telefone && telefonesIguais(x.telefone, id),
+        )
+      ) {
+        throw new Error(
+          'Não encontramos essa conta pelo telefone. Se você já cadastrou um e-mail, entre com ele.',
+        )
+      }
       throw new Error(
-        ehEmail(id) ? 'E-mail ou senha incorretos' : 'Telefone ou senha incorretos',
+        porEmail ? 'E-mail ou senha incorretos' : 'Telefone ou senha incorretos',
       )
     }
     this.iniciarSessao(p.id)

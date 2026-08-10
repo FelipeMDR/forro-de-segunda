@@ -169,11 +169,15 @@ errado — tem que ser o endereço `https://...vercel.app`.
 Quem cadastrou e-mail resolve sozinho: na tela de login, **Esqueci minha
 senha** → digita o e-mail → recebe um link para criar outra.
 
-Quem criou conta **antes** dessa novidade nasceu sem e-mail e ainda não
-consegue. Peça para essas pessoas cadastrarem o e-mail em **Perfil → Acesso
-e senha** — o app já cobra isso com um aviso. Enquanto não cadastrarem, você
-destrava em Supabase → **Authentication → Users** → clique no usuário →
-**Reset password**.
+Quem criou conta **antes** dessa novidade nasceu sem e-mail: continua
+entrando pelo telefone, mas ainda não recupera a senha sozinho. Peça para
+essas pessoas cadastrarem o e-mail em **Perfil → Acesso e senha** — o app já
+cobra isso com um aviso. **Depois de cadastrar, elas passam a entrar pelo
+e-mail**, e o telefone deixa de valer no login (o app avisa disso na hora e
+explica no erro, se alguém tentar).
+
+Enquanto não cadastrarem, você destrava em Supabase → **Authentication →
+Users** → clique no usuário → **Reset password**.
 
 **"Posso mudar minha turma?"**
 Não — turma e papel são definidos pela organização, no Painel.

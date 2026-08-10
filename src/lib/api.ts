@@ -40,22 +40,24 @@ export interface ForroApi {
   getSessionUserId(): Promise<string | null>
   onAuthChange(cb: (userId: string | null) => void): () => void
   /**
-   * Entra com telefone **ou** e-mail + senha.
+   * Entra com e-mail + senha.
    *
-   * Aceita os dois porque quem cadastra um e-mail real passa a ter esse
-   * endereço como e-mail da conta no Supabase — e é o e-mail da conta
-   * que o app entrega ao GoTrue. Quem nunca cadastrou continua no
-   * e-mail sintético derivado do telefone. Ver migração 013.
+   * Aceita telefone só pelas contas anteriores ao e-mail, que seguem no
+   * endereço sintético — e esse é calculado a partir do número, sem
+   * consulta nenhuma. Traduzir telefone em e-mail de verdade exigiria
+   * uma consulta pública (quem vai entrar não tem sessão), que viraria
+   * um jeito de descobrir o e-mail de qualquer aluno pelo número. Essa
+   * porta some sozinha conforme as contas antigas cadastram e-mail.
    */
   signInTelefone(identificador: string, senha: string): Promise<void>
   /**
    * Primeiro acesso: cria a conta se o telefone estiver na lista de
    * chamada. Nome e turma vêm da lista automaticamente.
    *
-   * O e-mail vira o e-mail da conta e é o único jeito de recuperar a
-   * senha depois — sem ele, o link de recuperação não teria para onde
-   * ir. Vazio = conta sem recuperação (contas antigas ficam assim até
-   * a pessoa cadastrar um e-mail no perfil).
+   * O e-mail vira o e-mail da conta: é com ele que a pessoa passa a
+   * entrar e é para ele que vai o link de recuperação de senha. O
+   * telefone continua sendo o que libera o cadastro (é a chave da lista
+   * de chamada), mas deixa de ser o identificador do login.
    */
   signUpTelefone(
     telefone: string,

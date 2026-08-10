@@ -211,18 +211,21 @@ supabase/
   O projeto funciona a semana toda, com espaços diferentes tendo horários
   de início diferentes, então segunda pode abrir às 18h e quarta às 20h
   dentro do mesmo desafio.
-- **E-mail é o que torna a senha recuperável.** O login sempre foi
+- **Login por e-mail; telefone só libera o cadastro.** O login era
   telefone + senha sobre um e-mail sintético
   (`a<10 dígitos>@alunos.forrodesegunda.app`) que não recebe mensagem —
   então o "esqueci minha senha" do Supabase, que envia para o e-mail *da
-  conta*, não tinha para onde ir. Quem se cadastra agora informa um
-  e-mail real, e é ele que vira o e-mail da conta. Como esse é o mesmo
-  campo que identificava o login, o login passou a aceitar telefone
-  **ou** e-mail, e `email_de_login` (migração 013) faz a ponte no caso do
-  telefone. O preço disso está escrito na própria migração: quem souber
-  um telefone descobre o e-mail de login — um passo além do que
-  `telefone_na_lista` já expunha (o nome). Contas antigas seguem no
-  e-mail sintético até a pessoa cadastrar um e-mail no perfil.
+  conta*, não tinha para onde ir. Agora quem se cadastra informa um
+  e-mail real, que vira o e-mail da conta e portanto o identificador do
+  login. O telefone continua sendo a chave da lista de chamada (é ele
+  que libera o cadastro e traz nome e turmas), só deixou de identificar
+  o login.
+  Contas anteriores seguem no e-mail sintético e por isso continuam
+  entrando pelo número: aquele endereço é *calculado* a partir dele, sem
+  consulta nenhuma. Essa é a razão de a rampa ser barata — e de não
+  existir uma função `telefone → e-mail`, que teria de ser pública (quem
+  vai entrar não tem sessão) e viraria um jeito de descobrir o e-mail de
+  qualquer aluno pelo número.
 - **Chamada libera o cadastro; matrícula move as turmas.** A
   `alunos_cadastrados` só é lida por `handle_new_user`, na criação da
   conta — daí a lista não controlar acesso e não fazer sentido guardar

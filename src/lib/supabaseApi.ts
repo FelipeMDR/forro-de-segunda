@@ -130,30 +130,28 @@ export class SupabaseApi implements ForroApi {
     }
   }
 
-  /**
-   * Descobre com que e-mail aquele telefone entra. Quem nunca cadastrou
-   * e-mail continua no sintético, que dá para calcular aqui mesmo; para
-   * os demais, quem sabe é o banco (migração 013).
-   */
-  private async emailDeLogin(telefone: string): Promise<string> {
-    const { data, error } = await this.sb.rpc('email_de_login', {
-      tel: telefone,
-    })
-    // Sem a migração 013 a função não existe: cai no sintético, que é
-    // exatamente o comportamento antigo.
-    if (error || !data) return synthEmail(telefone)
-    return data as string
-  }
-
   async signInTelefone(identificador: string, senha: string) {
-    const email = ehEmail(identificador)
-      ? identificador.trim()
-      : await this.emailDeLogin(identificador)
+    // Telefone só serve às contas anteriores ao e-mail, que seguem no
+    // endereço sintético — e esse é CALCULADO aqui, sem consultar nada.
+    // Traduzir telefone em e-mail exigiria uma consulta pública, que
+    // viraria um jeito de descobrir o e-mail de qualquer aluno.
+    const porTelefone = !ehEmail(identificador)
+    const email = porTelefone
+      ? synthEmail(identificador)
+      : identificador.trim()
     const { error } = await this.sb.auth.signInWithPassword({
       email,
       password: senha,
     })
-    if (error) throw new Error(traduz(error.message))
+    if (!error) return
+    // Quem já cadastrou e-mail perdeu o endereço sintético: o telefone
+    // deixa de achar a conta e o erro genérico não ajudaria em nada.
+    if (porTelefone && /invalid login credentials/i.test(error.message)) {
+      throw new Error(
+        'Não encontramos essa conta pelo telefone. Se você já cadastrou um e-mail, entre com ele.',
+      )
+    }
+    throw new Error(traduz(error.message))
   }
 
   async signUpTelefone(telefone: string, email: string, senha: string) {
