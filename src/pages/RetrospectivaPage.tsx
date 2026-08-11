@@ -53,7 +53,7 @@ function desenharCard(r: Retrospectiva, nome: string): HTMLCanvasElement {
 
   const numeros: Array<[string, string]> = [
     [String(r.presencas), r.presencas === 1 ? 'presença' : 'presenças'],
-    [String(r.parceiros), r.parceiros === 1 ? 'parceiro' : 'parceiros'],
+    [String(r.parceiros), r.parceiros === 1 ? 'dupla' : 'duplas'],
     [String(r.streak), r.streak === 1 ? 'semana seguida' : 'semanas seguidas'],
   ]
   numeros.forEach(([valor, rotulo], i) => {
@@ -146,7 +146,7 @@ export function RetrospectivaPage() {
 
   const numeros: Array<[string, string]> = [
     [String(r.presencas), r.presencas === 1 ? 'presença' : 'presenças'],
-    [String(r.parceiros), r.parceiros === 1 ? 'parceiro' : 'parceiros'],
+    [String(r.parceiros), r.parceiros === 1 ? 'dupla' : 'duplas'],
     [String(r.streak), 'semanas seguidas'],
     [String(r.reacoesRecebidas), 'reações recebidas'],
   ]

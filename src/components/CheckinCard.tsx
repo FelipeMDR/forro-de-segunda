@@ -260,8 +260,8 @@ export function CheckinCard({
             {duplaPossivel.marcado
               ? duplaPossivel.confirmada
                 ? '✓ Dançaram juntos'
-                : '✓ Dancei com'
-              : '💃 Dancei com'}
+                : '✓ Dupla marcada'
+              : '💃 Marcar dupla'}
           </button>
         </div>
       )}

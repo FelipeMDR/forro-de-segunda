@@ -104,8 +104,8 @@ export function computeBadges(input: {
         emoji,
         titulo,
         descricao: `${parceiros} ${
-          parceiros === 1 ? 'parceiro confirmado' : 'parceiros confirmados'
-        } de dança`,
+          parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
+        }`,
       })
     }
   }

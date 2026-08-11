@@ -67,7 +67,7 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
     [stats ? String(stats.presencas) : '–', 'presenças', ''],
     [stats ? String(stats.desafios) : '–', 'desafios', ''],
     // Rodízio: pessoas diferentes, não número de danças
-    [stats ? String(stats.parceiros) : '–', 'parceiros', ''],
+    [stats ? String(stats.parceiros) : '–', 'duplas', ''],
   ]
   return (
     <div className="grid w-full grid-cols-4 gap-2 pt-2">

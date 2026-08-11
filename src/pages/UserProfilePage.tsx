@@ -77,7 +77,7 @@ function DanceiCom({ perfilId, nome }: { perfilId: string; nome: string }) {
         disabled={ocupado}
         onClick={() => void alternar()}
       >
-        {estado.marcado ? '✓ Dancei com hoje' : `Dancei com ${nome} hoje 💃`}
+        {estado.marcado ? '✓ Dupla marcada' : `Marcar dupla com ${nome} 💃`}
       </button>
       {estado.marcado && (
         <p className="text-xs text-tinta-500">
