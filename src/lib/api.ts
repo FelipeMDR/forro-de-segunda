@@ -214,6 +214,10 @@ export interface ForroApi {
   /**
    * Quem mais fez check-in naquele dia, já dizendo quem eu marquei.
    * É a grade de rostos que aparece depois do check-in.
+   *
+   * Lista vazia se EU não tiver check-in nesse dia — sem co-presença
+   * minha não existe candidato válido, e a marcação seria recusada de
+   * qualquer forma (ver `marcarDupla`).
    */
   parceirosPossiveis(data: string): Promise<ParceiroPossivel[]>
   /**

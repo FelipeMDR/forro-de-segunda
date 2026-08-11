@@ -202,6 +202,14 @@ supabase/
 
 ### Decisões de modelagem
 
+- **Marcar dupla exige co-presença minha, não só da outra pessoa.**
+  `parceirosPossiveis(data)` lista quem posso marcar num dia — e devolve
+  lista vazia se EU não tiver check-in nesse dia, mesmo que a outra
+  pessoa tenha. `marcarDupla`/`marcar_dupla` (SQL) já recusavam a
+  gravação nesse caso, mas o botão continuava aparecendo em três lugares
+  (grade pós-check-in, perfil, feed) — convidando para uma ação que
+  ia falhar ao confirmar em vez de nunca ser oferecida. Um bug de UX, não
+  de integridade: nenhuma dupla inválida chegava a ser gravada.
 - **Check-in sem `challenge_id`:** um check-in vale automaticamente para
   *todos* os desafios em que o aluno está inscrito cuja janela (período +
   dia da semana + horário) bate com o momento da foto. Uma foto por aula,

@@ -1408,6 +1408,14 @@ export class SupabaseApi implements ForroApi {
       } | null
     }>
 
+    // Sem check-in meu no dia, não existe candidato nenhum — é a mesma
+    // regra que marcar_dupla exige na hora de gravar (migração 016),
+    // só que aqui na hora de LISTAR. Sem isso, o botão de marcar dupla
+    // aparecia para quem nem apareceu naquele dia: a marcação era
+    // recusada ao confirmar, mas só depois de convidar para uma ação
+    // que nunca ia dar certo.
+    if (!checkins.some((c) => c.user_id === uid)) return []
+
     const minhas = ok(
       await this.sb
         .from('duplas')

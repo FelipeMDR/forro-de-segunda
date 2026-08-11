@@ -1248,6 +1248,12 @@ export class DemoApi implements ForroApi {
 
   async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
     const uid = this.uid()
+    // Sem check-in meu no dia, não existe candidato nenhum — mesma regra
+    // que marcarDupla exige na hora de gravar, só que aqui na hora de
+    // LISTAR. Sem isso, o botão de marcar dupla aparecia para quem nem
+    // apareceu naquele dia: a marcação era recusada ao confirmar, mas só
+    // depois de convidar para uma ação que nunca ia dar certo.
+    if (!this.fezCheckinEm(uid, data)) return []
     const minhas = (this.db.duplas ?? []).filter(
       (d) => d.de_user === uid && d.data === data,
     )
