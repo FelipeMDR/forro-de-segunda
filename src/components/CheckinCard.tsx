@@ -8,6 +8,7 @@ import {
   cargoPrincipal,
   emojiCargo,
   type FeedItem,
+  type ParceiroPossivel,
 } from '../lib/types'
 import { Avatar } from './Avatar'
 import { CommentsSheet } from './CommentsSheet'
@@ -15,15 +16,37 @@ import { CommentsSheet } from './CommentsSheet'
 export function CheckinCard({
   item,
   onChanged,
+  dupla,
+  onDupla,
 }: {
   item: FeedItem
   onChanged: () => void
+  /**
+   * Situação da dupla com quem postou, se houver co-presença hoje.
+   * Vem do feed já resolvido para não render uma consulta por cartão.
+   */
+  dupla?: ParceiroPossivel | null
+  onDupla?: (marcar: boolean) => Promise<void>
 }) {
   const { api, userId, papel } = useAuth()
   const toast = useToast()
   const [menuAberto, setMenuAberto] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
+  const [marcandoDupla, setMarcandoDupla] = useState(false)
+
+  const duplaPossivel = dupla ?? null
+  const alternarDupla = async () => {
+    if (!duplaPossivel || !onDupla) return
+    setMarcandoDupla(true)
+    try {
+      await onDupla(!duplaPossivel.marcado)
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setMarcandoDupla(false)
+    }
+  }
 
   // Só o cargo mais alto vai para o feed — a lista completa fica no perfil
   const cargo = cargoPrincipal(item.autor.cargos)
@@ -218,6 +241,30 @@ export function CheckinCard({
           </button>
         )}
       </footer>
+
+      {/* Caminho passivo de marcar dupla: rolando o feed depois, a
+          pessoa lembra e toca. Só aparece na foto de outra pessoa numa
+          noite em que eu também dei check-in. */}
+      {duplaPossivel && (
+        <div className="border-t border-preto/5 px-4 py-2">
+          <button
+            onClick={() => void alternarDupla()}
+            disabled={marcandoDupla}
+            aria-pressed={duplaPossivel.marcado}
+            className={`rounded-full px-3 py-1 text-xs font-bold transition disabled:opacity-60 ${
+              duplaPossivel.marcado
+                ? 'bg-verde-700 text-white'
+                : 'bg-preto/5 text-tinta-700 hover:bg-preto/10'
+            }`}
+          >
+            {duplaPossivel.marcado
+              ? duplaPossivel.confirmada
+                ? '✓ Dançaram juntos'
+                : '✓ Dancei com'
+              : '💃 Dancei com'}
+          </button>
+        </div>
+      )}
 
       {comentariosAbertos && (
         <CommentsSheet
