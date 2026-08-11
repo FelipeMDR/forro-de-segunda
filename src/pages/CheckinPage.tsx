@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -71,15 +71,32 @@ export function CheckinPage() {
 
   const suspensos = useMemo(() => diasSuspensos(feriados), [feriados])
 
-  const meusAtivos = useMemo(
-    () => desafios.filter((c) => c.sou_membro && challengePhase(c) === 'ativo'),
+  const ativos = useMemo(
+    () => desafios.filter((c) => challengePhase(c) === 'ativo'),
     [desafios],
   )
+  const meusAtivos = useMemo(
+    () => ativos.filter((c) => c.sou_membro),
+    [ativos],
+  )
 
-  // Desafios (que eu participo) cuja janela está aberta agora
+  // Todos com janela aberta agora, inclusive os que não participo:
+  // entrar no desafio é escolher competir, e quem entra depois leva as
+  // presenças que já tinha. Para isso o check-in precisa ser avaliado
+  // agora — em desafio com local, o veredito não tem como ser feito
+  // depois, já que a coordenada não é guardada (migração 014).
+  const abertosAgora = useMemo(
+    () => desafiosQueContam(new Date(), ativos, suspensos),
+    [ativos, suspensos],
+  )
   const valendoAgora = useMemo(
-    () => desafiosQueContam(new Date(), meusAtivos, suspensos),
-    [meusAtivos, suspensos],
+    () => abertosAgora.filter((c) => c.sou_membro),
+    [abertosAgora],
+  )
+  /** Rolando agora, mas ainda não entrei. */
+  const foraDeles = useMemo(
+    () => abertosAgora.filter((c) => !c.sou_membro),
+    [abertosAgora],
   )
 
   // Hoje a janela existiria, mas a aula foi cancelada. Sem isso o aluno
@@ -114,8 +131,15 @@ export function CheckinPage() {
     return { aindaPontuam, jaPontuaram }
   }, [valendoAgora, meusCheckins, suspensos])
 
-  // Desafios abertos agora que exigem estar no local
+  // Desafios abertos agora que exigem estar no local — inclusive os que
+  // não participo, senão a foto não seria avaliada e entrar depois não
+  // recuperaria nada.
   const comLocal = useMemo(
+    () => abertosAgora.filter((c) => c.local),
+    [abertosAgora],
+  )
+  /** Só os meus, que é o que a tela detalha com distância. */
+  const meusComLocal = useMemo(
     () => valendoAgora.filter((c) => c.local),
     [valendoAgora],
   )
@@ -144,7 +168,7 @@ export function CheckinPage() {
   /** Situação de cada desafio com local: dentro do raio ou não. */
   const situacaoLocal = useMemo(
     () =>
-      comLocal.map((c) => {
+      meusComLocal.map((c) => {
         const distancia = posicao ? distanciaMetros(posicao, c.local!) : null
         return {
           desafio: c,
@@ -152,7 +176,7 @@ export function CheckinPage() {
           dentro: distancia !== null && distancia <= c.local!.raio_m,
         }
       }),
-    [comLocal, posicao],
+    [meusComLocal, posicao],
   )
 
   /** Dos que ainda pontuam, os que a localização não barra. */
@@ -193,7 +217,9 @@ export function CheckinPage() {
             ? 'Foto publicada! O ponto de hoje já tinha sido contado 😉'
             : suspensaoAgora
               ? 'Foto publicada! Como a aula de hoje foi cancelada, ela não conta ponto 🚫'
-              : 'Foto publicada! (nenhum desafio com janela aberta agora)',
+              : foraDeles.length > 0
+                ? 'Foto publicada! Ela já fica valendo caso você entre no desafio 🏆'
+                : 'Foto publicada! (nenhum desafio com janela aberta agora)',
       )
       navigate('/')
     } catch (e) {
@@ -226,7 +252,9 @@ export function CheckinPage() {
                 📍 {erroLocal}. Estes desafios só contam ponto para quem
                 está no local:{' '}
                 <strong>{comLocal.map((c) => c.titulo).join(', ')}</strong>.
-                Você ainda pode postar, mas não vai marcar ponto neles.
+                Você ainda pode postar, mas não vai marcar ponto neles —{' '}
+                <strong>nem se entrar depois</strong>, porque a conferência
+                do local só dá para fazer na hora da foto.
               </p>
               <button className="btn-ghost" onClick={() => void buscarLocal()}>
                 Tentar de novo
@@ -275,8 +303,24 @@ export function CheckinPage() {
         </div>
       )}
 
+      {/* Rolando agora sem eu participar: a foto já fica valendo, então
+          o aviso convida em vez de dizer que não conta. Entrar continua
+          sendo escolha — a competição não é obrigatória. */}
+      {foraDeles.length > 0 && (
+        <div className="rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
+          🏆 Está rolando agora, e você não está participando:{' '}
+          <strong>{foraDeles.map((c) => c.titulo).join(', ')}</strong>. Pode
+          postar tranquilo — <strong>esta foto já fica valendo</strong>, e se
+          você entrar depois ela conta junto com as anteriores.{' '}
+          <Link className="font-bold underline" to="/desafios">
+            Ver desafios
+          </Link>
+        </div>
+      )}
+
       {aindaPontuam.length === 0 &&
         jaPontuaram.length === 0 &&
+        foraDeles.length === 0 &&
         (suspensaoAgora ? (
           <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
             🚫 <strong>Hoje não tem forró</strong>
@@ -287,7 +331,7 @@ export function CheckinPage() {
           </div>
         ) : (
           <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
-            ⚠️ Nenhum desafio seu está com janela de check-in aberta agora. Você
+            ⚠️ Nenhum desafio está com janela de check-in aberta agora. Você
             pode postar mesmo assim, mas a foto{' '}
             <strong>não marcará ponto</strong>.
           </div>

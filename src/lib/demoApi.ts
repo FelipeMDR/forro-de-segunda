@@ -705,16 +705,14 @@ export class DemoApi implements ForroApi {
       legenda: legenda.trim() || null,
       criado_em: new Date().toISOString(),
       // Mesmo veredito que a função registrar_checkin faz no servidor:
-      // guarda em quais desafios valeu, nunca a coordenada.
+      // guarda em quais desafios valeu, nunca a coordenada. Não olha
+      // participação de propósito — o veredito é sobre o lugar, e é o
+      // que faz o ponto aparecer para quem entra depois (migração 014).
       locais: coords
         ? this.db.challenges
             .filter(
               (c) =>
-                c.local &&
-                this.db.members.some(
-                  (m) => m.challenge_id === c.id && m.user_id === this.uid(),
-                ) &&
-                distanciaMetros(coords, c.local) <= c.local.raio_m,
+                c.local && distanciaMetros(coords, c.local) <= c.local.raio_m,
             )
             .map((c) => c.id)
         : [],

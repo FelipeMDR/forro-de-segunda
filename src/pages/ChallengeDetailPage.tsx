@@ -242,17 +242,27 @@ export function ChallengeDetailPage() {
           </div>
         ) : (
           fase !== 'encerrado' && (
-            <button
-              className={
-                desafio.sou_membro ? 'btn-ghost w-full' : 'btn-primary w-full'
-              }
-              disabled={ocupado}
-              onClick={() => void entrarOuSair()}
-            >
-              {desafio.sou_membro
-                ? 'Sair do desafio'
-                : 'Entrar na competição 🔥'}
-            </button>
+            <div className="space-y-2">
+              <button
+                className={
+                  desafio.sou_membro ? 'btn-ghost w-full' : 'btn-primary w-full'
+                }
+                disabled={ocupado}
+                onClick={() => void entrarOuSair()}
+              >
+                {desafio.sou_membro
+                  ? 'Sair do desafio'
+                  : 'Entrar na competição 🔥'}
+              </button>
+              {/* Entrar é escolha, e ninguém perde o que já fez por ter
+                  demorado a decidir. */}
+              {!desafio.sou_membro && (
+                <p className="text-center text-xs text-tinta-500">
+                  Os check-ins que você já fez dentro do período entram junto
+                  — não precisa começar do zero.
+                </p>
+              )}
+            </div>
           )
         )}
       </div>

@@ -249,6 +249,16 @@ supabase/
   ser justo a noite do Forró na Rep), e a decisão vive no cancelamento,
   não no desafio. Como a suspensão é checada sobre o dia em que a janela
   *abriu*, uma janela que vira a noite cai inteira.
+- **Entrar no desafio é escolha, e não zera o passado.** Competir é
+  opcional, então quem entra no meio leva junto os check-ins que já fez
+  no período — o ranking soma pelo período, nunca pela data de entrada.
+  Isso já valia para desafio sem local; com trava de local não valia,
+  porque o veredito só era gravado para quem já era membro e a
+  coordenada não é guardada para reavaliar depois. Desde a migração 014
+  o veredito é sobre o LUGAR, não sobre participação: vale para qualquer
+  desafio ativo com local, e o ponto aparece sozinho quando a pessoa
+  entra. Por isso a tela de check-in pede o GPS mesmo para desafios em
+  que o aluno ainda não entrou.
 - **Ponto = presença; ranking = competição.** Sem meta fixa: vence quem
   somar mais presenças no período. O horário do check-in usado na conta é o
   do servidor (`criado_em`), o aluno não consegue burlar pelo relógio.
