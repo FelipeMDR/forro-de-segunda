@@ -5,7 +5,7 @@ import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
-import { turmaLabel } from './types'
+import { PAGINA_FEED, turmaLabel } from './types'
 import type {
   AgendaEvent,
   AgendaEventInput,
@@ -427,8 +427,12 @@ export class SupabaseApi implements ForroApi {
 
   // ---- Feed / check-ins ----
 
-  async getFeed(): Promise<FeedItem[]> {
-    const res = await this.sb
+  async getFeed(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<FeedItem[]> {
+    const limite = opcoes?.limite ?? PAGINA_FEED
+    let consulta = this.sb
       .from('checkins')
       // `profiles!user_id`: há mais de um caminho entre checkins e profiles
       // (a FK direta e o M2M que o PostgREST deduz via `reactions`), então
@@ -440,14 +444,16 @@ export class SupabaseApi implements ForroApi {
            comentarios:comments(count)`,
       )
       .order('criado_em', { ascending: false })
-      .limit(60)
+      .limit(limite)
+    if (opcoes?.antesDe) consulta = consulta.lt('criado_em', opcoes.antesDe)
+    const res = await consulta
 
     // O embed aninhado (checkins → profiles → profile_turmas) depende das
     // FKs estarem no cache do PostgREST. Se falhar, monta o feed com
     // consultas simples em vez de deixar a tela vazia.
     if (res.error) {
       console.warn('[feed] embed falhou, usando consultas simples:', res.error)
-      return this.getFeedSimples()
+      return this.getFeedSimples(opcoes)
     }
 
     const data = res.data as unknown as Array<Record<string, unknown>>
@@ -480,14 +486,17 @@ export class SupabaseApi implements ForroApi {
   }
 
   /** Plano B do feed: sem embeds, só consultas diretas + junção no cliente. */
-  private async getFeedSimples(): Promise<FeedItem[]> {
-    const checkins = ok(
-      await this.sb
-        .from('checkins')
-        .select('id, user_id, foto_url, legenda, criado_em')
-        .order('criado_em', { ascending: false })
-        .limit(60),
-    ) as Array<{
+  private async getFeedSimples(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<FeedItem[]> {
+    let base = this.sb
+      .from('checkins')
+      .select('id, user_id, foto_url, legenda, criado_em')
+      .order('criado_em', { ascending: false })
+      .limit(opcoes?.limite ?? PAGINA_FEED)
+    if (opcoes?.antesDe) base = base.lt('criado_em', opcoes.antesDe)
+    const checkins = ok(await base) as Array<{
       id: string
       user_id: string
       foto_url: string

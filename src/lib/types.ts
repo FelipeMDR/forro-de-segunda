@@ -50,6 +50,16 @@ export function turmaLabel(turmas: TurmaMembro[]): string | null {
     .join(' · ')
 }
 
+/**
+ * Publicações por página do feed.
+ *
+ * Eram 60 de uma vez. Quase ninguém rola tanto, e o custo se repetia a
+ * cada atualização em tempo real, que refaz a consulta inteira — com
+ * uma noite movimentada isso virava megabytes de dados móveis por
+ * pessoa, só de metadados.
+ */
+export const PAGINA_FEED = 12
+
 export interface FeedItem {
   id: string
   user_id: string

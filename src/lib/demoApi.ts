@@ -11,7 +11,12 @@ import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
-import { CARGOS_PADRAO, LIMITE_FAVORITOS, turmaLabel } from './types'
+import {
+  CARGOS_PADRAO,
+  LIMITE_FAVORITOS,
+  PAGINA_FEED,
+  turmaLabel,
+} from './types'
 import type {
   AgendaEvent,
   AgendaEventInput,
@@ -742,10 +747,14 @@ export class DemoApi implements ForroApi {
 
   // ---- Feed / check-ins ----
 
-  async getFeed(): Promise<FeedItem[]> {
+  async getFeed(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<FeedItem[]> {
     return [...this.db.checkins]
       .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
-      .slice(0, 100)
+      .filter((c) => !opcoes?.antesDe || c.criado_em < opcoes.antesDe)
+      .slice(0, opcoes?.limite ?? PAGINA_FEED)
       .map((c) => this.toFeedItem(c))
   }
 

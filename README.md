@@ -249,6 +249,15 @@ supabase/
   ser justo a noite do Forró na Rep), e a decisão vive no cancelamento,
   não no desafio. Como a suspensão é checada sobre o dia em que a janela
   *abriu*, uma janela que vira a noite cai inteira.
+- **Feed paginado, e o tempo real só recarrega o topo.** A página tem
+  12 publicações (`PAGINA_FEED`), com cursor por `criado_em` — não por
+  deslocamento, que repetiria ou pularia itens quando alguém postasse
+  no meio. O gargalo não era o tamanho: era o realtime, que refazia a
+  consulta inteira a cada curtida de qualquer pessoa, para todo mundo
+  com o app aberto. Agora a atualização busca só a primeira página e
+  funde com o que está na tela, o intervalo é de 3 s e nada é buscado
+  com o app em segundo plano. As fotos já eram `loading="lazy"` e ficam
+  em cache-first no service worker por 30 dias.
 - **Entrar no desafio é escolha, e não zera o passado.** Competir é
   opcional, então quem entra no meio leva junto os check-ins que já fez
   no período — o ranking soma pelo período, nunca pela data de entrada.

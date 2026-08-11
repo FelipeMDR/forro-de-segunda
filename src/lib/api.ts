@@ -105,7 +105,15 @@ export interface ForroApi {
   updateProfile(patch: { nome?: string; avatarBlob?: Blob }): Promise<void>
 
   // ---- Feed / check-ins ----
-  getFeed(): Promise<FeedItem[]>
+  /**
+   * Página do feed, da mais nova para a mais antiga.
+   *
+   * `antesDe` é a data do último item já carregado — paginação por
+   * cursor, e não por deslocamento: como o feed recebe publicações
+   * novas o tempo todo, um `offset` faria repetir ou pular itens quando
+   * alguém postasse entre uma página e outra.
+   */
+  getFeed(opcoes?: { limite?: number; antesDe?: string }): Promise<FeedItem[]>
   /** Notifica quando o feed muda (realtime). Retorna unsubscribe. */
   subscribeFeed(cb: () => void): () => void
   /**

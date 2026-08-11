@@ -13,6 +13,7 @@ import {
   type OcorrenciaAgenda,
 } from '../lib/dates'
 import { Avatar } from '../components/Avatar'
+import { PAGINA_FEED } from '../lib/types'
 import type {
   AgendaEvent,
   ConfirmacaoPresenca,
@@ -163,15 +164,42 @@ export function FeedPage() {
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [visao, setVisao] = useState<'todos' | 'turma'>('todos')
+  const [carregandoMais, setCarregandoMais] = useState(false)
+  const [temMais, setTemMais] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout>>()
+  const ultimaCarga = useRef(0)
+  /** Evento de tempo real que chegou com o app em segundo plano. */
+  const pendente = useRef(false)
 
+  /**
+   * Recarrega só a PRIMEIRA página e funde com o que já está na tela.
+   *
+   * É o que mantém o tempo real barato: sem isso, quem rolou cinco
+   * páginas refaria as cinco a cada curtida de qualquer pessoa. Itens
+   * mais antigos que a página nova ficam como estão — no máximo com um
+   * contador desatualizado, que a próxima rolagem corrige.
+   */
   const carregar = useCallback(async () => {
     try {
       // Carregados em separado: se a agenda falhar, o feed ainda
       // aparece (antes um erro derrubava a tela inteira).
       setErro(null)
-      const f = await api.getFeed()
-      setFeed(f)
+      ultimaCarga.current = Date.now()
+      const novos = await api.getFeed({ limite: PAGINA_FEED })
+      setFeed((atual) => {
+        if (!atual) {
+          setTemMais(novos.length === PAGINA_FEED)
+          return novos
+        }
+        const idsNovos = new Set(novos.map((i) => i.id))
+        const corte = novos[novos.length - 1]?.criado_em
+        // Descarta o que estava na faixa recarregada e não voltou:
+        // é o que faz uma publicação apagada sumir da tela.
+        const cauda = atual.filter(
+          (i) => !idsNovos.has(i.id) && (!corte || i.criado_em < corte),
+        )
+        return [...novos, ...cauda]
+      })
       const [e, fer] = await Promise.all([
         api.listEvents().catch(() => [] as AgendaEvent[]),
         api.listFeriados().catch(() => [] as Feriado[]),
@@ -184,19 +212,54 @@ export function FeedPage() {
     }
   }, [api])
 
+  const carregarMais = async () => {
+    if (!feed || feed.length === 0 || carregandoMais) return
+    setCarregandoMais(true)
+    try {
+      const antesDe = feed[feed.length - 1].criado_em
+      const proximos = await api.getFeed({ limite: PAGINA_FEED, antesDe })
+      setFeed((atual) => [...(atual ?? []), ...proximos])
+      setTemMais(proximos.length === PAGINA_FEED)
+    } catch (e) {
+      console.error('[feed] falha ao carregar mais', e)
+    } finally {
+      setCarregandoMais(false)
+    }
+  }
+
   useEffect(() => {
     void carregar()
-    // Realtime: re-busca o feed (com debounce) quando algo muda
+
+    // Tempo real: qualquer curtida de qualquer pessoa chega aqui. Numa
+    // segunda movimentada são centenas de eventos, então o intervalo é
+    // generoso e nada é buscado com o app em segundo plano — ninguém
+    // está olhando, e gastaria dados à toa.
     const unsub = api.subscribeFeed(() => {
+      if (document.hidden) {
+        pendente.current = true
+        return
+      }
       clearTimeout(timer.current)
-      timer.current = setTimeout(() => void carregar(), 400)
+      timer.current = setTimeout(() => void carregar(), 3000)
     })
-    const onFocus = () => void carregar()
-    window.addEventListener('focus', onFocus)
+
+    // Voltar para o app não precisa refazer a consulta se acabou de
+    // sair: alternar de aplicativo no celular dispara isso o tempo todo.
+    const aoVoltar = () => {
+      if (document.hidden) return
+      const velho = Date.now() - ultimaCarga.current > 2 * 60 * 1000
+      if (velho || pendente.current) {
+        pendente.current = false
+        void carregar()
+      }
+    }
+    window.addEventListener('focus', aoVoltar)
+    document.addEventListener('visibilitychange', aoVoltar)
     return () => {
       unsub()
       clearTimeout(timer.current)
-      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('focus', aoVoltar)
+      document.removeEventListener('visibilitychange', aoVoltar)
     }
   }, [api, carregar])
 
@@ -337,9 +400,24 @@ export function FeedPage() {
         visao === 'turma' ? (
           <EmptyState
             emoji="🫂"
-            titulo="Nada da sua turma ainda"
-            texto={`Ninguém de ${minhasTurmas.join(' ou ')} postou por enquanto. Que tal ser a primeira pessoa?`}
+            titulo="Nada da sua turma por aqui"
+            texto={
+              // O filtro roda sobre o que já foi carregado. Dizer que
+              // "ninguém postou" seria mentira quando há páginas por vir.
+              temMais
+                ? `Ninguém de ${minhasTurmas.join(' ou ')} aparece nas publicações mais recentes.`
+                : `Ninguém de ${minhasTurmas.join(' ou ')} postou por enquanto. Que tal ser a primeira pessoa?`
+            }
           >
+            {temMais && (
+              <button
+                className="btn-primary"
+                disabled={carregandoMais}
+                onClick={() => void carregarMais()}
+              >
+                {carregandoMais ? 'Carregando…' : 'Procurar mais atrás'}
+              </button>
+            )}
             <button className="btn-ghost" onClick={() => setVisao('todos')}>
               Ver todo mundo
             </button>
@@ -356,19 +434,31 @@ export function FeedPage() {
           </EmptyState>
         )
       ) : (
-        feedVisivel.map((item) => (
-          <CheckinCard
-            key={item.id}
-            item={item}
-            onChanged={() => void carregar()}
-            dupla={
-              item.criado_em.slice(0, 10) === hojeISO
-                ? duplasHoje.get(item.user_id)
-                : null
-            }
-            onDupla={(marcar) => marcarDupla(item.user_id, marcar)}
-          />
-        ))
+        <>
+          {feedVisivel.map((item) => (
+            <CheckinCard
+              key={item.id}
+              item={item}
+              onChanged={() => void carregar()}
+              dupla={
+                item.criado_em.slice(0, 10) === hojeISO
+                  ? duplasHoje.get(item.user_id)
+                  : null
+              }
+              onDupla={(marcar) => marcarDupla(item.user_id, marcar)}
+            />
+          ))}
+
+          {temMais && (
+            <button
+              className="btn-ghost w-full"
+              disabled={carregandoMais}
+              onClick={() => void carregarMais()}
+            >
+              {carregandoMais ? 'Carregando…' : 'Ver publicações mais antigas'}
+            </button>
+          )}
+        </>
       )}
     </div>
   )
