@@ -258,6 +258,15 @@ supabase/
   funde com o que está na tela, o intervalo é de 3 s e nada é buscado
   com o app em segundo plano. As fotos já eram `loading="lazy"` e ficam
   em cache-first no service worker por 30 dias.
+- **Rolagem infinita via `IntersectionObserver`, não botão.** Uma `<div>`
+  vazia (`sentinela`) fica logo depois do último cartão só enquanto
+  `temMais` é verdadeiro; quando ela entra na tela, `carregarMais()`
+  busca a próxima página sozinho. `rootMargin: '600px'` busca ANTES de
+  chegar no fim de verdade, para a página seguinte já estar pronta
+  quando a rolagem chegar lá. O observer é recriado (`useEffect` com
+  `[temMais, carregarMais]` nas dependências) sempre que `carregarMais`
+  muda de identidade — ele é um `useCallback` que depende de `feed`,
+  então cada nova página resulta num observer novo com o cursor certo.
 - **Notificação de foto abre a publicação, não link aninhado.** Reação
   e comentário viram `<Link to="/publicacao/:id">` com miniatura — sem
   isso, "Fulana reagiu à sua foto" não dizia qual. A rota busca o

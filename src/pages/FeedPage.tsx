@@ -170,6 +170,8 @@ export function FeedPage() {
   const ultimaCarga = useRef(0)
   /** Evento de tempo real que chegou com o app em segundo plano. */
   const pendente = useRef(false)
+  /** Marcador invisível no fim da lista — carrega mais ao entrar na tela. */
+  const sentinela = useRef<HTMLDivElement | null>(null)
 
   /**
    * Recarrega só a PRIMEIRA página e funde com o que já está na tela.
@@ -212,7 +214,7 @@ export function FeedPage() {
     }
   }, [api])
 
-  const carregarMais = async () => {
+  const carregarMais = useCallback(async () => {
     if (!feed || feed.length === 0 || carregandoMais) return
     setCarregandoMais(true)
     try {
@@ -225,7 +227,7 @@ export function FeedPage() {
     } finally {
       setCarregandoMais(false)
     }
-  }
+  }, [api, feed, carregandoMais])
 
   useEffect(() => {
     void carregar()
@@ -262,6 +264,26 @@ export function FeedPage() {
       document.removeEventListener('visibilitychange', aoVoltar)
     }
   }, [api, carregar])
+
+  // Rolagem infinita: carrega a próxima página sozinho quando o
+  // marcador do fim da lista entra na tela, em vez de esperar um
+  // clique. `rootMargin` positivo busca um pouco ANTES de chegar no
+  // fim de verdade, para a próxima página já estar pronta quando a
+  // rolagem chegar lá — sem isso, toda virada de página mostraria um
+  // soluço de carregamento.
+  useEffect(() => {
+    if (!temMais) return
+    const el = sentinela.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entradas) => {
+        if (entradas[0]?.isIntersecting) void carregarMais()
+      },
+      { rootMargin: '600px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [temMais, carregarMais])
 
   // Próximos compromissos relevantes pra mim (qualquer turma minha, ou
   // todos), já considerando feriados/cancelamentos: se a próxima aula
@@ -450,13 +472,11 @@ export function FeedPage() {
           ))}
 
           {temMais && (
-            <button
-              className="btn-ghost w-full"
-              disabled={carregandoMais}
-              onClick={() => void carregarMais()}
-            >
-              {carregandoMais ? 'Carregando…' : 'Ver publicações mais antigas'}
-            </button>
+            <div ref={sentinela} className="flex justify-center py-4">
+              {carregandoMais && (
+                <p className="text-xs text-tinta-500">Carregando mais…</p>
+              )}
+            </div>
           )}
         </>
       )}
