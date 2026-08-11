@@ -24,6 +24,9 @@ import type {
   DistintivoRecebedor,
   FeedItem,
   Feriado,
+  Notificacao,
+  ParceiroDanca,
+  ParceiroPossivel,
   FeriadoInput,
   Papel,
   PapelDanca,
@@ -104,6 +107,32 @@ function horaCurta(v: unknown): string {
 
 /** Distintivo sem a contagem de recebedores (embed simples). */
 type DistintivoBasico = Omit<DistintivoDef, 'concedidos'>
+
+/** Formas cruas das consultas que alimentam o painel de notificações. */
+type PerfilNotif = { nome: string; avatar_url: string | null } | null
+interface ReacaoNotif {
+  checkin_id: string
+  user_id: string
+  tipo: string
+  criado_em: string
+  perfil: PerfilNotif
+}
+interface ComentarioNotif {
+  id: string
+  checkin_id: string
+  user_id: string
+  texto: string
+  criado_em: string
+  perfil: PerfilNotif
+}
+interface DuplaNotif {
+  id: string
+  data: string
+  de_user: string
+  confirmada: boolean
+  criado_em: string
+  perfil: PerfilNotif
+}
 
 export class SupabaseApi implements ForroApi {
   readonly mode = 'supabase' as const
@@ -1146,6 +1175,247 @@ export class SupabaseApi implements ForroApi {
       nome: c.perfil?.nome ?? 'Alguém',
       avatar_url: c.perfil?.avatar_url ?? null,
     }))
+  }
+
+  // ---- Notificações ----
+
+  /**
+   * Monta a lista a partir do que já existe no banco: reações e
+   * comentários nas MINHAS fotos, e marcações de dupla apontando para
+   * mim. Sem tabela própria, sem gatilhos, sem limpeza.
+   */
+  async listNotificacoes(): Promise<Notificacao[]> {
+    const uid = await this.requireUid()
+    const meus = ok(
+      await this.sb
+        .from('checkins')
+        .select('id')
+        .eq('user_id', uid)
+        .order('criado_em', { ascending: false })
+        .limit(100),
+    ) as Array<{ id: string }>
+    const ids = meus.map((c) => c.id)
+
+    const [reacoes, comentarios, duplas] = await Promise.all([
+      ids.length
+        ? this.sb
+            .from('reactions')
+            .select(
+              'checkin_id, user_id, tipo, criado_em, perfil:profiles!user_id(nome, avatar_url)',
+            )
+            .in('checkin_id', ids)
+            .neq('user_id', uid)
+            .order('criado_em', { ascending: false })
+            .limit(50)
+            .then((r) => (r.data ?? []) as unknown as ReacaoNotif[])
+        : Promise.resolve([] as ReacaoNotif[]),
+      ids.length
+        ? this.sb
+            .from('comments')
+            .select(
+              'id, checkin_id, user_id, texto, criado_em, perfil:profiles!user_id(nome, avatar_url)',
+            )
+            .in('checkin_id', ids)
+            .neq('user_id', uid)
+            .order('criado_em', { ascending: false })
+            .limit(50)
+            .then((r) => (r.data ?? []) as unknown as ComentarioNotif[])
+        : Promise.resolve([] as ComentarioNotif[]),
+      this.sb
+        .from('duplas')
+        .select(
+          'id, data, de_user, confirmada, criado_em, perfil:profiles!de_user(nome, avatar_url)',
+        )
+        .eq('para_user', uid)
+        .order('criado_em', { ascending: false })
+        .limit(50)
+        .then((r) => (r.data ?? []) as unknown as DuplaNotif[]),
+    ])
+
+    const itens: Notificacao[] = [
+      ...reacoes.map((r) => ({
+        id: `reacao:${r.checkin_id}:${r.user_id}`,
+        tipo: 'reacao' as const,
+        criado_em: r.criado_em,
+        autor: {
+          id: r.user_id,
+          nome: r.perfil?.nome ?? 'Alguém',
+          avatar_url: r.perfil?.avatar_url ?? null,
+        },
+        detalhe: r.tipo,
+        checkin_id: r.checkin_id,
+      })),
+      ...comentarios.map((c) => ({
+        id: `comentario:${c.id}`,
+        tipo: 'comentario' as const,
+        criado_em: c.criado_em,
+        autor: {
+          id: c.user_id,
+          nome: c.perfil?.nome ?? 'Alguém',
+          avatar_url: c.perfil?.avatar_url ?? null,
+        },
+        detalhe: c.texto,
+        checkin_id: c.checkin_id,
+      })),
+      ...duplas.map((d) => ({
+        id: `dupla:${d.id}`,
+        tipo: 'dupla' as const,
+        criado_em: d.criado_em,
+        autor: {
+          id: d.de_user,
+          nome: d.perfil?.nome ?? 'Alguém',
+          avatar_url: d.perfil?.avatar_url ?? null,
+        },
+        detalhe: null,
+        checkin_id: null,
+        data: d.data,
+        pendente: !d.confirmada,
+      })),
+    ]
+    return itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+  }
+
+  async contarNaoLidas(): Promise<number> {
+    const uid = await this.requireUid()
+    const perfil = ok(
+      await this.sb
+        .from('profiles')
+        .select('notificacoes_vistas_em')
+        .eq('id', uid)
+        .maybeSingle(),
+    ) as { notificacoes_vistas_em: string | null } | null
+    const desde = perfil?.notificacoes_vistas_em
+    const itens = await this.listNotificacoes()
+    // Pendência de confirmação conta sempre: é ação, não aviso
+    return itens.filter(
+      (n) => n.pendente || !desde || n.criado_em > desde,
+    ).length
+  }
+
+  async marcarNotificacoesVistas() {
+    const uid = await this.requireUid()
+    ok(
+      await this.sb
+        .from('profiles')
+        .update({ notificacoes_vistas_em: new Date().toISOString() })
+        .eq('id', uid),
+    )
+  }
+
+  // ---- Duplas de dança ----
+
+  /** Início e fim do dia em ISO, para filtrar check-ins por data. */
+  private limitesDoDia(data: string) {
+    return {
+      de: new Date(`${data}T00:00:00`).toISOString(),
+      ate: new Date(`${data}T23:59:59.999`).toISOString(),
+    }
+  }
+
+  async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
+    const uid = await this.requireUid()
+    const { de, ate } = this.limitesDoDia(data)
+    const checkins = ok(
+      await this.sb
+        .from('checkins')
+        .select(
+          'user_id, autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca))',
+        )
+        .gte('criado_em', de)
+        .lte('criado_em', ate),
+    ) as unknown as Array<{
+      user_id: string
+      autor: {
+        nome: string
+        avatar_url: string | null
+        turmas: TurmaMembro[] | null
+      } | null
+    }>
+
+    const minhas = ok(
+      await this.sb
+        .from('duplas')
+        .select('para_user, confirmada')
+        .eq('de_user', uid)
+        .eq('data', data),
+    ) as Array<{ para_user: string; confirmada: boolean }>
+    const marcados = new Map(minhas.map((d) => [d.para_user, d.confirmada]))
+
+    // Uma pessoa por mais de um check-in no dia vira uma linha só
+    const porPessoa = new Map<string, ParceiroPossivel>()
+    for (const c of checkins) {
+      if (c.user_id === uid || porPessoa.has(c.user_id)) continue
+      porPessoa.set(c.user_id, {
+        user_id: c.user_id,
+        nome: c.autor?.nome ?? 'Alguém',
+        avatar_url: c.autor?.avatar_url ?? null,
+        turma: turmaLabel(c.autor?.turmas ?? []),
+        marcado: marcados.has(c.user_id),
+        confirmada: marcados.get(c.user_id) === true,
+      })
+    }
+    return [...porPessoa.values()].sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'pt-BR'),
+    )
+  }
+
+  async marcarDupla(parceiroId: string, data: string) {
+    ok(
+      await this.sb.rpc('marcar_dupla', {
+        p_parceiro: parceiroId,
+        p_data: data,
+      }),
+    )
+  }
+
+  async desmarcarDupla(parceiroId: string, data: string) {
+    const uid = await this.requireUid()
+    // Apaga os dois sentidos: se eu tiro, a dupla deixa de existir —
+    // manter só o lado do outro deixaria um "confirmada" mentiroso.
+    ok(
+      await this.sb
+        .from('duplas')
+        .delete()
+        .eq('data', data)
+        .or(
+          `and(de_user.eq.${uid},para_user.eq.${parceiroId}),and(de_user.eq.${parceiroId},para_user.eq.${uid})`,
+        ),
+    )
+  }
+
+  async parceirosDe(userId: string): Promise<ParceiroDanca[]> {
+    // Só confirmadas contam. Como a dupla confirmada tem as duas
+    // linhas, olhar por de_user já cobre tudo sem duplicar.
+    const rows = ok(
+      await this.sb
+        .from('duplas')
+        .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
+        .eq('de_user', userId)
+        .eq('confirmada', true),
+    ) as unknown as Array<{
+      data: string
+      para_user: string
+      perfil: { nome: string; avatar_url: string | null } | null
+    }>
+
+    const porPessoa = new Map<string, ParceiroDanca & { dias: Set<string> }>()
+    for (const r of rows) {
+      let p = porPessoa.get(r.para_user)
+      if (!p) {
+        p = {
+          user_id: r.para_user,
+          nome: r.perfil?.nome ?? 'Alguém',
+          avatar_url: r.perfil?.avatar_url ?? null,
+          noites: 0,
+          dias: new Set(),
+        }
+        porPessoa.set(r.para_user, p)
+      }
+      p.dias.add(r.data)
+    }
+    return [...porPessoa.values()]
+      .map(({ dias, ...p }) => ({ ...p, noites: dias.size }))
+      .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
   }
 
   async confirmarPresenca(eventoId: string, data: string, vai: boolean) {

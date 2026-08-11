@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
+import { MarcarDuplas } from '../components/MarcarDuplas'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
@@ -9,6 +10,7 @@ import {
   diasSuspensos,
   janelaDoCheckin,
   suspensaoDoDia,
+  toISODate,
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
 import {
@@ -27,7 +29,6 @@ import type { Challenge, Feriado } from '../lib/types'
 export function CheckinPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
-  const navigate = useNavigate()
   const [desafios, setDesafios] = useState<Challenge[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
   const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
@@ -221,7 +222,16 @@ export function CheckinPage() {
                 ? 'Foto publicada! Ela já fica valendo caso você entre no desafio 🏆'
                 : 'Foto publicada! (nenhum desafio com janela aberta agora)',
       )
-      navigate('/')
+      // Não sai da tela: o melhor momento para marcar com quem se
+      // dançou é agora, com a noite fresca. A pessoa navega quando
+      // quiser — ou nem marca, que também está ok.
+      setFoto(null)
+      setLegenda('')
+      setPreview((old) => {
+        if (old) URL.revokeObjectURL(old)
+        return null
+      })
+      setMeusCheckins((atual) => [...atual, new Date()])
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -229,9 +239,23 @@ export function CheckinPage() {
     }
   }
 
+  const hojeISO = toISODate(agora)
+  const jaPosteiHoje = meusCheckins.some((d) => toISODate(d) === hojeISO)
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
+
+      {/* Só depois de ter foto no dia: marcar dupla exige que os dois
+          tenham feito check-in, então antes disso nem faria sentido. */}
+      {jaPosteiHoje && (
+        <>
+          <MarcarDuplas data={hojeISO} />
+          <Link className="btn-ghost block text-center" to="/">
+            Ir para o feed
+          </Link>
+        </>
+      )}
 
       {aindaPontuamAqui.length > 0 && (
         <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">

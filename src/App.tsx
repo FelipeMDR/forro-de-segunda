@@ -11,6 +11,7 @@ import { ChallengesPage } from './pages/ChallengesPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
+import { NotificacoesPage } from './pages/NotificacoesPage'
 import { NovaSenhaPage } from './pages/NovaSenhaPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { UserProfilePage } from './pages/UserProfilePage'
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/desafios" element={<ChallengesPage />} />
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
               <Route path="/buscar" element={<BuscarPage />} />
+              <Route path="/notificacoes" element={<NotificacoesPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />

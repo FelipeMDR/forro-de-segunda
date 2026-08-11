@@ -226,6 +226,57 @@ export interface AgendaEventInput {
 }
 
 /**
+ * Alguém que fez check-in na mesma noite — candidato a "dancei com".
+ *
+ * A lista é limitada a quem esteve lá justamente para o marcar não
+ * virar uma busca entre 300 pessoas: são uns 30 rostos, é só tocar.
+ * E de quebra impede a mentira que incomodaria — dizer que dançou com
+ * quem nem apareceu.
+ */
+export interface ParceiroPossivel {
+  user_id: string
+  nome: string
+  avatar_url: string | null
+  turma: string | null
+  /** Já marquei essa pessoa nesta data. */
+  marcado: boolean
+  /** Os dois se marcaram. */
+  confirmada: boolean
+}
+
+/** Par confirmado dos dois lados — é o que conta para distintivo. */
+export interface ParceiroDanca {
+  user_id: string
+  nome: string
+  avatar_url: string | null
+  /** Quantas noites vocês dançaram juntos. */
+  noites: number
+}
+
+export type TipoNotificacao = 'reacao' | 'comentario' | 'dupla'
+
+/**
+ * Item do painel de notificações.
+ *
+ * Não existe tabela para isso: a lista é montada das reações,
+ * comentários e marcações que apontam para mim. Uma tabela própria
+ * cresceria para sempre e precisaria de gatilhos para se manter em dia.
+ */
+export interface Notificacao {
+  id: string
+  tipo: TipoNotificacao
+  criado_em: string
+  autor: { id: string; nome: string; avatar_url: string | null }
+  /** Reação: o emoji. Comentário: o texto. Dupla: null. */
+  detalhe: string | null
+  /** Para abrir a foto (reação e comentário). */
+  checkin_id: string | null
+  /** Dupla: a noite, e se ainda falta eu confirmar. */
+  data?: string
+  pendente?: boolean
+}
+
+/**
  * Quem confirmou presença numa ocorrência da agenda. A chave é
  * (pessoa, evento, data): confirmar a aula desta segunda não confirma
  * a da semana que vem.

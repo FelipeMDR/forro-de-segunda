@@ -18,6 +18,9 @@ import type {
   DistintivoRecebedor,
   FeedItem,
   Feriado,
+  Notificacao,
+  ParceiroDanca,
+  ParceiroPossivel,
   FeriadoInput,
   Papel,
   PapelDanca,
@@ -180,6 +183,30 @@ export interface ForroApi {
     data: string,
     vai: boolean,
   ): Promise<void>
+
+  // ---- Duplas de dança ----
+  /**
+   * Quem mais fez check-in naquele dia, já dizendo quem eu marquei.
+   * É a grade de rostos que aparece depois do check-in.
+   */
+  parceirosPossiveis(data: string): Promise<ParceiroPossivel[]>
+  /**
+   * Marca que dancei com alguém. O banco exige que os dois tenham
+   * check-in no dia e confirma sozinho se o outro já tinha marcado.
+   */
+  marcarDupla(parceiroId: string, data: string): Promise<void>
+  /** Desfaz a marcação — vale para quem marcou e para quem foi marcado. */
+  desmarcarDupla(parceiroId: string, data: string): Promise<void>
+  /** Pares confirmados de alguém, para distintivos e retrospectiva. */
+  parceirosDe(userId: string): Promise<ParceiroDanca[]>
+
+  // ---- Notificações ----
+  /** Curtidas, comentários e marcações que apontam para mim. */
+  listNotificacoes(): Promise<Notificacao[]>
+  /** Quantas são mais novas que a última vez que abri o painel. */
+  contarNaoLidas(): Promise<number>
+  /** Carimba o painel como visto agora. */
+  marcarNotificacoesVistas(): Promise<void>
 
   // ---- Organizador ----
   getAttendance(inicioISO: string, fimISO: string): Promise<AttendanceRow[]>

@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Avatar } from './Avatar'
 import { Logo } from './Logo'
@@ -7,10 +8,13 @@ function Item({
   to,
   emoji,
   rotulo,
+  distintivo = 0,
 }: {
   to: string
   emoji: string
   rotulo: string
+  /** Bolinha com a contagem — 0 não mostra nada. */
+  distintivo?: number
 }) {
   return (
     <NavLink
@@ -22,14 +26,40 @@ function Item({
         }`
       }
     >
-      <span className="text-xl leading-none">{emoji}</span>
+      <span className="relative text-xl leading-none">
+        {emoji}
+        {distintivo > 0 && (
+          <span
+            className="absolute -right-2.5 -top-1 min-w-[18px] rounded-full bg-brasa-700 px-1 text-[10px] font-bold leading-[18px] text-white"
+            aria-label={`${distintivo} não lidas`}
+          >
+            {distintivo > 9 ? '9+' : distintivo}
+          </span>
+        )}
+      </span>
       {rotulo}
     </NavLink>
   )
 }
 
 export function Layout() {
-  const { profile, papel } = useAuth()
+  const { api, profile, papel } = useAuth()
+  const { pathname } = useLocation()
+  const [naoLidas, setNaoLidas] = useState(0)
+
+  // Recontagem ao trocar de tela: barato o bastante e evita um item
+  // ficar marcado como novo depois de a pessoa já ter aberto o painel.
+  useEffect(() => {
+    let cancelado = false
+    void api
+      .contarNaoLidas()
+      .then((n) => !cancelado && setNaoLidas(n))
+      // Sem a migração 016 a consulta falha — o app segue sem o contador
+      .catch(() => {})
+    return () => {
+      cancelado = true
+    }
+  }, [api, pathname])
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
@@ -42,13 +72,26 @@ export function Layout() {
         {/* A marca oficial já traz o nome escrito, então não há texto
             ao lado: duas grafias do nome brigariam entre si. */}
         <Logo altura={38} />
+        {papel === 'organizador' && (
+          <NavLink
+            to="/organizador"
+            aria-label="Painel do organizador"
+            className={({ isActive }) =>
+              `ml-auto flex h-9 w-9 items-center justify-center rounded-full text-lg transition active:scale-90 ${
+                isActive ? 'bg-brasa-500/20 text-brasa-700' : 'hover:bg-preto/5'
+              }`
+            }
+          >
+            🛠️
+          </NavLink>
+        )}
         <NavLink
           to="/buscar"
           aria-label="Buscar pessoas"
           className={({ isActive }) =>
-            `ml-auto flex h-9 w-9 items-center justify-center rounded-full text-lg transition active:scale-90 ${
-              isActive ? 'bg-brasa-500/20 text-brasa-700' : 'hover:bg-preto/5'
-            }`
+            `flex h-9 w-9 items-center justify-center rounded-full text-lg transition active:scale-90 ${
+              papel === 'organizador' ? '' : 'ml-auto'
+            } ${isActive ? 'bg-brasa-500/20 text-brasa-700' : 'hover:bg-preto/5'}`
           }
         >
           🔎
@@ -81,11 +124,14 @@ export function Layout() {
             📸
           </NavLink>
           <Item to="/perfil" emoji="👤" rotulo="Perfil" />
-          {papel === 'organizador' ? (
-            <Item to="/organizador" emoji="🛠️" rotulo="Painel" />
-          ) : (
-            <div className="flex-1" />
-          )}
+          {/* O painel do organizador saiu daqui para o topo: é usado
+              por umas dez pessoas, e as notificações por trezentas. */}
+          <Item
+            to="/notificacoes"
+            emoji="🔔"
+            rotulo="Avisos"
+            distintivo={naoLidas}
+          />
         </div>
       </nav>
     </div>

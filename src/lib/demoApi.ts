@@ -27,6 +27,9 @@ import type {
   Comment,
   ConfirmacaoPresenca,
   DistintivoDef,
+  Notificacao,
+  ParceiroDanca,
+  ParceiroPossivel,
   DistintivoDefInput,
   DistintivoRecebedor,
   FeedItem,
@@ -77,7 +80,13 @@ interface DB {
   /** telefone normalizado → senha (só no demo; produção usa Supabase Auth) */
   senhas: Record<string, string>
   checkins: CheckinRow[]
-  reactions: { checkin_id: string; user_id: string; tipo: string }[]
+  reactions: {
+    checkin_id: string
+    user_id: string
+    tipo: string
+    /** Ausente nos dados antigos — cai na data da foto. */
+    criado_em?: string
+  }[]
   comments: {
     id: string
     checkin_id: string
@@ -106,6 +115,16 @@ interface DB {
   feriados: Feriado[]
   /** Ausente nos bancos demo antigos — vale como lista vazia. */
   confirmacoes?: { user_id: string; evento_id: string; data: string }[]
+  duplas?: {
+    id: string
+    data: string
+    de_user: string
+    para_user: string
+    confirmada: boolean
+    criado_em: string
+  }[]
+  /** Última vez que cada pessoa abriu o painel de notificações. */
+  notificacoesVistas?: Record<string, string>
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -389,6 +408,8 @@ function seed(): DB {
     events: eventos,
     feriados,
     confirmacoes: [],
+    duplas: [],
+    notificacoesVistas: {},
     alunos,
     turmas,
     cargos,
@@ -740,12 +761,19 @@ export class DemoApi implements ForroApi {
     const existing = this.db.reactions.find(
       (r) => r.checkin_id === checkinId && r.user_id === uid,
     )
+    const agora = new Date().toISOString()
     if (existing && existing.tipo === tipo) {
       this.db.reactions = this.db.reactions.filter((r) => r !== existing)
     } else if (existing) {
       existing.tipo = tipo
+      existing.criado_em = agora
     } else {
-      this.db.reactions.push({ checkin_id: checkinId, user_id: uid, tipo })
+      this.db.reactions.push({
+        checkin_id: checkinId,
+        user_id: uid,
+        tipo,
+        criado_em: agora,
+      })
     }
     this.persist()
     this.notifyFeed()
@@ -1110,6 +1138,187 @@ export class DemoApi implements ForroApi {
 
   async deleteFeriado(id: string) {
     this.db.feriados = this.db.feriados.filter((f) => f.id !== id)
+    this.persist()
+  }
+
+  // ---- Duplas de dança ----
+
+  private fezCheckinEm(userId: string, data: string) {
+    return this.db.checkins.some(
+      (c) => c.user_id === userId && c.criado_em.slice(0, 10) === data,
+    )
+  }
+
+  async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
+    const uid = this.uid()
+    const minhas = (this.db.duplas ?? []).filter(
+      (d) => d.de_user === uid && d.data === data,
+    )
+    const ids = new Set(
+      this.db.checkins
+        .filter((c) => c.criado_em.slice(0, 10) === data && c.user_id !== uid)
+        .map((c) => c.user_id),
+    )
+    return [...ids]
+      .map((id) => {
+        const p = this.db.profiles.find((x) => x.id === id)
+        const marca = minhas.find((d) => d.para_user === id)
+        return {
+          user_id: id,
+          nome: p?.nome ?? 'Alguém',
+          avatar_url: p?.avatar_url ?? null,
+          turma: p ? turmaLabel(p.turmas) : null,
+          marcado: !!marca,
+          confirmada: marca?.confirmada === true,
+        }
+      })
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+
+  async marcarDupla(parceiroId: string, data: string) {
+    const uid = this.uid()
+    if (parceiroId === uid) throw new Error('Não dá para marcar você mesmo')
+    // Espelha a checagem de co-presença da função marcar_dupla
+    if (!this.fezCheckinEm(uid, data)) {
+      throw new Error('Você não fez check-in nesse dia')
+    }
+    if (!this.fezCheckinEm(parceiroId, data)) {
+      throw new Error('Essa pessoa não fez check-in nesse dia')
+    }
+    this.db.duplas = this.db.duplas ?? []
+    if (
+      !this.db.duplas.some(
+        (d) => d.data === data && d.de_user === uid && d.para_user === parceiroId,
+      )
+    ) {
+      this.db.duplas.push({
+        id: uuid(),
+        data,
+        de_user: uid,
+        para_user: parceiroId,
+        confirmada: false,
+        criado_em: new Date().toISOString(),
+      })
+    }
+    // Os dois se marcaram: confirma sozinho
+    const oOutroMarcou = this.db.duplas.some(
+      (d) => d.data === data && d.de_user === parceiroId && d.para_user === uid,
+    )
+    if (oOutroMarcou) {
+      for (const d of this.db.duplas) {
+        const par =
+          d.data === data &&
+          ((d.de_user === uid && d.para_user === parceiroId) ||
+            (d.de_user === parceiroId && d.para_user === uid))
+        if (par) d.confirmada = true
+      }
+    }
+    this.persist()
+  }
+
+  async desmarcarDupla(parceiroId: string, data: string) {
+    const uid = this.uid()
+    this.db.duplas = (this.db.duplas ?? []).filter(
+      (d) =>
+        !(
+          d.data === data &&
+          ((d.de_user === uid && d.para_user === parceiroId) ||
+            (d.de_user === parceiroId && d.para_user === uid))
+        ),
+    )
+    this.persist()
+  }
+
+  async parceirosDe(userId: string): Promise<ParceiroDanca[]> {
+    const porPessoa = new Map<string, { nome: string; avatar: string | null; dias: Set<string> }>()
+    for (const d of this.db.duplas ?? []) {
+      if (d.de_user !== userId || !d.confirmada) continue
+      const p = this.db.profiles.find((x) => x.id === d.para_user)
+      const atual = porPessoa.get(d.para_user) ?? {
+        nome: p?.nome ?? 'Alguém',
+        avatar: p?.avatar_url ?? null,
+        dias: new Set<string>(),
+      }
+      atual.dias.add(d.data)
+      porPessoa.set(d.para_user, atual)
+    }
+    return [...porPessoa.entries()]
+      .map(([user_id, v]) => ({
+        user_id,
+        nome: v.nome,
+        avatar_url: v.avatar,
+        noites: v.dias.size,
+      }))
+      .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
+  }
+
+  // ---- Notificações ----
+
+  async listNotificacoes(): Promise<Notificacao[]> {
+    const uid = this.uid()
+    const meus = new Set(
+      this.db.checkins.filter((c) => c.user_id === uid).map((c) => c.id),
+    )
+    const perfil = (id: string) => {
+      const p = this.db.profiles.find((x) => x.id === id)
+      return {
+        id,
+        nome: p?.nome ?? 'Alguém',
+        avatar_url: p?.avatar_url ?? null,
+      }
+    }
+
+    const itens: Notificacao[] = [
+      ...this.db.reactions
+        .filter((r) => meus.has(r.checkin_id) && r.user_id !== uid)
+        .map((r) => ({
+          id: `reacao:${r.checkin_id}:${r.user_id}`,
+          tipo: 'reacao' as const,
+          // Reações antigas do demo não têm hora: usa a da foto
+          criado_em:
+            r.criado_em ??
+            this.db.checkins.find((c) => c.id === r.checkin_id)?.criado_em ??
+            new Date().toISOString(),
+          autor: perfil(r.user_id),
+          detalhe: r.tipo,
+          checkin_id: r.checkin_id,
+        })),
+      ...this.db.comments
+        .filter((c) => meus.has(c.checkin_id) && c.user_id !== uid)
+        .map((c) => ({
+          id: `comentario:${c.id}`,
+          tipo: 'comentario' as const,
+          criado_em: c.criado_em,
+          autor: perfil(c.user_id),
+          detalhe: c.texto,
+          checkin_id: c.checkin_id,
+        })),
+      ...(this.db.duplas ?? [])
+        .filter((d) => d.para_user === uid)
+        .map((d) => ({
+          id: `dupla:${d.id}`,
+          tipo: 'dupla' as const,
+          criado_em: d.criado_em,
+          autor: perfil(d.de_user),
+          detalhe: null,
+          checkin_id: null,
+          data: d.data,
+          pendente: !d.confirmada,
+        })),
+    ]
+    return itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+  }
+
+  async contarNaoLidas(): Promise<number> {
+    const desde = this.db.notificacoesVistas?.[this.uid()]
+    const itens = await this.listNotificacoes()
+    return itens.filter((n) => n.pendente || !desde || n.criado_em > desde)
+      .length
+  }
+
+  async marcarNotificacoesVistas() {
+    this.db.notificacoesVistas = this.db.notificacoesVistas ?? {}
+    this.db.notificacoesVistas[this.uid()] = new Date().toISOString()
     this.persist()
   }
 

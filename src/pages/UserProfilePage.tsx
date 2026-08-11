@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
@@ -12,8 +12,83 @@ import {
 } from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
+import { toISODate } from '../lib/dates'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
-import type { Badge, CheckinFavorito, Profile } from '../lib/types'
+import type {
+  Badge,
+  CheckinFavorito,
+  ParceiroPossivel,
+  Profile,
+} from '../lib/types'
+
+/**
+ * "Dancei com" no perfil de alguém.
+ *
+ * Só aparece quando os DOIS fizeram check-in hoje — sem esse contexto
+ * o botão viraria uma forma de marcar qualquer pessoa em qualquer dia.
+ * A checagem também é feita no banco; aqui é só para não mostrar um
+ * botão que daria erro.
+ */
+function DanceiCom({ perfilId, nome }: { perfilId: string; nome: string }) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [estado, setEstado] = useState<ParceiroPossivel | null | undefined>()
+  const [ocupado, setOcupado] = useState(false)
+  const hoje = toISODate(new Date())
+
+  const carregar = useCallback(async () => {
+    try {
+      const lista = await api.parceirosPossiveis(hoje)
+      setEstado(lista.find((p) => p.user_id === perfilId) ?? null)
+    } catch {
+      setEstado(null)
+    }
+  }, [api, hoje, perfilId])
+
+  useEffect(() => {
+    void carregar()
+  }, [carregar])
+
+  // undefined = carregando; null = sem co-presença hoje
+  if (!estado) return null
+
+  const alternar = async () => {
+    setOcupado(true)
+    try {
+      if (estado.marcado) await api.desmarcarDupla(perfilId, hoje)
+      else await api.marcarDupla(perfilId, hoje)
+      await carregar()
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <div className="w-full space-y-1.5 text-center">
+      <button
+        className={`w-full rounded-xl py-2.5 text-sm font-bold transition disabled:opacity-60 ${
+          estado.marcado
+            ? 'bg-verde-700 text-white'
+            : 'bg-preto/5 text-tinta-700'
+        }`}
+        disabled={ocupado}
+        onClick={() => void alternar()}
+      >
+        {estado.marcado ? '✓ Dancei com hoje' : `Dancei com ${nome} hoje 💃`}
+      </button>
+      {estado.marcado && (
+        <p className="text-xs text-tinta-500">
+          {estado.confirmada
+            ? 'Confirmado pelos dois 🤝'
+            : `Esperando ${nome} confirmar`}
+        </p>
+      )}
+    </div>
+  )
+}
 
 /**
  * Perfil público de outro aluno: mesmas informações do próprio perfil,
@@ -102,6 +177,7 @@ export function UserProfilePage() {
           <TurmaChips turmas={perfil.turmas} />
         </div>
         <StatsRow stats={stats} />
+        <DanceiCom perfilId={perfil.id} nome={primeiroNome} />
       </div>
 
       <BadgeGrid

@@ -14,6 +14,10 @@ create table if not exists public.profiles (
   -- não lê auth.users, e o painel precisa saber quem já pode recuperar
   -- a senha. Ver migração 013.
   email text,
+  -- Até onde a pessoa já viu as notificações. Não há tabela de
+  -- notificações: a lista é montada das reações, comentários e duplas
+  -- que são meus, e este carimbo separa o novo do já visto (mig. 016).
+  notificacoes_vistas_em timestamptz default now(),
   criado_em timestamptz not null default now()
 );
 
@@ -85,8 +89,26 @@ create table if not exists public.reactions (
   checkin_id uuid not null references public.checkins(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   tipo text not null,
+  criado_em timestamptz not null default now(),
   primary key (checkin_id, user_id)
 );
+
+-- Marcação de dupla: de_user diz que dançou com para_user naquele dia.
+-- Duas linhas opostas = confirmada dos dois lados. Só a função
+-- marcar_dupla escreve (ver migração 016), porque é ela que exige que
+-- os dois tenham check-in no dia.
+create table if not exists public.duplas (
+  id uuid primary key default gen_random_uuid(),
+  data date not null,
+  de_user uuid not null references public.profiles(id) on delete cascade,
+  para_user uuid not null references public.profiles(id) on delete cascade,
+  confirmada boolean not null default false,
+  criado_em timestamptz not null default now(),
+  unique (data, de_user, para_user),
+  constraint duplas_pessoas_diferentes check (de_user <> para_user)
+);
+create index if not exists duplas_para_idx on public.duplas (para_user, data);
+create index if not exists duplas_de_idx on public.duplas (de_user, data);
 
 create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
@@ -262,6 +284,49 @@ as $$
   end;
 $$;
 
+-- Marca que dancei com alguém num dia. Exige que OS DOIS tenham
+-- check-in na data, e confirma a dupla sozinha quando o outro lado já
+-- tinha marcado. Security definer porque duplas não tem policy de
+-- insert — é isso que impede forjar a marcação sem co-presença.
+create or replace function public.marcar_dupla(p_parceiro uuid, p_data date)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Você precisa entrar primeiro';
+  end if;
+  if p_parceiro = v_uid then
+    raise exception 'Não dá para marcar você mesmo';
+  end if;
+  if not exists (select 1 from checkins
+                 where user_id = v_uid and criado_em::date = p_data) then
+    raise exception 'Você não fez check-in nesse dia';
+  end if;
+  if not exists (select 1 from checkins
+                 where user_id = p_parceiro and criado_em::date = p_data) then
+    raise exception 'Essa pessoa não fez check-in nesse dia';
+  end if;
+
+  insert into public.duplas (data, de_user, para_user)
+  values (p_data, v_uid, p_parceiro)
+  on conflict (data, de_user, para_user) do nothing;
+
+  if exists (select 1 from public.duplas
+             where data = p_data and de_user = p_parceiro and para_user = v_uid) then
+    update public.duplas set confirmada = true
+    where data = p_data
+      and ((de_user = v_uid and para_user = p_parceiro)
+        or (de_user = p_parceiro and para_user = v_uid));
+  end if;
+end;
+$$;
+revoke all on function public.marcar_dupla(uuid, date) from public, anon;
+grant execute on function public.marcar_dupla(uuid, date) to authenticated;
+
 -- Consulta pré-cadastro (chamada ANTES do login, pelo papel anon):
 -- o telefone está na lista de chamada? Já tem conta no app?
 create or replace function public.telefone_na_lista(tel text)
@@ -429,6 +494,7 @@ alter table public.reports enable row level security;
 alter table public.events enable row level security;
 alter table public.feriados enable row level security;
 alter table public.confirmacoes_presenca enable row level security;
+alter table public.duplas enable row level security;
 alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
 alter table public.cargos enable row level security;
@@ -543,6 +609,14 @@ create policy "feriados_write" on public.feriados
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());
+
+-- duplas: todos leem; ninguém insere direto (só marcar_dupla, que
+-- exige co-presença); apaga quem marcou ou quem foi marcado
+create policy "duplas_select" on public.duplas
+  for select to authenticated using (true);
+create policy "duplas_delete" on public.duplas
+  for delete to authenticated
+  using (de_user = auth.uid() or para_user = auth.uid());
 
 -- confirmações "eu vou": todos leem (a graça é ver quem vai);
 -- cada um escreve só a própria
