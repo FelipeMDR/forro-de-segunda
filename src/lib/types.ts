@@ -253,6 +253,15 @@ export interface ParceiroDanca {
   noites: number
 }
 
+/** Check-in com a contagem de reações — base da retrospectiva. */
+export interface CheckinComReacoes {
+  id: string
+  foto_url: string
+  legenda: string | null
+  criado_em: string
+  reacoes: number
+}
+
 export type TipoNotificacao = 'reacao' | 'comentario' | 'dupla'
 
 /**

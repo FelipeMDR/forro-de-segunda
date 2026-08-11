@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
 import { NovaSenhaPage } from './pages/NovaSenhaPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { RetrospectivaPage } from './pages/RetrospectivaPage'
 import { UserProfilePage } from './pages/UserProfilePage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
               <Route path="/buscar" element={<BuscarPage />} />
               <Route path="/notificacoes" element={<NotificacoesPage />} />
+              <Route path="/retrospectiva" element={<RetrospectivaPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />

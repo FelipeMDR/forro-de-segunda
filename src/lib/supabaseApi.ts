@@ -15,6 +15,7 @@ import type {
   Cargo,
   Challenge,
   ChallengeInput,
+  CheckinComReacoes,
   CheckinFavorito,
   Comment,
   ConfirmacaoPresenca,
@@ -706,6 +707,33 @@ export class SupabaseApi implements ForroApi {
         .eq('user_id', userId),
     )
     return data as { criado_em: string }[]
+  }
+
+  async checkinsComReacoes(
+    userId: string,
+    desdeISO: string,
+  ): Promise<CheckinComReacoes[]> {
+    const data = ok(
+      await this.sb
+        .from('checkins')
+        .select('id, foto_url, legenda, criado_em, reacoes:reactions(count)')
+        .eq('user_id', userId)
+        .gte('criado_em', desdeISO)
+        .order('criado_em', { ascending: false }),
+    ) as unknown as Array<{
+      id: string
+      foto_url: string
+      legenda: string | null
+      criado_em: string
+      reacoes: { count: number }[]
+    }>
+    return data.map((c) => ({
+      id: c.id,
+      foto_url: c.foto_url,
+      legenda: c.legenda,
+      criado_em: c.criado_em,
+      reacoes: c.reacoes?.[0]?.count ?? 0,
+    }))
   }
 
   async setFavorito(checkinId: string, favorito: boolean) {

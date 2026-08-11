@@ -24,6 +24,7 @@ import type {
   ChallengeJanela,
   ChallengeLocal,
   CheckinFavorito,
+  CheckinComReacoes,
   Comment,
   ConfirmacaoPresenca,
   DistintivoDef,
@@ -829,6 +830,22 @@ export class DemoApi implements ForroApi {
     return this.db.checkins
       .filter((c) => c.user_id === userId)
       .map((c) => ({ criado_em: c.criado_em }))
+  }
+
+  async checkinsComReacoes(
+    userId: string,
+    desdeISO: string,
+  ): Promise<CheckinComReacoes[]> {
+    return this.db.checkins
+      .filter((c) => c.user_id === userId && c.criado_em >= desdeISO)
+      .map((c) => ({
+        id: c.id,
+        foto_url: c.foto_url,
+        legenda: c.legenda,
+        criado_em: c.criado_em,
+        reacoes: this.db.reactions.filter((r) => r.checkin_id === c.id).length,
+      }))
+      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
   }
 
   async setFavorito(checkinId: string, favorito: boolean) {

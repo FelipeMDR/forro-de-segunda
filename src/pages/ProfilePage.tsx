@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import {
   BadgeGrid,
@@ -298,6 +299,13 @@ export function ProfilePage() {
         </div>
 
         <StatsRow stats={stats} />
+
+        <Link
+          to="/retrospectiva"
+          className="w-full rounded-xl bg-azul-500/10 px-4 py-3 text-center text-sm font-bold text-azul-700"
+        >
+          ✨ Ver minha retrospectiva do semestre
+        </Link>
       </div>
 
       <BadgeGrid

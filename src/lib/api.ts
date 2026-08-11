@@ -9,6 +9,7 @@ import type {
   Cargo,
   Challenge,
   ChallengeInput,
+  CheckinComReacoes,
   CheckinFavorito,
   Comment,
   ConfirmacaoPresenca,
@@ -126,6 +127,16 @@ export interface ForroApi {
   reportCheckin(checkinId: string, motivo: string): Promise<void>
   /** Check-ins de qualquer aluno (usado no próprio perfil e no público). */
   checkinsDe(userId: string): Promise<{ criado_em: string }[]>
+  /**
+   * Check-ins de um período com a contagem de reações — é o que a
+   * retrospectiva usa para achar a foto mais curtida. Consulta à parte
+   * porque `checkinsDe` é chamada em toda abertura de perfil e não
+   * precisa carregar isso.
+   */
+  checkinsComReacoes(
+    userId: string,
+    desdeISO: string,
+  ): Promise<CheckinComReacoes[]>
   /**
    * Marca/desmarca um check-in próprio como favorito. Favoritos ficam
    * numa galeria no perfil e escapam da política de retenção de fotos.
