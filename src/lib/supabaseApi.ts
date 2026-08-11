@@ -1624,6 +1624,15 @@ export class SupabaseApi implements ForroApi {
     return alvo.length
   }
 
+  async semestreEncerrado() {
+    // head + count: não traz linha nenhuma, só quer saber se existe
+    const { count, error } = await this.sb
+      .from('profile_turmas')
+      .select('user_id', { count: 'exact', head: true })
+    if (error) throw new Error(traduz(error.message))
+    return (count ?? 0) === 0
+  }
+
   async encerrarSemestre() {
     const perfis = await this.listProfiles()
     const comTurma = perfis.filter((p) => p.turmas.length > 0)

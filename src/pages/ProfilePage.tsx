@@ -163,6 +163,7 @@ export function ProfilePage() {
   const [badges, setBadges] = useState<Badge[] | null>(null)
   const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
   const [pushAtivo, setPushAtivo] = useState(false)
+  const [semestreEncerrado, setSemestreEncerrado] = useState(false)
 
   useEffect(() => {
     setNome(profile?.nome ?? '')
@@ -206,6 +207,10 @@ export function ProfilePage() {
         setFavoritos([])
       })
     void isPushEnabled().then(setPushAtivo)
+    void api
+      .semestreEncerrado()
+      .then(setSemestreEncerrado)
+      .catch(() => setSemestreEncerrado(false))
   }, [api, userId, profile])
 
   if (!profile) {
@@ -300,12 +305,17 @@ export function ProfilePage() {
 
         <StatsRow stats={stats} />
 
-        <Link
-          to="/retrospectiva"
-          className="w-full rounded-xl bg-azul-500/10 px-4 py-3 text-center text-sm font-bold text-azul-700"
-        >
-          ✨ Ver minha retrospectiva do semestre
-        </Link>
+        {/* Só quando o semestre fecha. Durante o semestre a retrospectiva
+            seria um balanço pela metade; ela some sozinha quando a
+            matrícula nova devolve as turmas. */}
+        {semestreEncerrado && (
+          <Link
+            to="/retrospectiva"
+            className="w-full rounded-xl bg-azul-500/10 px-4 py-3 text-center text-sm font-bold text-azul-700"
+          >
+            ✨ Ver minha retrospectiva do semestre
+          </Link>
+        )}
       </div>
 
       <BadgeGrid

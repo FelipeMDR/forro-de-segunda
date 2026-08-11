@@ -64,7 +64,7 @@ export function montarRetrospectiva(
 
 /** Frase de fechamento, escolhida pelo que a pessoa mais fez. */
 export function fraseDaRetrospectiva(r: Retrospectiva): string {
-  if (r.presencas === 0) return 'Bora estrear na pista no próximo semestre? 💃'
+  if (r.presencas === 0) return 'Bora pro forró no próximo semestre 💃'
   if (r.parceiros >= 10) return 'Você rodou a pista inteira — que rodízio! 🪩'
   if (r.streak >= 8) return 'Presença de quem não falha uma segunda 🔥'
   if (r.presencas >= 20) return 'A pista já conhece seu passo 🎶'

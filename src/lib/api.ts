@@ -263,6 +263,15 @@ export interface ForroApi {
    * Devolve quantas pessoas tinham turma.
    */
   encerrarSemestre(): Promise<number>
+  /**
+   * O semestre está encerrado? É o estado em que NINGUÉM tem turma —
+   * exatamente o que `encerrarSemestre` produz e a matrícula desfaz.
+   *
+   * Deriva do banco em vez de guardar uma bandeira: uma bandeira
+   * poderia divergir do que aconteceu de fato (alguém apagar turmas na
+   * mão, uma matrícula parcial), e aqui não tem como.
+   */
+  semestreEncerrado(): Promise<boolean>
   listProfiles(): Promise<Profile[]>
   /** Adiciona um vínculo turma+papel a um aluno (organizador). */
   addTurmaAluno(

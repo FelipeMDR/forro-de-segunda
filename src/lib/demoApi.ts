@@ -138,7 +138,7 @@ interface DB {
   }[]
 }
 
-const DB_KEY = 'fds-demo-db-v9'
+const DB_KEY = 'fds-demo-db-v10'
 const SESSION_KEY = 'fds-demo-uid'
 
 function uuid(): string {
@@ -224,6 +224,17 @@ function seed(): DB {
   const em = (diasAtras: number, hora: number, minuto: number): string => {
     const d = addDays(now, -diasAtras)
     d.setHours(hora, minuto, 0, 0)
+    // Rodando o demo de manhã, "hoje às 19h" cairia no futuro e o feed
+    // mostraria "em 17 horas". Puxa para o passado recente mantendo a
+    // ordem do dia (hora mais tarde = mais perto de agora), sem
+    // atravessar para ontem, o que quebraria a co-presença de hoje.
+    if (d.getTime() > now.getTime()) {
+      const inicioDoDia = new Date(now)
+      inicioDoDia.setHours(0, 0, 0, 0)
+      const atrasoMs = (24 * 60 - (hora * 60 + minuto)) * 1000
+      const alvo = Math.max(now.getTime() - atrasoMs, inicioDoDia.getTime() + 1000)
+      return new Date(alvo).toISOString()
+    }
     return d.toISOString()
   }
 
@@ -246,6 +257,11 @@ function seed(): DB {
     { id: uuid(), user_id: maria.id, foto_url: fotos[4], legenda: null, criado_em: em(9, 19, 50) },
     { id: uuid(), user_id: joao.id, foto_url: fotos[4], legenda: null, criado_em: em(14, 19, 25) },
     { id: uuid(), user_id: maria.id, foto_url: fotos[1], legenda: 'Aprendi o dois pra lá, dois pra cá', criado_em: em(16, 19, 10) },
+    // Check-ins de HOJE (índices 9, 10, 11): é a co-presença que faz a
+    // grade de "dancei com" e o botão do feed aparecerem sem preparo.
+    { id: uuid(), user_id: maria.id, foto_url: fotos[2], legenda: 'Segunda de novo, e eu aqui 🎶', criado_em: em(0, 19, 55) },
+    { id: uuid(), user_id: ana.id, foto_url: fotos[4], legenda: 'Salão cheio hoje!', criado_em: em(0, 20, 5) },
+    { id: uuid(), user_id: joao.id, foto_url: fotos[3], legenda: 'Bora que bora', criado_em: em(0, 20, 15) },
   ]
 
   const { inicio, fim } = monthRange(now)
@@ -362,11 +378,15 @@ function seed(): DB {
   }
 
   const reactions = [
-    { checkin_id: checkins[0].id, user_id: joao.id, tipo: '🔥' },
-    { checkin_id: checkins[0].id, user_id: ana.id, tipo: '❤️' },
-    { checkin_id: checkins[2].id, user_id: maria.id, tipo: '👏' },
-    { checkin_id: checkins[2].id, user_id: ana.id, tipo: '❤️' },
-    { checkin_id: checkins[5].id, user_id: maria.id, tipo: '💃' },
+    { checkin_id: checkins[0].id, user_id: joao.id, tipo: '🔥', criado_em: em(1, 20, 5) },
+    { checkin_id: checkins[0].id, user_id: ana.id, tipo: '❤️', criado_em: em(1, 21, 30) },
+    { checkin_id: checkins[2].id, user_id: maria.id, tipo: '👏', criado_em: em(2, 19, 30) },
+    { checkin_id: checkins[2].id, user_id: ana.id, tipo: '❤️', criado_em: em(2, 20, 0) },
+    { checkin_id: checkins[5].id, user_id: maria.id, tipo: '💃', criado_em: em(8, 21, 0) },
+    // Nas fotos de hoje da Maria, para o painel de notificações dela
+    // já nascer com coisa nova para ver
+    { checkin_id: checkins[9].id, user_id: ana.id, tipo: '❤️', criado_em: em(0, 20, 5) },
+    { checkin_id: checkins[9].id, user_id: joao.id, tipo: '👏', criado_em: em(0, 20, 20) },
   ]
 
   const comments = [
@@ -385,6 +405,47 @@ function seed(): DB {
       criado_em: em(1, 20, 0),
     },
   ]
+
+  // Duplas de exemplo. A Maria entra com três parceiros confirmados
+  // (rende o distintivo de rodízio) e uma marcação PENDENTE do Pedro,
+  // que é o que faz o painel de notificações nascer com algo a fazer.
+  // `em()` cuida de não jogar a marcação para o futuro quando o demo
+  // roda de manhã — mesma questão dos check-ins de hoje.
+  const dupla = (
+    de: string,
+    para: string,
+    diasAtras: number,
+    confirmada: boolean,
+  ) => ({
+    id: uuid(),
+    data: toISODate(addDays(now, -diasAtras)),
+    de_user: de,
+    para_user: para,
+    confirmada,
+    criado_em: em(diasAtras, 21, 0),
+  })
+
+  const duplas = [
+    // Confirmadas dos dois lados
+    ...[
+      [ana.id, 1],
+      [joao.id, 4],
+      [joao.id, 9],
+      [pedro.id, 16],
+    ].flatMap(([outro, dias]) => [
+      dupla(maria.id, outro as string, dias as number, true),
+      dupla(outro as string, maria.id, dias as number, true),
+    ]),
+    // Mão única: o Pedro marcou hoje e a Maria ainda não respondeu
+    dupla(pedro.id, maria.id, 0, false),
+  ]
+
+  // "Eu vou" no aulão de hoje, para o botão já nascer com companhia
+  const confirmacoes = [ana.id, joao.id, pedro.id].map((user_id) => ({
+    user_id,
+    evento_id: eventos[1].id,
+    data: toISODate(now),
+  }))
 
   return {
     profiles,
@@ -408,9 +469,14 @@ function seed(): DB {
     reports: [],
     events: eventos,
     feriados,
-    confirmacoes: [],
-    duplas: [],
-    notificacoesVistas: {},
+    confirmacoes,
+    duplas,
+    // Como a migração faz em produção: tudo que é antigo já nasce
+    // visto. Sobram as reações de hoje e a marcação pendente, que é o
+    // contador que faz sentido ver ao abrir o demo.
+    notificacoesVistas: Object.fromEntries(
+      profiles.map((p) => [p.id, addDays(now, -2).toISOString()]),
+    ),
     alunos,
     turmas,
     cargos,
@@ -440,6 +506,7 @@ export class DemoApi implements ForroApi {
         'fds-demo-db-v6',
         'fds-demo-db-v7',
         'fds-demo-db-v8',
+        'fds-demo-db-v9',
       ]) {
         localStorage.removeItem(k)
       }
@@ -1490,6 +1557,10 @@ export class DemoApi implements ForroApi {
     )
     this.persist()
     return antes - this.db.alunos.length
+  }
+
+  async semestreEncerrado() {
+    return this.db.profiles.every((p) => p.turmas.length === 0)
   }
 
   async encerrarSemestre() {
