@@ -114,6 +114,13 @@ export interface ForroApi {
    * alguém postasse entre uma página e outra.
    */
   getFeed(opcoes?: { limite?: number; antesDe?: string }): Promise<FeedItem[]>
+  /**
+   * Uma publicação específica, fora da paginação do feed — é o que uma
+   * notificação abre. `null` se o check-in não existe mais (denúncia
+   * removida etc.). A foto em si pode já ter sido arquivada pela
+   * retenção; quem chama trata isso, `getCheckin` só busca o registro.
+   */
+  getCheckin(id: string): Promise<FeedItem | null>
   /** Notifica quando o feed muda (realtime). Retorna unsubscribe. */
   subscribeFeed(cb: () => void): () => void
   /**

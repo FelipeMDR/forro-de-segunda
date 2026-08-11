@@ -258,6 +258,15 @@ supabase/
   funde com o que está na tela, o intervalo é de 3 s e nada é buscado
   com o app em segundo plano. As fotos já eram `loading="lazy"` e ficam
   em cache-first no service worker por 30 dias.
+- **Notificação de foto abre a publicação, não link aninhado.** Reação
+  e comentário viram `<Link to="/publicacao/:id">` com miniatura — sem
+  isso, "Fulana reagiu à sua foto" não dizia qual. A rota busca o
+  check-in avulso (`getCheckin`, fora da paginação do feed) e reaproveita
+  o `CheckinCard`. Como o corpo da notificação já usa um `<Link>` para
+  a foto, o avatar por dentro NÃO é outro `<Link>` para o perfil — `<a>`
+  dentro de `<a>` quebra o HTML; quem quiser o perfil clica no autor já
+  dentro da publicação. "Dancei com" não referencia uma foto, então
+  continua sem link, só a resposta de confirmar/recusar.
 - **Entrar no desafio é escolha, e não zera o passado.** Competir é
   opcional, então quem entra no meio leva junto os check-ins que já fez
   no período — o ranking soma pelo período, nunca pela data de entrada.

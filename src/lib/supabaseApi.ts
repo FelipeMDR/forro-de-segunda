@@ -457,45 +457,80 @@ export class SupabaseApi implements ForroApi {
     }
 
     const data = res.data as unknown as Array<Record<string, unknown>>
-    return data.map((c) => {
-      const autor = c.autor as {
-        nome: string
-        avatar_url: string | null
-        turmas: TurmaMembro[] | null
-        cargos: Array<{ cargo: string }> | null
-      } | null
-      return {
-        id: c.id as string,
-        user_id: c.user_id as string,
-        foto_url: c.foto_url as string,
-        legenda: c.legenda as string | null,
-        criado_em: c.criado_em as string,
-        favorito: Boolean(c.favorito),
-        autor: {
-          nome: autor?.nome ?? 'Alguém',
-          avatar_url: autor?.avatar_url ?? null,
-          turma: turmaLabel(autor?.turmas ?? []),
-          turmas: (autor?.turmas ?? []).map((t) => t.turma),
-          cargos: (autor?.cargos ?? []).map((x) => x.cargo),
-        },
-        reacoes: (c.reacoes as FeedItem['reacoes']) ?? [],
-        comentarios:
-          (c.comentarios as Array<{ count: number }>)?.[0]?.count ?? 0,
-      }
-    })
+    return data.map((c) => this.mapFeedRow(c))
+  }
+
+  /** Mesmo mapeamento usado por `getFeed` e `getCheckin`, num lugar só. */
+  private mapFeedRow(c: Record<string, unknown>): FeedItem {
+    const autor = c.autor as {
+      nome: string
+      avatar_url: string | null
+      turmas: TurmaMembro[] | null
+      cargos: Array<{ cargo: string }> | null
+    } | null
+    return {
+      id: c.id as string,
+      user_id: c.user_id as string,
+      foto_url: c.foto_url as string,
+      legenda: c.legenda as string | null,
+      criado_em: c.criado_em as string,
+      favorito: Boolean(c.favorito),
+      autor: {
+        nome: autor?.nome ?? 'Alguém',
+        avatar_url: autor?.avatar_url ?? null,
+        turma: turmaLabel(autor?.turmas ?? []),
+        turmas: (autor?.turmas ?? []).map((t) => t.turma),
+        cargos: (autor?.cargos ?? []).map((x) => x.cargo),
+      },
+      reacoes: (c.reacoes as FeedItem['reacoes']) ?? [],
+      comentarios:
+        (c.comentarios as Array<{ count: number }>)?.[0]?.count ?? 0,
+    }
+  }
+
+  /**
+   * Uma publicação específica — é o que a notificação abre ("reagiu à
+   * sua foto") em vez de deixar a pessoa procurar no feed. Fora da
+   * página de 12, então precisa da própria busca.
+   */
+  async getCheckin(id: string): Promise<FeedItem | null> {
+    const res = await this.sb
+      .from('checkins')
+      .select(
+        `id, user_id, foto_url, legenda, criado_em, favorito,
+           autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)),
+           reacoes:reactions(tipo, user_id),
+           comentarios:comments(count)`,
+      )
+      .eq('id', id)
+      .maybeSingle()
+
+    if (res.error) {
+      console.warn('[checkin] embed falhou, usando consulta simples:', res.error)
+      const lista = await this.getFeedSimples({ id })
+      return lista[0] ?? null
+    }
+    return res.data ? this.mapFeedRow(res.data as Record<string, unknown>) : null
   }
 
   /** Plano B do feed: sem embeds, só consultas diretas + junção no cliente. */
   private async getFeedSimples(opcoes?: {
     limite?: number
     antesDe?: string
+    /** Uma publicação específica em vez de uma página — ver `getCheckin`. */
+    id?: string
   }): Promise<FeedItem[]> {
     let base = this.sb
       .from('checkins')
       .select('id, user_id, foto_url, legenda, criado_em')
-      .order('criado_em', { ascending: false })
-      .limit(opcoes?.limite ?? PAGINA_FEED)
-    if (opcoes?.antesDe) base = base.lt('criado_em', opcoes.antesDe)
+    if (opcoes?.id) {
+      base = base.eq('id', opcoes.id)
+    } else {
+      base = base
+        .order('criado_em', { ascending: false })
+        .limit(opcoes?.limite ?? PAGINA_FEED)
+      if (opcoes?.antesDe) base = base.lt('criado_em', opcoes.antesDe)
+    }
     const checkins = ok(await base) as Array<{
       id: string
       user_id: string
@@ -1226,12 +1261,16 @@ export class SupabaseApi implements ForroApi {
     const meus = ok(
       await this.sb
         .from('checkins')
-        .select('id')
+        .select('id, foto_url')
         .eq('user_id', uid)
         .order('criado_em', { ascending: false })
         .limit(100),
-    ) as Array<{ id: string }>
+    ) as Array<{ id: string; foto_url: string | null }>
     const ids = meus.map((c) => c.id)
+    // Miniatura na notificação: é o que diz DE QUAL foto se trata sem
+    // precisar abrir nada. Vem daqui, e não do embed de reactions/
+    // comments, porque nenhuma das duas tabelas guarda a foto.
+    const fotoPor = new Map(meus.map((c) => [c.id, c.foto_url]))
 
     const [reacoes, comentarios, duplas] = await Promise.all([
       ids.length
@@ -1281,6 +1320,7 @@ export class SupabaseApi implements ForroApi {
         },
         detalhe: r.tipo,
         checkin_id: r.checkin_id,
+        foto_url: fotoPor.get(r.checkin_id) ?? null,
       })),
       ...comentarios.map((c) => ({
         id: `comentario:${c.id}`,
@@ -1293,6 +1333,7 @@ export class SupabaseApi implements ForroApi {
         },
         detalhe: c.texto,
         checkin_id: c.checkin_id,
+        foto_url: fotoPor.get(c.checkin_id) ?? null,
       })),
       ...duplas.map((d) => ({
         id: `dupla:${d.id}`,

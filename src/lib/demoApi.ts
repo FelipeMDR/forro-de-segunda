@@ -760,6 +760,11 @@ export class DemoApi implements ForroApi {
       .map((c) => this.toFeedItem(c))
   }
 
+  async getCheckin(id: string): Promise<FeedItem | null> {
+    const c = this.db.checkins.find((x) => x.id === id)
+    return c ? this.toFeedItem(c) : null
+  }
+
   private toFeedItem(c: CheckinRow): FeedItem {
     const autor = this.db.profiles.find((p) => p.id === c.user_id)
     return {
@@ -1381,6 +1386,9 @@ export class DemoApi implements ForroApi {
           autor: perfil(r.user_id),
           detalhe: r.tipo,
           checkin_id: r.checkin_id,
+          foto_url:
+            this.db.checkins.find((c) => c.id === r.checkin_id)?.foto_url ??
+            null,
         })),
       ...this.db.comments
         .filter((c) => meus.has(c.checkin_id) && c.user_id !== uid)
@@ -1391,6 +1399,9 @@ export class DemoApi implements ForroApi {
           autor: perfil(c.user_id),
           detalhe: c.texto,
           checkin_id: c.checkin_id,
+          foto_url:
+            this.db.checkins.find((x) => x.id === c.checkin_id)?.foto_url ??
+            null,
         })),
       ...(this.db.duplas ?? [])
         .filter((d) => d.para_user === uid)

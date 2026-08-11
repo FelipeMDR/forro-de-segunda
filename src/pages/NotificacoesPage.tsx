@@ -53,6 +53,94 @@ function LinhaDupla({
   )
 }
 
+/**
+ * Uma linha do painel.
+ *
+ * Reação e comentário viram `<Link>` até a publicação — é o que
+ * resolve "não sei de qual foto ela está falando". Como o texto já
+ * mostra o nome de quem reagiu (não do dono da foto), não tem link
+ * para perfil aqui dentro: um `<a>` dentro de outro `<a>` quebra o
+ * HTML, e quem quiser ver o perfil clica no autor já dentro da
+ * publicação. "Dancei com" não é sobre uma foto, então continua sem
+ * link — só a resposta de confirmar/recusar.
+ */
+function LinhaNotificacao({
+  n,
+  ocupado,
+  onConfirmar,
+  onRecusar,
+}: {
+  n: Notificacao
+  ocupado: boolean
+  onConfirmar: () => void
+  onRecusar: () => void
+}) {
+  const conteudo =
+    n.tipo === 'dupla' ? (
+      <LinhaDupla
+        n={n}
+        ocupado={ocupado}
+        onConfirmar={onConfirmar}
+        onRecusar={onRecusar}
+      />
+    ) : n.tipo === 'reacao' ? (
+      <p className="text-sm">
+        <strong>{n.autor.nome}</strong> reagiu à sua foto{' '}
+        <span className="text-base">{n.detalhe}</span>
+      </p>
+    ) : (
+      <p className="text-sm">
+        <strong>{n.autor.nome}</strong> comentou:{' '}
+        <span className="text-tinta-600">"{n.detalhe}"</span>
+      </p>
+    )
+
+  const rodape = (
+    <p className="mt-0.5 text-xs text-tinta-500">
+      {formatRelative(n.criado_em)}
+    </p>
+  )
+
+  if (n.tipo === 'dupla' || !n.checkin_id) {
+    return (
+      <div className="flex items-start gap-3 p-4">
+        <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
+          <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          {conteudo}
+          {rodape}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to={`/publicacao/${n.checkin_id}`}
+      className="flex items-start gap-3 p-4 transition hover:bg-preto/5"
+    >
+      <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
+      <div className="min-w-0 flex-1">
+        {conteudo}
+        {rodape}
+      </div>
+      {n.foto_url ? (
+        <img
+          src={n.foto_url}
+          alt=""
+          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-preto/5 text-lg">
+          📷
+        </span>
+      )}
+    </Link>
+  )
+}
+
 export function NotificacoesPage() {
   const { api } = useAuth()
   const toast = useToast()
@@ -107,38 +195,13 @@ export function NotificacoesPage() {
       ) : (
         <div className="card divide-y divide-preto/10">
           {itens.map((n) => (
-            <div key={n.id} className="flex items-start gap-3 p-4">
-              <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
-                <Avatar
-                  nome={n.autor.nome}
-                  url={n.autor.avatar_url}
-                  tamanho={40}
-                />
-              </Link>
-              <div className="min-w-0 flex-1">
-                {n.tipo === 'dupla' ? (
-                  <LinhaDupla
-                    n={n}
-                    ocupado={ocupado === n.id}
-                    onConfirmar={() => void responder(n, true)}
-                    onRecusar={() => void responder(n, false)}
-                  />
-                ) : n.tipo === 'reacao' ? (
-                  <p className="text-sm">
-                    <strong>{n.autor.nome}</strong> reagiu à sua foto{' '}
-                    <span className="text-base">{n.detalhe}</span>
-                  </p>
-                ) : (
-                  <p className="text-sm">
-                    <strong>{n.autor.nome}</strong> comentou:{' '}
-                    <span className="text-tinta-600">"{n.detalhe}"</span>
-                  </p>
-                )}
-                <p className="mt-0.5 text-xs text-tinta-500">
-                  {formatRelative(n.criado_em)}
-                </p>
-              </div>
-            </div>
+            <LinhaNotificacao
+              key={n.id}
+              n={n}
+              ocupado={ocupado === n.id}
+              onConfirmar={() => void responder(n, true)}
+              onRecusar={() => void responder(n, false)}
+            />
           ))}
         </div>
       )}

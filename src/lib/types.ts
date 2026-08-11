@@ -290,6 +290,12 @@ export interface Notificacao {
   detalhe: string | null
   /** Para abrir a foto (reação e comentário). */
   checkin_id: string | null
+  /**
+   * Miniatura da publicação (reação e comentário) — é o que deixa
+   * claro DE QUAL foto a notificação está falando, sem precisar abrir
+   * nada. Vazio se a foto já foi arquivada pela retenção.
+   */
+  foto_url?: string | null
   /** Dupla: a noite, e se ainda falta eu confirmar. */
   data?: string
   pendente?: boolean
