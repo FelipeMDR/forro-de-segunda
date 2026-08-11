@@ -18,6 +18,19 @@ const MARCOS_PRESENCA: Array<[number, string, string]> = [
   [100, '💎', '100 presenças'],
 ]
 
+/**
+ * Rodízio: quantas PESSOAS DIFERENTES, não quantas danças. Premiar
+ * volume incentivaria dançar sempre com o mesmo par; premiar variedade
+ * empurra o rodízio, que é cultura do forró — dançar com quem chegou
+ * hoje, e não só com quem já se conhece.
+ */
+const MARCOS_RODIZIO: Array<[number, string, string]> = [
+  [3, '🤝', 'Dançou com 3 pessoas'],
+  [10, '💫', 'Dançou com 10 pessoas'],
+  [25, '🌟', 'Dançou com 25 pessoas'],
+  [50, '🪩', 'Dançou com 50 pessoas'],
+]
+
 export function computeBadges(input: {
   userId: string
   turmas: TurmaMembro[]
@@ -26,6 +39,12 @@ export function computeBadges(input: {
   distintivosCustom?: Badge[]
   checkinDates: Date[]
   events: AgendaEvent[]
+  /**
+   * Pares confirmados pelos dois lados. Só os confirmados entram: se
+   * marcação de mão única contasse, dava para inflar o próprio número
+   * marcando gente que nem dançou com você.
+   */
+  parceiros?: number
 }): Badge[] {
   const badges: Badge[] = []
 
@@ -72,6 +91,21 @@ export function computeBadges(input: {
         titulo,
         // Texto neutro: o mesmo distintivo aparece no perfil dos outros
         descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
+      })
+    }
+  }
+
+  // 2.5 Rodízio — pessoas diferentes com quem a dupla foi confirmada
+  const parceiros = input.parceiros ?? 0
+  for (const [minimo, emoji, titulo] of MARCOS_RODIZIO) {
+    if (parceiros >= minimo) {
+      badges.push({
+        id: `rodizio-${minimo}`,
+        emoji,
+        titulo,
+        descricao: `${parceiros} ${
+          parceiros === 1 ? 'parceiro confirmado' : 'parceiros confirmados'
+        } de dança`,
       })
     }
   }

@@ -7,6 +7,8 @@ export interface PerfilStats {
   streak: number
   presencas: number
   desafios: number
+  /** Pessoas diferentes com dupla confirmada dos dois lados. */
+  parceiros: number
 }
 
 /**
@@ -19,12 +21,15 @@ export async function carregarPerfilStats(
   turmas: TurmaMembro[],
   cargos: string[] = [],
 ): Promise<{ stats: PerfilStats; badges: Badge[] }> {
-  const [checkins, eventos, nDesafios, distintivosCustom] = await Promise.all([
-    api.checkinsDe(userId),
-    api.listEvents(),
-    api.contarDesafios(userId),
-    api.distintivosDe(userId),
-  ])
+  const [checkins, eventos, nDesafios, distintivosCustom, parceiros] =
+    await Promise.all([
+      api.checkinsDe(userId),
+      api.listEvents(),
+      api.contarDesafios(userId),
+      api.distintivosDe(userId),
+      // Sem a migração 016 a tabela não existe — o perfil vale sem isso
+      api.parceirosDe(userId).catch(() => []),
+    ])
   const datas = checkins.map((c) => new Date(c.criado_em))
 
   return {
@@ -33,6 +38,7 @@ export async function carregarPerfilStats(
       // Presença = dia com check-in (mesma regra do ranking)
       presencas: diasDistintos(datas),
       desafios: nDesafios,
+      parceiros: parceiros.length,
     },
     badges: computeBadges({
       userId,
@@ -41,6 +47,7 @@ export async function carregarPerfilStats(
       distintivosCustom,
       checkinDates: datas,
       events: eventos,
+      parceiros: parceiros.length,
     }),
   }
 }

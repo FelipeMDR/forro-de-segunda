@@ -66,9 +66,11 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
     ['🔥 ' + (stats ? String(stats.streak) : '–'), 'semanas seguidas', 'text-brasa-700'],
     [stats ? String(stats.presencas) : '–', 'presenças', ''],
     [stats ? String(stats.desafios) : '–', 'desafios', ''],
+    // Rodízio: pessoas diferentes, não número de danças
+    [stats ? String(stats.parceiros) : '–', 'parceiros', ''],
   ]
   return (
-    <div className="grid w-full grid-cols-3 gap-2 pt-2">
+    <div className="grid w-full grid-cols-4 gap-2 pt-2">
       {itens.map(([valor, rotulo, cor]) => (
         <div key={rotulo} className="rounded-2xl bg-fundo px-2 py-3 text-center">
           <p className={`text-2xl font-extrabold ${cor}`}>{valor}</p>

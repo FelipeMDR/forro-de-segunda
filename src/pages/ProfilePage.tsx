@@ -185,7 +185,7 @@ export function ProfilePage() {
       .catch((e) => {
         console.error('[perfil] falha ao carregar estatísticas', e)
         // Sem estatísticas, mostra ao menos os distintivos de turma
-        setStats({ streak: 0, presencas: 0, desafios: 0 })
+        setStats({ streak: 0, presencas: 0, desafios: 0, parceiros: 0 })
         setBadges(
           computeBadges({
             userId,
