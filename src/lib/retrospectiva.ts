@@ -23,24 +23,21 @@ export interface Retrospectiva {
 }
 
 /**
- * Começo do semestre corrente: 1º de janeiro ou 1º de julho.
- *
- * O projeto se organiza por semestre — turmas, matrícula e encerramento
- * seguem esse ciclo, então a retrospectiva segue também.
+ * Rótulo "1º/2º semestre de AAAA" a partir de quando o período
+ * REALMENTE começou — e não do calendário civil. `inicio` normalmente
+ * vem do último "Encerrar semestre" (ver `RetrospectivaPage`), então o
+ * rótulo já reflete o semestre de verdade do projeto, seja lá quando
+ * ele começar.
  */
-export function inicioDoSemestre(agora = new Date()): Date {
-  const primeiro = agora.getMonth() < 6
-  return new Date(agora.getFullYear(), primeiro ? 0 : 6, 1, 0, 0, 0, 0)
-}
-
-export function rotuloDoSemestre(agora = new Date()): string {
-  const primeiro = agora.getMonth() < 6
-  return `${primeiro ? '1º' : '2º'} semestre de ${agora.getFullYear()}`
+export function rotuloDoSemestre(inicio: Date): string {
+  const primeiro = inicio.getMonth() < 6
+  return `${primeiro ? '1º' : '2º'} semestre de ${inicio.getFullYear()}`
 }
 
 export function montarRetrospectiva(
   checkins: CheckinComReacoes[],
   parceiros: ParceiroDanca[],
+  inicio: Date,
   agora = new Date(),
 ): Retrospectiva {
   const datas = checkins.map((c) => new Date(c.criado_em))
@@ -51,8 +48,8 @@ export function montarRetrospectiva(
     null,
   )
   return {
-    desde: inicioDoSemestre(agora).toISOString(),
-    rotuloPeriodo: rotuloDoSemestre(agora),
+    desde: inicio.toISOString(),
+    rotuloPeriodo: rotuloDoSemestre(inicio),
     presencas: diasDistintos(datas),
     streak: computeStreak(datas, agora),
     parceiros: parceiros.length,
@@ -62,11 +59,31 @@ export function montarRetrospectiva(
   }
 }
 
-/** Frase de fechamento, escolhida pelo que a pessoa mais fez. */
+/**
+ * Frase de fechamento — prioriza o que mais se destacou NESSA pessoa
+ * (a foto que bombou, a dupla que se formou) em vez de só bater faixas
+ * genéricas de presença. Sempre que possível usa um número ou um nome
+ * de verdade, para não soar copiada e colada de um card para o outro.
+ */
 export function fraseDaRetrospectiva(r: Retrospectiva): string {
   if (r.presencas === 0) return 'Bora pro forró no próximo semestre 💃'
+
+  if (r.destaque && r.destaque.reacoes >= 5) {
+    return `Sua foto bombou: ${r.destaque.reacoes} reações 🔥`
+  }
+
+  if (r.parceiroTop && r.parceiroTop.noites >= 5) {
+    const primeiroNome = r.parceiroTop.nome.split(/\s+/)[0]
+    return `Você e ${primeiroNome} formaram a dupla do semestre 💞`
+  }
+
   if (r.parceiros >= 10) return 'Você rodou a pista inteira — que rodízio! 🪩'
-  if (r.streak >= 8) return 'Presença de quem não falha uma segunda 🔥'
-  if (r.presencas >= 20) return 'A pista já conhece seu passo 🎶'
-  return 'Cada noite dessas virou história 🪗'
+
+  if (r.streak >= 8) return `${r.streak} semanas seguidas sem faltar 🔥`
+
+  if (r.presencas >= 20) return `${r.presencas} noites de forró — respeito! 🎶`
+
+  return `${r.presencas} ${
+    r.presencas === 1 ? 'noite dançada' : 'noites dançadas'
+  } nesse semestre 🪗`
 }

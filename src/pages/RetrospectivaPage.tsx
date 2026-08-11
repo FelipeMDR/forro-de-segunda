@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
   fraseDaRetrospectiva,
-  inicioDoSemestre,
   montarRetrospectiva,
   type Retrospectiva,
 } from '../lib/retrospectiva'
@@ -87,13 +86,21 @@ export function RetrospectivaPage() {
     let cancelado = false
     void (async () => {
       try {
-        const desde = inicioDoSemestre().toISOString()
+        // O início real do semestre é o último "Encerrar semestre". Sem
+        // isso ter acontecido nunca, cai para quando a conta foi criada
+        // — melhor que chutar pelo calendário civil (1º/jan ou 1º/jul),
+        // que não tem relação com quando as turmas do projeto começam.
+        const ultimoEncerramento = await api
+          .inicioSemestreAtual()
+          .catch(() => null)
+        const desde =
+          ultimoEncerramento ?? profile?.criado_em ?? new Date(0).toISOString()
         const [checkins, parceiros] = await Promise.all([
           api.checkinsComReacoes(userId, desde),
           api.parceirosDe(userId).catch(() => []),
         ])
         if (cancelado) return
-        setR(montarRetrospectiva(checkins, parceiros))
+        setR(montarRetrospectiva(checkins, parceiros, new Date(desde)))
       } catch (e) {
         if (cancelado) return
         console.error('[retrospectiva] falha ao carregar', e)
@@ -103,7 +110,7 @@ export function RetrospectivaPage() {
     return () => {
       cancelado = true
     }
-  }, [api, userId])
+  }, [api, userId, profile?.criado_em])
 
   const compartilhar = async () => {
     if (!r || !profile) return

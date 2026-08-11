@@ -131,6 +131,8 @@ interface DB {
   }[]
   /** Última vez que cada pessoa abriu o painel de notificações. */
   notificacoesVistas?: Record<string, string>
+  /** Datas (ISO) em que "Encerrar semestre" foi usado, em ordem. */
+  semestres?: string[]
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -1575,8 +1577,14 @@ export class DemoApi implements ForroApi {
   async encerrarSemestre() {
     const comTurma = this.db.profiles.filter((p) => p.turmas.length > 0)
     for (const p of comTurma) p.turmas = []
+    this.db.semestres = [...(this.db.semestres ?? []), new Date().toISOString()]
     this.persist()
     return comTurma.length
+  }
+
+  async inicioSemestreAtual(): Promise<string | null> {
+    const lista = this.db.semestres ?? []
+    return lista.length > 0 ? lista[lista.length - 1] : null
   }
 
   async listProfiles(): Promise<Profile[]> {

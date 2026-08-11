@@ -280,6 +280,14 @@ export interface ForroApi {
    * mão, uma matrícula parcial), e aqui não tem como.
    */
   semestreEncerrado(): Promise<boolean>
+  /**
+   * Início do semestre atual: a data do último "Encerrar semestre".
+   * `null` se isso nunca aconteceu — aí quem chama cai para a data de
+   * criação da própria conta. É o que a retrospectiva usa em vez de
+   * chutar pelo calendário (1º de janeiro / 1º de julho), que não tem
+   * relação com quando as turmas do projeto de fato começam.
+   */
+  inicioSemestreAtual(): Promise<string | null>
   listProfiles(): Promise<Profile[]>
   /** Adiciona um vínculo turma+papel a um aluno (organizador). */
   addTurmaAluno(

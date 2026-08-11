@@ -158,6 +158,14 @@ create table if not exists public.feriados (
   criado_em timestamptz not null default now()
 );
 
+-- Histórico de "Encerrar semestre" — é daqui que a retrospectiva sabe
+-- quando o semestre atual começou, em vez de chutar pelo calendário.
+create table if not exists public.semestres (
+  id uuid primary key default gen_random_uuid(),
+  encerrado_em timestamptz not null default now(),
+  encerrado_por uuid references public.profiles(id) on delete set null
+);
+
 -- "Eu vou hoje": confirmação de presença numa OCORRÊNCIA da agenda.
 -- A aula de segunda é um evento recorrente só, então a chave inclui a
 -- data — confirmar esta segunda não confirma a próxima. Ver migração 015.
@@ -495,6 +503,7 @@ alter table public.events enable row level security;
 alter table public.feriados enable row level security;
 alter table public.confirmacoes_presenca enable row level security;
 alter table public.duplas enable row level security;
+alter table public.semestres enable row level security;
 alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
 alter table public.cargos enable row level security;
@@ -609,6 +618,12 @@ create policy "feriados_write" on public.feriados
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());
+
+-- semestres: todos leem; só organizador registra um encerramento
+create policy "semestres_select" on public.semestres
+  for select to authenticated using (true);
+create policy "semestres_insert" on public.semestres
+  for insert to authenticated with check (public.is_organizador());
 
 -- duplas: todos leem; ninguém insere direto (só marcar_dupla, que
 -- exige co-presença); apaga quem marcou ou quem foi marcado

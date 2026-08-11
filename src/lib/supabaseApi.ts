@@ -1648,7 +1648,28 @@ export class SupabaseApi implements ForroApi {
     for (const lote of emLotes(comTurma.map((p) => p.id), 100)) {
       ok(await this.sb.from('profile_turmas').delete().in('user_id', lote))
     }
+    // Fica registrado mesmo se ninguém tinha turma (comTurma vazio):
+    // é o carimbo de quando o semestre virou, não uma contagem.
+    const uid = await this.getSessionUserId()
+    ok(
+      await this.sb
+        .from('semestres')
+        .insert({ encerrado_por: uid }),
+    )
     return comTurma.length
+  }
+
+  async inicioSemestreAtual(): Promise<string | null> {
+    const { data, error } = await this.sb
+      .from('semestres')
+      .select('encerrado_em')
+      .order('encerrado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    // Sem a migração 017 a tabela não existe — cai no fallback de quem
+    // chamou (data de criação da conta), sem quebrar a retrospectiva.
+    if (error) return null
+    return (data as { encerrado_em: string } | null)?.encerrado_em ?? null
   }
 
   async listPerfisPublicos(): Promise<PerfilPublico[]> {
