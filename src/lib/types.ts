@@ -226,6 +226,19 @@ export interface AgendaEventInput {
 }
 
 /**
+ * Quem confirmou presença numa ocorrência da agenda. A chave é
+ * (pessoa, evento, data): confirmar a aula desta segunda não confirma
+ * a da semana que vem.
+ */
+export interface ConfirmacaoPresenca {
+  evento_id: string
+  data: string // "YYYY-MM-DD"
+  user_id: string
+  nome: string
+  avatar_url: string | null
+}
+
+/**
  * Feriado ou cancelamento pontual: suspende a(s) aula(s) recorrente(s)
  * numa data específica (ex.: feriado nacional, professor ausente).
  * `turma: null` cancela a aula de TODAS as turmas nesse dia; com uma

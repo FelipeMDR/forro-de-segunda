@@ -25,6 +25,7 @@ import type {
   ChallengeLocal,
   CheckinFavorito,
   Comment,
+  ConfirmacaoPresenca,
   DistintivoDef,
   DistintivoDefInput,
   DistintivoRecebedor,
@@ -103,6 +104,8 @@ interface DB {
   }[]
   events: AgendaEvent[]
   feriados: Feriado[]
+  /** Ausente nos bancos demo antigos — vale como lista vazia. */
+  confirmacoes?: { user_id: string; evento_id: string; data: string }[]
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -385,6 +388,7 @@ function seed(): DB {
     reports: [],
     events: eventos,
     feriados,
+    confirmacoes: [],
     alunos,
     turmas,
     cargos,
@@ -1106,6 +1110,33 @@ export class DemoApi implements ForroApi {
 
   async deleteFeriado(id: string) {
     this.db.feriados = this.db.feriados.filter((f) => f.id !== id)
+    this.persist()
+  }
+
+  async confirmacoesDe(datas: string[]): Promise<ConfirmacaoPresenca[]> {
+    const alvo = new Set(datas)
+    return (this.db.confirmacoes ?? [])
+      .filter((c) => alvo.has(c.data))
+      .map((c) => {
+        const p = this.db.profiles.find((x) => x.id === c.user_id)
+        return {
+          evento_id: c.evento_id,
+          data: c.data,
+          user_id: c.user_id,
+          nome: p?.nome ?? 'Alguém',
+          avatar_url: p?.avatar_url ?? null,
+        }
+      })
+  }
+
+  async confirmarPresenca(eventoId: string, data: string, vai: boolean) {
+    const uid = this.uid()
+    this.db.confirmacoes = (this.db.confirmacoes ?? []).filter(
+      (c) => !(c.user_id === uid && c.evento_id === eventoId && c.data === data),
+    )
+    if (vai) {
+      this.db.confirmacoes.push({ user_id: uid, evento_id: eventoId, data })
+    }
     this.persist()
   }
 

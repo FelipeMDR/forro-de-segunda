@@ -136,6 +136,20 @@ create table if not exists public.feriados (
   criado_em timestamptz not null default now()
 );
 
+-- "Eu vou hoje": confirmação de presença numa OCORRÊNCIA da agenda.
+-- A aula de segunda é um evento recorrente só, então a chave inclui a
+-- data — confirmar esta segunda não confirma a próxima. Ver migração 015.
+create table if not exists public.confirmacoes_presenca (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  evento_id uuid not null references public.events(id) on delete cascade,
+  data date not null,
+  criado_em timestamptz not null default now(),
+  unique (user_id, evento_id, data)
+);
+create index if not exists confirmacoes_data_idx
+  on public.confirmacoes_presenca (data);
+
 -- Lista de chamada: telefone → turma. É ela que LIBERA o cadastro:
 -- o aluno só cria conta se o telefone estiver aqui, e já entra com
 -- nome e turma preenchidos.
@@ -414,6 +428,7 @@ alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.events enable row level security;
 alter table public.feriados enable row level security;
+alter table public.confirmacoes_presenca enable row level security;
 alter table public.alunos_cadastrados enable row level security;
 alter table public.turmas enable row level security;
 alter table public.cargos enable row level security;
@@ -528,6 +543,15 @@ create policy "feriados_write" on public.feriados
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());
+
+-- confirmações "eu vou": todos leem (a graça é ver quem vai);
+-- cada um escreve só a própria
+create policy "confirmacoes_select" on public.confirmacoes_presenca
+  for select to authenticated using (true);
+create policy "confirmacoes_insert" on public.confirmacoes_presenca
+  for insert to authenticated with check (user_id = auth.uid());
+create policy "confirmacoes_delete" on public.confirmacoes_presenca
+  for delete to authenticated using (user_id = auth.uid());
 
 -- alunos_cadastrados (lista de chamada): só organizador
 -- (o cadastro por telefone usa funções security definer)

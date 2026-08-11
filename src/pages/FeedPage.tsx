@@ -12,9 +12,80 @@ import {
   toISODate,
   type OcorrenciaAgenda,
 } from '../lib/dates'
-import type { AgendaEvent, Feriado, FeedItem } from '../lib/types'
+import { Avatar } from '../components/Avatar'
+import type {
+  AgendaEvent,
+  ConfirmacaoPresenca,
+  Feriado,
+  FeedItem,
+} from '../lib/types'
 
-function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
+/**
+ * "Eu vou" de uma ocorrência: quem confirmou e o botão de entrar na
+ * lista. Em dança social, saber que tem gente indo é o que faz alguém
+ * sair de casa — por isso as caras aparecem, e não só a contagem.
+ */
+function EuVou({
+  confirmados,
+  souEu,
+  ocupado,
+  onToggle,
+}: {
+  confirmados: ConfirmacaoPresenca[]
+  souEu: boolean
+  ocupado: boolean
+  onToggle: () => void
+}) {
+  const mostrar = confirmados.slice(0, 4)
+  const resto = confirmados.length - mostrar.length
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <button
+        /* verde-700 e não 600: o texto branco sobre o 600 dá 3,09:1,
+           abaixo do mínimo de 4,5:1 para texto pequeno. */
+        className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+          souEu
+            ? 'bg-verde-700 text-white'
+            : 'bg-preto/5 text-tinta-700 hover:bg-preto/10'
+        }`}
+        disabled={ocupado}
+        onClick={onToggle}
+      >
+        {souEu ? '✓ Eu vou' : 'Eu vou'}
+      </button>
+      {confirmados.length > 0 && (
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex -space-x-2">
+            {mostrar.map((c) => (
+              <div key={c.user_id} className="ring-2 ring-papel rounded-full">
+                <Avatar nome={c.nome} url={c.avatar_url} tamanho={22} />
+              </div>
+            ))}
+          </div>
+          <span className="truncate text-xs text-tinta-500">
+            {confirmados.length}{' '}
+            {confirmados.length === 1 ? 'confirmado' : 'confirmados'}
+            {resto > 0 && ''}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AgendaCard({
+  ocorrencias,
+  confirmacoes,
+  userId,
+  ocupado,
+  onConfirmar,
+}: {
+  ocorrencias: OcorrenciaAgenda[]
+  confirmacoes: ConfirmacaoPresenca[]
+  userId: string | null
+  ocupado: string | null
+  onConfirmar: (eventoId: string, data: string, vai: boolean) => void
+}) {
   if (ocorrencias.length === 0) return null
   const hoje = toISODate(new Date())
   return (
@@ -23,7 +94,13 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
         📅 Agenda
       </h2>
       {ocorrencias.map(({ evento, quando, cancelada, motivoCancelamento }, i) => {
-        const ehHoje = toISODate(quando) === hoje
+        const dia = toISODate(quando)
+        const ehHoje = dia === hoje
+        const confirmados = confirmacoes.filter(
+          (c) => c.evento_id === evento.id && c.data === dia,
+        )
+        const souEu = confirmados.some((c) => c.user_id === userId)
+        const chave = `${evento.id}|${dia}`
         return (
           <div key={`${evento.id}-${i}`} className="flex items-center gap-3">
             <span className="text-xl">
@@ -59,6 +136,15 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
                   {evento.descricao && ` — ${evento.descricao}`}
                 </p>
               )}
+              {/* Aula cancelada não tem para onde ir */}
+              {!cancelada && (
+                <EuVou
+                  confirmados={confirmados}
+                  souEu={souEu}
+                  ocupado={ocupado === chave}
+                  onToggle={() => onConfirmar(evento.id, dia, !souEu)}
+                />
+              )}
             </div>
           </div>
         )
@@ -68,10 +154,12 @@ function AgendaCard({ ocorrencias }: { ocorrencias: OcorrenciaAgenda[] }) {
 }
 
 export function FeedPage() {
-  const { api, profile } = useAuth()
+  const { api, profile, userId } = useAuth()
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
   const [eventos, setEventos] = useState<AgendaEvent[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
+  const [confirmacoes, setConfirmacoes] = useState<ConfirmacaoPresenca[]>([])
+  const [confirmando, setConfirmando] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [visao, setVisao] = useState<'todos' | 'turma'>('todos')
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -123,6 +211,40 @@ export function FeedPage() {
     return proximasOcorrenciasAgenda(relevantes, feriados, agora).slice(0, 4)
   }, [eventos, feriados, profile])
 
+  // As confirmações só interessam para as datas que estão na tela
+  const datasDaAgenda = useMemo(
+    () => [...new Set(agenda.map((o) => toISODate(o.quando)))],
+    [agenda],
+  )
+
+  const carregarConfirmacoes = useCallback(async () => {
+    if (datasDaAgenda.length === 0) return
+    try {
+      setConfirmacoes(await api.confirmacoesDe(datasDaAgenda))
+    } catch (e) {
+      // Sem a migração 015 a tabela não existe — o resto do feed vale
+      console.error('[feed] falha ao carregar confirmações', e)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, datasDaAgenda.join('|')])
+
+  useEffect(() => {
+    void carregarConfirmacoes()
+  }, [carregarConfirmacoes])
+
+  const confirmar = async (eventoId: string, data: string, vai: boolean) => {
+    const chave = `${eventoId}|${data}`
+    setConfirmando(chave)
+    try {
+      await api.confirmarPresenca(eventoId, data, vai)
+      await carregarConfirmacoes()
+    } catch (e) {
+      console.error('[feed] falha ao confirmar presença', e)
+    } finally {
+      setConfirmando(null)
+    }
+  }
+
   const minhasTurmas = useMemo(
     () => profile?.turmas.map((m) => m.turma) ?? [],
     [profile],
@@ -140,7 +262,13 @@ export function FeedPage() {
   return (
     <div className="space-y-4">
       <InstallPrompt />
-      <AgendaCard ocorrencias={agenda} />
+      <AgendaCard
+        ocorrencias={agenda}
+        confirmacoes={confirmacoes}
+        userId={userId}
+        ocupado={confirmando}
+        onConfirmar={(e, d, vai) => void confirmar(e, d, vai)}
+      />
 
       {/* Sem turma no semestre (veterano) não há o que filtrar — o
           seletor só apareceria para levar a uma lista vazia. */}

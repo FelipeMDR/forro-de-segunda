@@ -11,6 +11,7 @@ import type {
   ChallengeInput,
   CheckinFavorito,
   Comment,
+  ConfirmacaoPresenca,
   ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
@@ -168,6 +169,17 @@ export interface ForroApi {
   listFeriados(): Promise<Feriado[]>
   saveFeriado(f: FeriadoInput): Promise<void>
   deleteFeriado(id: string): Promise<void>
+  /**
+   * Quem confirmou presença nas datas pedidas. Traz nome e avatar
+   * porque a graça é ver as caras de quem vai, não só a contagem.
+   */
+  confirmacoesDe(datas: string[]): Promise<ConfirmacaoPresenca[]>
+  /** Confirma ou desmarca a própria presença numa ocorrência. */
+  confirmarPresenca(
+    eventoId: string,
+    data: string,
+    vai: boolean,
+  ): Promise<void>
 
   // ---- Organizador ----
   getAttendance(inicioISO: string, fimISO: string): Promise<AttendanceRow[]>

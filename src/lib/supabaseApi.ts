@@ -17,6 +17,7 @@ import type {
   ChallengeInput,
   CheckinFavorito,
   Comment,
+  ConfirmacaoPresenca,
   ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
@@ -1123,6 +1124,49 @@ export class SupabaseApi implements ForroApi {
 
   async deleteFeriado(id: string) {
     ok(await this.sb.from('feriados').delete().eq('id', id))
+  }
+
+  async confirmacoesDe(datas: string[]): Promise<ConfirmacaoPresenca[]> {
+    if (datas.length === 0) return []
+    const data = ok(
+      await this.sb
+        .from('confirmacoes_presenca')
+        .select('evento_id, data, user_id, perfil:profiles(nome, avatar_url)')
+        .in('data', datas),
+    ) as unknown as Array<{
+      evento_id: string
+      data: string
+      user_id: string
+      perfil: { nome: string; avatar_url: string | null } | null
+    }>
+    return data.map((c) => ({
+      evento_id: c.evento_id,
+      data: c.data,
+      user_id: c.user_id,
+      nome: c.perfil?.nome ?? 'Alguém',
+      avatar_url: c.perfil?.avatar_url ?? null,
+    }))
+  }
+
+  async confirmarPresenca(eventoId: string, data: string, vai: boolean) {
+    const uid = await this.requireUid()
+    if (vai) {
+      ok(
+        await this.sb.from('confirmacoes_presenca').upsert(
+          { user_id: uid, evento_id: eventoId, data },
+          { onConflict: 'user_id,evento_id,data' },
+        ),
+      )
+    } else {
+      ok(
+        await this.sb
+          .from('confirmacoes_presenca')
+          .delete()
+          .eq('user_id', uid)
+          .eq('evento_id', eventoId)
+          .eq('data', data),
+      )
+    }
   }
 
   // ---- Organizador ----
