@@ -187,9 +187,6 @@ export function UserProfilePage() {
 
       <FavoritosGrid
         favoritos={favoritos}
-        onMudou={() => {
-          if (id) void api.favoritosDe(id).then(setFavoritos)
-        }}
         vazio={`${primeiroNome} ainda não guardou nenhum check-in nos favoritos.`}
       />
     </div>

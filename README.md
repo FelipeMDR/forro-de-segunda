@@ -267,6 +267,16 @@ supabase/
   dentro de `<a>` quebra o HTML; quem quiser o perfil clica no autor já
   dentro da publicação. "Dancei com" não referencia uma foto, então
   continua sem link, só a resposta de confirmar/recusar.
+- **A galeria de favoritos abre na mesma tela.** `FavoritosGrid` também
+  virou uma grade de `<Link to="/publicacao/:id">`, no lugar do
+  visualizador escuro que reimplementava reações, comentários e "tirar
+  dos favoritos" por conta própria (o `CheckinCard` já faz as três
+  coisas — o botão de estrela só aparece quando `item.user_id` é quem
+  está logado, então a leitura no perfil de outra pessoa continua sem
+  ele). Como a página é remontada ao voltar para o perfil, o `onMudou`
+  que recarregava a lista manualmente deixou de ter função — `favoritosDe`
+  parou de buscar `reacoes`/`comentarios`, que também não tinham mais
+  quem os lesse.
 - **Entrar no desafio é escolha, e não zera o passado.** Competir é
   opcional, então quem entra no meio leva junto os check-ins que já fez
   no período — o ranking soma pelo período, nunca pela data de entrada.
