@@ -953,6 +953,8 @@ export class DemoApi implements ForroApi {
   }
 
   async favoritosDe(userId: string): Promise<CheckinFavorito[]> {
+    // A galeria só mostra miniaturas; reações e comentários vêm da
+    // publicação inteira quando alguém toca (ver getCheckin).
     return this.db.checkins
       .filter((c) => c.user_id === userId && c.favorito)
       .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
@@ -961,11 +963,6 @@ export class DemoApi implements ForroApi {
         foto_url: c.foto_url,
         legenda: c.legenda,
         criado_em: c.criado_em,
-        reacoes: this.db.reactions
-          .filter((r) => r.checkin_id === c.id)
-          .map((r) => ({ tipo: r.tipo, user_id: r.user_id })),
-        comentarios: this.db.comments.filter((x) => x.checkin_id === c.id)
-          .length,
       }))
   }
 

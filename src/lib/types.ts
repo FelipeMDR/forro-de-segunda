@@ -91,13 +91,6 @@ export interface CheckinFavorito {
   foto_url: string
   legenda: string | null
   criado_em: string
-  /**
-   * Reações e comentários nunca foram perdidos: a retenção só apaga o
-   * arquivo da foto, não a linha do check-in. Eles só não vinham nesta
-   * consulta — por isso a galeria parecia esquecê-los.
-   */
-  reacoes: { tipo: string; user_id: string }[]
-  comentarios: number
 }
 
 /**

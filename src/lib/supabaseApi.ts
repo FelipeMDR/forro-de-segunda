@@ -791,12 +791,13 @@ export class SupabaseApi implements ForroApi {
   }
 
   async favoritosDe(userId: string): Promise<CheckinFavorito[]> {
+    // Reações e comentários não vêm mais daqui: a galeria só mostra
+    // miniaturas, e quem toca abre a publicação inteira (getCheckin),
+    // que busca isso na hora — sem duplicar a contagem em dois lugares.
     const data = ok(
       await this.sb
         .from('checkins')
-        .select(
-          'id, foto_url, legenda, criado_em, reacoes:reactions(tipo, user_id), comentarios:comments(count)',
-        )
+        .select('id, foto_url, legenda, criado_em')
         .eq('user_id', userId)
         .eq('favorito', true)
         .order('criado_em', { ascending: false }),
@@ -806,9 +807,6 @@ export class SupabaseApi implements ForroApi {
       foto_url: c.foto_url as string,
       legenda: c.legenda as string | null,
       criado_em: c.criado_em as string,
-      reacoes: (c.reacoes as CheckinFavorito['reacoes']) ?? [],
-      comentarios:
-        (c.comentarios as Array<{ count: number }>)?.[0]?.count ?? 0,
     }))
   }
 
