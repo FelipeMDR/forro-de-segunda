@@ -97,7 +97,7 @@ export function RetrospectivaPage() {
           ultimoEncerramento ?? profile?.criado_em ?? new Date(0).toISOString()
         const [checkins, parceiros] = await Promise.all([
           api.checkinsComReacoes(userId, desde),
-          api.parceirosDe(userId).catch(() => []),
+          api.parceirosDe(userId, desde).catch(() => []),
         ])
         if (cancelado) return
         setR(montarRetrospectiva(checkins, parceiros, new Date(desde)))

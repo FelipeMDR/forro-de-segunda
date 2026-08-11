@@ -1324,10 +1324,14 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
-  async parceirosDe(userId: string): Promise<ParceiroDanca[]> {
+  async parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]> {
+    // Mesmo corte de dia que o Supabase: `desde` é ISO datetime,
+    // `d.data` é só "AAAA-MM-DD".
+    const desdeData = desde?.slice(0, 10)
     const porPessoa = new Map<string, { nome: string; avatar: string | null; dias: Set<string> }>()
     for (const d of this.db.duplas ?? []) {
       if (d.de_user !== userId || !d.confirmada) continue
+      if (desdeData && d.data < desdeData) continue
       const p = this.db.profiles.find((x) => x.id === d.para_user)
       const atual = porPessoa.get(d.para_user) ?? {
         nome: p?.nome ?? 'Alguém',

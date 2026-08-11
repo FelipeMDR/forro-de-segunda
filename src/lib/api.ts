@@ -216,8 +216,16 @@ export interface ForroApi {
   marcarDupla(parceiroId: string, data: string): Promise<void>
   /** Desfaz a marcação — vale para quem marcou e para quem foi marcado. */
   desmarcarDupla(parceiroId: string, data: string): Promise<void>
-  /** Pares confirmados de alguém, para distintivos e retrospectiva. */
-  parceirosDe(userId: string): Promise<ParceiroDanca[]>
+  /**
+   * Pares confirmados de alguém.
+   *
+   * Sem `desde`: histórico completo — é o que alimenta o card do
+   * perfil e o distintivo de rodízio, que são conquistas que não
+   * fazem sentido zerar a cada semestre. Com `desde` (ISO): só as
+   * noites dentro do período — é o que a retrospectiva usa, para não
+   * herdar duplas de semestres já encerrados.
+   */
+  parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]>
 
   // ---- Notificações ----
   /** Curtidas, comentários e marcações que apontam para mim. */

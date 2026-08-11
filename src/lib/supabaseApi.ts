@@ -1420,16 +1420,18 @@ export class SupabaseApi implements ForroApi {
     )
   }
 
-  async parceirosDe(userId: string): Promise<ParceiroDanca[]> {
+  async parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]> {
     // Só confirmadas contam. Como a dupla confirmada tem as duas
     // linhas, olhar por de_user já cobre tudo sem duplicar.
-    const rows = ok(
-      await this.sb
-        .from('duplas')
-        .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
-        .eq('de_user', userId)
-        .eq('confirmada', true),
-    ) as unknown as Array<{
+    let consulta = this.sb
+      .from('duplas')
+      .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
+      .eq('de_user', userId)
+      .eq('confirmada', true)
+    // `desde` é ISO datetime, `duplas.data` é só a data — corta na
+    // parte do dia para não excluir a própria noite do encerramento.
+    if (desde) consulta = consulta.gte('data', desde.slice(0, 10))
+    const rows = ok(await consulta) as unknown as Array<{
       data: string
       para_user: string
       perfil: { nome: string; avatar_url: string | null } | null
