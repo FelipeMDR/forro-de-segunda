@@ -86,10 +86,12 @@ npm run dev        # http://localhost:5173
 2. Abra **SQL Editor**, cole o conteúdo de [`supabase/schema.sql`](supabase/schema.sql)
    e execute. Isso cria as tabelas, RLS, triggers (cadastro por telefone,
    turma automática), o bucket de fotos e o realtime.
-3. **IMPORTANTE:** em **Authentication > Providers > Email**, desligue
-   **"Confirm email"**. O login é telefone + senha e usa um e-mail sintético
-   (`a<telefone>@alunos.forrodesegunda.app`) que não recebe mensagens — com a
-   confirmação ligada, ninguém consegue entrar.
+3. **IMPORTANTE:** configure o envio de e-mail seguindo
+   [`supabase/emails/README.md`](supabase/emails/README.md) — SMTP próprio,
+   URLs de retorno, limite de envio e os textos personalizados. Sem isso o
+   "esqueci minha senha" diz que enviou e o e-mail não chega a ninguém: o
+   servidor embutido do Supabase só entrega para membros da organização, e
+   no máximo umas duas mensagens por hora.
 4. Copie a **URL** e a **anon key** (Project Settings > API) para o `.env`:
 
 ```bash
@@ -105,12 +107,12 @@ values ('Seu Nome', '11 91234-5678', 'Avançado', 'Condutor(a)');
 ```
 
 6. Crie sua conta no app (aba **Primeira vez**) e vire organizador(a) —
-   o e-mail sintético começa com `a` + os 10 últimos dígitos do telefone:
+   pelo e-mail que você informou no cadastro:
 
 ```sql
 update public.roles set papel = 'organizador'
 where user_id = (
-  select id from auth.users where email like 'a1191234567%'
+  select id from auth.users where email = 'voce@email.com'
 );
 ```
 
@@ -125,11 +127,11 @@ Ana Xote;11 98888-0003;Intermediário;Conduzido
 Pedro Baião;11 98888-0004;Iniciante 02;Conduzido
 ```
 
-> **Esqueci a senha:** sem e-mail real não há link de recuperação. Por
-> enquanto, o organizador resolve pelo dashboard do Supabase
-> (Authentication > Users > usuário > Reset password) ou apagando o usuário
-> para o aluno se cadastrar de novo (isso apaga os check-ins dele). Uma tela
-> de redefinição pelo painel está no roadmap.
+> **Esqueci a senha:** o aluno resolve sozinho pelo link na tela de entrada,
+> desde que o passo 3 esteja feito. A exceção são as contas anteriores à
+> migração 013, que nasceram sem e-mail: elas precisam cadastrar um no perfil
+> primeiro. Enquanto não cadastram, só o organizador destrava (Authentication
+> > Users > usuário > Reset password).
 
 ### 2. Deploy na Vercel (grátis)
 

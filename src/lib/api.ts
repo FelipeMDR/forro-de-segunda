@@ -33,6 +33,34 @@ import type {
 } from './types'
 
 /**
+ * O cadastro já entrou, ou parou esperando o clique no e-mail?
+ *
+ * Depende de uma chave do painel do Supabase ("Confirm email"), não do
+ * código — por isso é um resultado, e não uma constante. O app precisa
+ * funcionar dos dois jeitos: se um dia a chave virar, nada aqui quebra.
+ */
+export type ResultadoCadastro = 'entrou' | 'confirmar'
+
+/**
+ * A troca de e-mail já valeu, ou espera confirmação no endereço novo?
+ * Mesma história: quem decide é o painel.
+ */
+export type ResultadoTrocaEmail = 'trocado' | 'confirmar'
+
+/**
+ * Erro de login de quem ainda não clicou no link de confirmação.
+ *
+ * Vira um tipo próprio porque a tela reage diferente: em vez de só
+ * mostrar o recado, ela oferece reenviar o e-mail.
+ */
+export class EmailNaoConfirmado extends Error {
+  constructor(readonly email: string) {
+    super('Confirme seu e-mail antes de entrar — o link está na sua caixa de entrada.')
+    this.name = 'EmailNaoConfirmado'
+  }
+}
+
+/**
  * Camada de dados única do app. Duas implementações:
  *  - SupabaseApi: produção (auth, Postgres, storage, realtime)
  *  - DemoApi: modo demonstração sem backend (localStorage) — usado
@@ -63,12 +91,20 @@ export interface ForroApi {
    * entrar e é para ele que vai o link de recuperação de senha. O
    * telefone continua sendo o que libera o cadastro (é a chave da lista
    * de chamada), mas deixa de ser o identificador do login.
+   *
+   * Devolve 'confirmar' quando o Supabase está exigindo o clique no
+   * e-mail: a conta existe, mas a sessão só nasce depois disso.
    */
   signUpTelefone(
     telefone: string,
     email: string,
     senha: string,
-  ): Promise<void>
+  ): Promise<ResultadoCadastro>
+  /**
+   * Manda de novo o e-mail de confirmação de cadastro. Serve para quem
+   * não recebeu, apagou sem querer ou deixou o link expirar.
+   */
+  reenviarConfirmacao(email: string): Promise<void>
   /**
    * Dispara o e-mail de recuperação de senha. Não diz se a conta
    * existe: responder isso transformaria a tela num verificador de
@@ -79,8 +115,14 @@ export interface ForroApi {
   definirNovaSenha(senha: string): Promise<void>
   /** Troca a senha de quem está logado. */
   trocarSenha(senha: string): Promise<void>
-  /** Cadastra ou troca o e-mail de recuperação de quem está logado. */
-  trocarEmail(email: string): Promise<void>
+  /**
+   * Cadastra ou troca o e-mail de recuperação de quem está logado.
+   *
+   * Devolve 'confirmar' quando o endereço novo ainda precisa do clique:
+   * até lá o login continua sendo pelo e-mail (ou telefone) antigo, e a
+   * tela não pode dizer que já trocou.
+   */
+  trocarEmail(email: string): Promise<ResultadoTrocaEmail>
   /** Consulta pré-cadastro: o telefone está na lista? Já tem conta? */
   telefoneNaLista(
     telefone: string,

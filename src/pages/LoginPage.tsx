@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { EmailNaoConfirmado } from '../lib/api'
 import { telefoneValido } from '../lib/phone'
 
 export function LoginPage() {
@@ -17,6 +18,10 @@ export function LoginPage() {
   // Recuperação de senha: null = fechado; string = e-mail digitado
   const [recuperando, setRecuperando] = useState<string | null>(null)
   const [enviado, setEnviado] = useState(false)
+  // Conta criada (ou tentando entrar) esperando o clique no e-mail:
+  // null = nada pendente; string = o endereço que precisa confirmar
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [reenviado, setReenviado] = useState(false)
   // Fluxo "primeira vez": null = ainda não verificou o telefone
   const [verificado, setVerificado] = useState<{
     nome: string | null
@@ -35,6 +40,20 @@ export function LoginPage() {
     setEmail('')
     setRecuperando(null)
     setEnviado(false)
+    setConfirmando(null)
+    setReenviado(false)
+  }
+
+  const reenviarConfirmacao = async () => {
+    setOcupado(true)
+    try {
+      await api.reenviarConfirmacao(confirmando ?? '')
+      setReenviado(true)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setOcupado(false)
+    }
   }
 
   const pedirRecuperacao = async (e: FormEvent) => {
@@ -56,7 +75,10 @@ export function LoginPage() {
     try {
       await api.signInTelefone(telefone, senha)
     } catch (err) {
-      toast((err as Error).message, 'erro')
+      // Senha certa, só falta o clique no link: em vez de repetir o
+      // recado, a tela passa a oferecer o reenvio
+      if (err instanceof EmailNaoConfirmado) setConfirmando(err.email)
+      else toast((err as Error).message, 'erro')
     } finally {
       setOcupado(false)
     }
@@ -99,7 +121,11 @@ export function LoginPage() {
     }
     setOcupado(true)
     try {
-      await api.signUpTelefone(telefone, email, senha)
+      // 'entrou' não precisa de tela: a sessão já existe e o app troca
+      // sozinho para o feed
+      if ((await api.signUpTelefone(telefone, email, senha)) === 'confirmar') {
+        setConfirmando(email.trim())
+      }
     } catch (err) {
       toast((err as Error).message, 'erro')
     } finally {
@@ -167,7 +193,43 @@ export function LoginPage() {
           ))}
         </div>
 
-        {aba === 'entrar' && recuperando !== null ? (
+        {confirmando !== null ? (
+          <div className="space-y-4">
+            <h2 className="text-lg font-extrabold">Confira seu e-mail 📬</h2>
+            <div className="rounded-xl bg-azul-500/10 px-3 py-3 text-sm text-azul-700">
+              <p>
+                Mandamos um link de confirmação para{' '}
+                <strong className="break-all">{confirmando}</strong>. Clique
+                nele e sua conta está liberada.
+              </p>
+              <p className="mt-2">
+                Não achou? Olhe no spam — e confira se o endereço está
+                escrito certinho.
+              </p>
+            </div>
+            {reenviado ? (
+              <p className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-800">
+                Pronto, mandamos outro link. 📬
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="btn-ghost w-full"
+                disabled={ocupado}
+                onClick={() => void reenviarConfirmacao()}
+              >
+                {ocupado ? 'Enviando…' : 'Não recebi — mandar de novo'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="w-full text-center text-sm font-bold text-tinta-600 underline"
+              onClick={() => trocarAba('entrar')}
+            >
+              Já confirmei, quero entrar
+            </button>
+          </div>
+        ) : aba === 'entrar' && recuperando !== null ? (
           enviado ? (
             <div className="space-y-4">
               <div className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-800">

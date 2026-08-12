@@ -645,6 +645,8 @@ export class DemoApi implements ForroApi {
     }
     p.email = novo || null
     this.persist()
+    // Idem: no demo não há link para clicar, então a troca já vale
+    return 'trocado' as const
   }
 
   async signUpTelefone(telefone: string, email: string, senha: string) {
@@ -697,6 +699,13 @@ export class DemoApi implements ForroApi {
 
     this.persist()
     this.iniciarSessao(profile.id)
+    // Sem servidor de e-mail aqui, confirmar seria pedir um clique num
+    // link que não existe. O demo entra direto — de propósito.
+    return 'entrou' as const
+  }
+
+  async reenviarConfirmacao(email: string) {
+    console.info('[demo] e-mail de confirmação iria para', email)
   }
 
   async demoSignUpOrganizador(nome: string, telefone: string, senha: string) {

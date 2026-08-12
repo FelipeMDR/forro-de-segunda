@@ -144,20 +144,18 @@ create trigger on_auth_user_email_changed
 -- Depois de rodar: Project Settings > API > "Reload schema cache".
 --
 -- FALTA CONFIGURAR NO PAINEL DO SUPABASE (sem isso o link não chega):
+-- o passo a passo completo virou um arquivo próprio, porque não é
+-- pouca coisa e nenhuma parte dele é SQL:
 --
--- 1. Authentication > URL Configuration
---    Site URL: https://<seu-app>.vercel.app
---    Redirect URLs: adicione https://<seu-app>.vercel.app/nova-senha
+--     supabase/emails/README.md
 --
--- 2. Authentication > Emails: confira o template "Reset Password".
+-- Em resumo: SMTP do Gmail (o servidor embutido do Supabase entrega
+-- para pouquíssima gente), Site URL e Redirect URLs, limite de envio
+-- por hora, e os textos personalizados em Authentication > Emails.
 --
--- 3. IMPORTANTE — Project Settings > Authentication > SMTP Settings:
---    o servidor de e-mail embutido do Supabase é só para testes e tem
---    um limite baixíssimo por hora. Com 300 alunos ele vai barrar os
---    envios. Configure um SMTP próprio (Resend, Brevo e similares têm
---    plano gratuito que dá conta) ANTES de anunciar a novidade.
---
--- 4. Authentication > Providers > Email: "Confirm email" segue
---    DESLIGADO. Com ele ligado, cadastrar e-mail real passaria a
---    exigir confirmação e travaria o cadastro dos alunos.
+-- NOTA — uma versão anterior deste arquivo mandava manter "Confirm
+-- email" DESLIGADO, porque sem servidor de e-mail que entregasse a
+-- confirmação o cadastro travaria de vez. Com o SMTP configurado isso
+-- deixou de valer: agora a recomendação é LIGAR, e o app já mostra a
+-- tela de "confira seu e-mail". Motivo e ressalvas no README acima.
 -- ============================================================

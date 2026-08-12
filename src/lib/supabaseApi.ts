@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { ForroApi } from './api'
+import { EmailNaoConfirmado, type ForroApi } from './api'
 import { diasSuspensos, limitesDaNoite, pontosNoDesafio } from './dates'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
@@ -39,6 +39,17 @@ import type {
   TurmaMembro,
 } from './types'
 
+/**
+ * Para onde o link do e-mail traz a pessoa de volta.
+ *
+ * O endereço precisa estar em Authentication > URL Configuration >
+ * Redirect URLs; fora da lista o Supabase ignora e joga na Site URL.
+ * Como o app roda em localhost, na prévia da Vercel e em produção, sai
+ * daqui de dentro do navegador em vez de virar variável de ambiente.
+ */
+const URL_CONFIRMADO = () => `${window.location.origin}/confirmado`
+const URL_NOVA_SENHA = () => `${window.location.origin}/nova-senha`
+
 /** Traduz mensagens comuns do Supabase Auth para o usuário final. */
 function traduz(msg: string): string {
   const mapa: Record<string, string> = {
@@ -47,8 +58,23 @@ function traduz(msg: string): string {
       'Este telefone já tem conta — use a aba Entrar',
     'Password should be at least 6 characters':
       'A senha precisa ter pelo menos 6 caracteres',
+    'Email not confirmed':
+      'Confirme seu e-mail antes de entrar — o link está na sua caixa de entrada.',
   }
   if (mapa[msg]) return mapa[msg]
+  // Limite de envio do GoTrue. O recado padrão só fala em "rate limit",
+  // que não diz nada a quem está tentando entrar na aula.
+  if (/rate limit|too many requests/i.test(msg)) {
+    return (
+      'Muitos e-mails pedidos de uma vez. Espere alguns minutos e tente ' +
+      'de novo — se estiver na correria da aula, fale com a organização.'
+    )
+  }
+  // Trava anti-spam por endereço: "you can only request this after N seconds"
+  const espera = msg.match(/after (\d+) seconds/i)
+  if (espera) {
+    return `Acabamos de mandar um e-mail. Espere ${espera[1]} segundos para pedir outro.`
+  }
   // O domínio do endereço sintético nunca existiu de verdade, e o
   // Supabase passou a validar isso. Quem tem conta antiga esbarra nele
   // ao trocar o e-mail, porque a troca confirma no endereço atual.
@@ -185,6 +211,11 @@ export class SupabaseApi implements ForroApi {
       password: senha,
     })
     if (!error) return
+    // Conta criada mas sem o clique no link. A tela precisa saber disso
+    // para oferecer o reenvio em vez de só repetir o recado.
+    if (/email not confirmed/i.test(error.message)) {
+      throw new EmailNaoConfirmado(email)
+    }
     // Quem já cadastrou e-mail perdeu o endereço sintético: o telefone
     // deixa de achar a conta e o erro genérico não ajudaria em nada.
     if (porTelefone && /invalid login credentials/i.test(error.message)) {
@@ -216,19 +247,36 @@ export class SupabaseApi implements ForroApi {
     const { data, error } = await this.sb.auth.signUp({
       email: email.trim(),
       password: senha,
-      options: { data: { telefone } },
+      options: { data: { telefone }, emailRedirectTo: URL_CONFIRMADO() },
     })
     if (error) throw new Error(traduz(error.message))
-    if (!data.session) {
+    // Endereço já usado por outra conta: com a confirmação ligada o
+    // GoTrue não conta isso (seria um jeito de descobrir quem tem conta)
+    // e devolve um usuário de fachada, sem identities. Sem esse teste a
+    // tela mandaria a pessoa esperar um e-mail que nunca vem.
+    if (data.user && data.user.identities?.length === 0) {
       throw new Error(
-        'O Supabase está exigindo confirmação de e-mail — desative em Authentication > Providers > Email > "Confirm email" (ver README)',
+        'Esse e-mail já está em uso em outra conta. Use outro endereço, ' +
+          'ou entre com ele em "Esqueci minha senha".',
       )
     }
+    // Sem sessão = "Confirm email" ligado: a conta existe, mas só vale
+    // depois do clique. Não é erro; é outro caminho de tela.
+    return data.session ? 'entrou' : 'confirmar'
+  }
+
+  async reenviarConfirmacao(email: string) {
+    const { error } = await this.sb.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: URL_CONFIRMADO() },
+    })
+    if (error) throw new Error(traduz(error.message))
   }
 
   async solicitarResetSenha(email: string) {
     const { error } = await this.sb.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/nova-senha`,
+      redirectTo: URL_NOVA_SENHA(),
     })
     // Erro de e-mail inexistente é engolido de propósito: a tela não
     // pode virar um verificador de quem é do projeto. Falha de rede ou
@@ -248,17 +296,23 @@ export class SupabaseApi implements ForroApi {
   }
 
   async trocarEmail(email: string) {
-    const { error } = await this.sb.auth.updateUser({ email: email.trim() })
+    const novo = email.trim()
+    const { data, error } = await this.sb.auth.updateUser(
+      { email: novo },
+      { emailRedirectTo: URL_CONFIRMADO() },
+    )
     if (error) throw new Error(traduz(error.message))
+    // Com confirmação ligada o GoTrue guarda o endereço em `new_email` e
+    // só move para `email` depois do clique. Escrever em profiles agora
+    // faria a tela dizer que trocou enquanto o login ainda é o antigo.
+    if (data.user?.email !== novo) return 'confirmar'
     // O gatilho da migração 013 copia para profiles.email; se ele ainda
     // não existir, ao menos a tela do painel não fica mentindo.
     const uid = await this.getSessionUserId()
     if (uid) {
-      await this.sb
-        .from('profiles')
-        .update({ email: email.trim() })
-        .eq('id', uid)
+      await this.sb.from('profiles').update({ email: novo }).eq('id', uid)
     }
+    return 'trocado'
   }
 
   async demoSignUpOrganizador(): Promise<void> {

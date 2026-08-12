@@ -33,6 +33,9 @@ function SegurancaCard() {
   const [senha, setSenha] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [salvandoEmail, setSalvandoEmail] = useState(false)
+  // Endereço que já foi pedido mas ainda espera o clique no link. Fica
+  // como aviso fixo, não toast: é uma instrução de vários passos.
+  const [aguardandoLink, setAguardandoLink] = useState<string | null>(null)
   const [salvandoSenha, setSalvandoSenha] = useState(false)
 
   useEffect(() => {
@@ -45,9 +48,13 @@ function SegurancaCard() {
   const salvarEmail = async () => {
     setSalvandoEmail(true)
     try {
-      await api.trocarEmail(email)
-      await refreshProfile()
-      toast('E-mail salvo! Agora dá para recuperar a senha por ele 📬')
+      if ((await api.trocarEmail(email)) === 'confirmar') {
+        setAguardandoLink(email.trim())
+      } else {
+        setAguardandoLink(null)
+        await refreshProfile()
+        toast('E-mail salvo! Agora dá para recuperar a senha por ele 📬')
+      }
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -106,6 +113,14 @@ function SegurancaCard() {
           Atenção: depois de cadastrar, é <strong>com o e-mail</strong> que
           você entra no app — o telefone deixa de valer no login.
         </p>
+        {aguardandoLink && (
+          <p className="mt-2 rounded-xl bg-azul-500/10 px-3 py-3 text-xs text-azul-700">
+            <strong>Falta confirmar.</strong> Mandamos um link para{' '}
+            <strong className="break-all">{aguardandoLink}</strong>. Enquanto
+            você não clicar nele, seu login continua o de antes — inclusive
+            se você fechar o app agora.
+          </p>
+        )}
         <button
           className="btn-ghost mt-2 w-full"
           disabled={salvandoEmail || !email.trim() || email === profile.email}

@@ -9,6 +9,7 @@ import { BuscarPage } from './pages/BuscarPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
 import { CheckinPage } from './pages/CheckinPage'
+import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
@@ -42,6 +43,7 @@ export default function App() {
                 cair aqui antes de o token virar sessão, e ser mandado
                 para o login perderia o token que veio na URL. */}
             <Route path="/nova-senha" element={<NovaSenhaPage />} />
+            <Route path="/confirmado" element={<ConfirmadoPage />} />
             <Route
               element={
                 <RequireAuth>

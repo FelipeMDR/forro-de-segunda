@@ -1,0 +1,119 @@
+<!doctype html>
+<!--
+  TEMPLATE: Confirm signup
+  Cole em Authentication > Emails > "Confirm signup" (aba Source/HTML).
+  Assunto sugerido: Confirme seu e-mail — Forró de Segunda 🪗
+
+  Variáveis usadas: {{ .ConfirmationURL }}
+  Ver supabase/emails/README.md para o resto da configuração.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Cliente não deve inverter as cores por conta própria: o cartão é
+         claro de propósito e o laranja perde a identidade invertido -->
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Confirme seu e-mail</title>
+  </head>
+  <body
+    style="margin: 0; padding: 0; background-color: #f5f4f2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;"
+  >
+    <!-- Prévia da caixa de entrada: sem isso o cliente mostra o começo do
+         HTML, que costuma ser lixo -->
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+      Só falta um clique para confirmar seu e-mail e entrar na dança.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f4f2;">
+      <tr>
+        <td align="center" style="padding: 24px 12px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid rgba(0, 5, 7, 0.08);">
+            <tr>
+              <td align="center" style="background-color: #de5300; padding: 22px 24px;">
+                <div style="font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px;">
+                  Forró de Segunda 🪗
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 28px 28px 8px 28px;">
+                <h1 style="margin: 0 0 12px 0; font-size: 22px; line-height: 1.3; color: #000507; font-weight: 800;">
+                  Falta um clique 🎶
+                </h1>
+                <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #2c3134;">
+                  Sua conta no app do Forró de Segunda está quase pronta.
+                  Confirme este e-mail para liberar seus check-ins, os
+                  desafios e o ranking do Espaço Livre.
+                </p>
+                <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #2c3134;">
+                  É por este endereço que você entra no app — e é para ele
+                  que vai o link caso você esqueça a senha.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td align="center" style="padding: 0 28px 24px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" bgcolor="#b84500" style="border-radius: 12px;">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px;"
+                      >
+                        Confirmar meu e-mail
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 0 28px 28px 28px;">
+                <!-- Alguns clientes barram o botão; o endereço cru salva -->
+                <p style="margin: 0 0 6px 0; font-size: 12px; line-height: 1.5; color: #5c6367;">
+                  Se o botão não funcionar, copie e cole este endereço no
+                  navegador:
+                </p>
+                <p style="margin: 0; font-size: 12px; line-height: 1.5; word-break: break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color: #0275ac;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 0 28px 28px 28px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f4f2; border-radius: 12px;">
+                  <tr>
+                    <td style="padding: 14px 16px; font-size: 13px; line-height: 1.6; color: #4a5155;">
+                      O link vale por pouco tempo e só pode ser usado uma
+                      vez. Se expirar, é só pedir outro na tela de entrada
+                      do app.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 0 28px 28px 28px; border-top: 1px solid rgba(0, 5, 7, 0.08);">
+                <p style="margin: 20px 0 0 0; font-size: 12px; line-height: 1.6; color: #656c70;">
+                  Não foi você que criou essa conta? Pode ignorar esta
+                  mensagem — sem o clique, nada acontece.
+                </p>
+                <p style="margin: 12px 0 0 0; font-size: 12px; line-height: 1.6; color: #656c70;">
+                  Forró de Segunda · Espaço Livre, Itajubá ·
+                  <strong style="color: #4a5155;">@fds.itajuba</strong>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
