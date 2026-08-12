@@ -7,6 +7,7 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import {
+  diaDaNoite,
   formatDateLong,
   proximasOcorrenciasAgenda,
   toISODate,
@@ -334,28 +335,28 @@ export function FeedPage() {
   // Uma consulta só, para hoje: o caminho passivo de marcar dupla é
   // sobre a noite que acabou ("rolando o feed no ônibus de volta"), e
   // buscar por data de cada post viraria N consultas.
-  const hojeISO = toISODate(new Date())
+  const noiteAtual = diaDaNoite(new Date())
   const [duplasHoje, setDuplasHoje] = useState<Map<string, ParceiroPossivel>>(
     new Map(),
   )
 
   const carregarDuplas = useCallback(async () => {
     try {
-      const lista = await api.parceirosPossiveis(hojeISO)
+      const lista = await api.parceirosPossiveis(noiteAtual)
       setDuplasHoje(new Map(lista.map((p) => [p.user_id, p])))
     } catch (e) {
       // Sem a migração 016 o botão simplesmente não aparece
       console.error('[feed] falha ao carregar duplas', e)
     }
-  }, [api, hojeISO])
+  }, [api, noiteAtual])
 
   useEffect(() => {
     void carregarDuplas()
   }, [carregarDuplas])
 
   const marcarDupla = async (parceiroId: string, marcar: boolean) => {
-    if (marcar) await api.marcarDupla(parceiroId, hojeISO)
-    else await api.desmarcarDupla(parceiroId, hojeISO)
+    if (marcar) await api.marcarDupla(parceiroId, noiteAtual)
+    else await api.desmarcarDupla(parceiroId, noiteAtual)
     await carregarDuplas()
   }
 
@@ -463,7 +464,7 @@ export function FeedPage() {
               item={item}
               onChanged={() => void carregar()}
               dupla={
-                item.criado_em.slice(0, 10) === hojeISO
+                diaDaNoite(new Date(item.criado_em)) === noiteAtual
                   ? duplasHoje.get(item.user_id)
                   : null
               }

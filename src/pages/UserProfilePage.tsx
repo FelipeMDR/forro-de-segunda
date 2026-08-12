@@ -13,7 +13,7 @@ import {
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { toISODate } from '../lib/dates'
+import { diaDaNoite } from '../lib/dates'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import type {
   Badge,
@@ -35,7 +35,9 @@ function DanceiCom({ perfilId, nome }: { perfilId: string; nome: string }) {
   const toast = useToast()
   const [estado, setEstado] = useState<ParceiroPossivel | null | undefined>()
   const [ocupado, setOcupado] = useState(false)
-  const hoje = toISODate(new Date())
+  // Noite de forró, não dia do calendário — quem dançou junto à 1h da
+  // manhã ainda está na noite que começou ontem.
+  const hoje = diaDaNoite(new Date())
 
   const carregar = useCallback(async () => {
     try {

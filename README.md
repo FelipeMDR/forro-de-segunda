@@ -202,6 +202,18 @@ supabase/
 
 ### Decisões de modelagem
 
+- **Duplas contam por NOITE de forró, não por dia do calendário.**
+  Uma noite vai das 05:00 às 04:59 do dia seguinte e pertence ao dia em
+  que começou (`diaDaNoite`/`limitesDaNoite`, `HORA_VIRADA_NOITE`) — em
+  espaço livre a galera fica de madrugada, e quem chegou às 23h e quem
+  chegou à 1h estavam juntos. Com o corte na meia-noite eles caíam em
+  datas diferentes e não podiam se marcar. No banco, `noite_do_checkin`
+  faz o mesmo (migração 018), e converte para o fuso local ANTES de
+  tirar a data: `criado_em::date` usava UTC, então em Itajubá qualquer
+  check-in a partir das 21h locais já virava "amanhã" e a marcação
+  falhava para quase toda a aula. Só as duplas usam essa regra — aula e
+  agenda continuam em dia de calendário, e desafios já tinham a própria
+  noção de janela que cruza a meia-noite.
 - **Marcar dupla exige co-presença minha, não só da outra pessoa.**
   `parceirosPossiveis(data)` lista quem posso marcar num dia — e devolve
   lista vazia se EU não tiver check-in nesse dia, mesmo que a outra

@@ -13,6 +13,43 @@ export function toISODate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * Hora em que uma noite de forró vira a próxima.
+ *
+ * Não é meia-noite: em espaço livre a galera fica de madrugada, e quem
+ * chega às 23h e quem chega à 1h estão na MESMA noite. Com o corte na
+ * meia-noite eles caíam em dias diferentes e não podiam se marcar como
+ * dupla. Cinco da manhã dá folga suficiente e ainda está longe do
+ * horário em que qualquer aula começa.
+ */
+export const HORA_VIRADA_NOITE = 5
+
+/**
+ * A que noite de forró um instante pertence, como data ISO.
+ *
+ * É a chave usada pelas duplas: das 05:00 de um dia às 04:59 do
+ * seguinte, tudo conta como a mesma noite — a do dia em que ela
+ * começou. Mesma ideia que `janelaDoCheckin` já usava para desafios que
+ * cruzam a meia-noite.
+ */
+export function diaDaNoite(d: Date): string {
+  const ajustado = new Date(d)
+  if (ajustado.getHours() < HORA_VIRADA_NOITE) {
+    ajustado.setDate(ajustado.getDate() - 1)
+  }
+  return toISODate(ajustado)
+}
+
+/** Começo e fim (instantes) da noite que leva aquela data ISO. */
+export function limitesDaNoite(dia: string): { de: Date; ate: Date } {
+  const de = new Date(`${dia}T00:00:00`)
+  de.setHours(HORA_VIRADA_NOITE, 0, 0, 0)
+  const ate = new Date(de)
+  ate.setDate(ate.getDate() + 1)
+  ate.setTime(ate.getTime() - 1)
+  return { de, ate }
+}
+
 /** Segunda-feira (00:00) da semana da data — âncora do streak semanal. */
 export function mondayOf(date: Date): Date {
   const d = new Date(date)

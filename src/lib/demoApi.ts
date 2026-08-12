@@ -1,6 +1,7 @@
 import type { ForroApi } from './api'
 import {
   addDays,
+  diaDaNoite,
   diasSuspensos,
   pontosNoDesafio,
   proximaOcorrencia,
@@ -1242,7 +1243,8 @@ export class DemoApi implements ForroApi {
 
   private fezCheckinEm(userId: string, data: string) {
     return this.db.checkins.some(
-      (c) => c.user_id === userId && c.criado_em.slice(0, 10) === data,
+      (c) =>
+        c.user_id === userId && diaDaNoite(new Date(c.criado_em)) === data,
     )
   }
 
@@ -1259,7 +1261,10 @@ export class DemoApi implements ForroApi {
     )
     const ids = new Set(
       this.db.checkins
-        .filter((c) => c.criado_em.slice(0, 10) === data && c.user_id !== uid)
+        .filter(
+          (c) =>
+            diaDaNoite(new Date(c.criado_em)) === data && c.user_id !== uid,
+        )
         .map((c) => c.user_id),
     )
     return [...ids]

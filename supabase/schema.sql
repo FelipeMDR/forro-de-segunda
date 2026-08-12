@@ -292,8 +292,19 @@ as $$
   end;
 $$;
 
--- Marca que dancei com alguém num dia. Exige que OS DOIS tenham
--- check-in na data, e confirma a dupla sozinha quando o outro lado já
+-- A que noite de forró um instante pertence: das 05:00 às 04:59 do dia
+-- seguinte, no fuso local. Converter ANTES de tirar a data é o que
+-- impede o check-in das 21h locais virar "amanhã" em UTC; descontar as
+-- 5h é o que mantém a madrugada na noite que começou ontem (mig. 018).
+create or replace function public.noite_do_checkin(quando timestamptz)
+returns date
+language sql immutable
+as $$
+  select ((quando at time zone 'America/Sao_Paulo') - interval '5 hours')::date;
+$$;
+
+-- Marca que dancei com alguém numa noite. Exige que OS DOIS tenham
+-- check-in nela, e confirma a dupla sozinha quando o outro lado já
 -- tinha marcado. Security definer porque duplas não tem policy de
 -- insert — é isso que impede forjar a marcação sem co-presença.
 create or replace function public.marcar_dupla(p_parceiro uuid, p_data date)
@@ -311,12 +322,14 @@ begin
     raise exception 'Não dá para marcar você mesmo';
   end if;
   if not exists (select 1 from checkins
-                 where user_id = v_uid and criado_em::date = p_data) then
-    raise exception 'Você não fez check-in nesse dia';
+                 where user_id = v_uid
+                   and noite_do_checkin(criado_em) = p_data) then
+    raise exception 'Você não fez check-in nessa noite';
   end if;
   if not exists (select 1 from checkins
-                 where user_id = p_parceiro and criado_em::date = p_data) then
-    raise exception 'Essa pessoa não fez check-in nesse dia';
+                 where user_id = p_parceiro
+                   and noite_do_checkin(criado_em) = p_data) then
+    raise exception 'Essa pessoa não fez check-in nessa noite';
   end if;
 
   insert into public.duplas (data, de_user, para_user)

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ForroApi } from './api'
-import { diasSuspensos, pontosNoDesafio } from './dates'
+import { diasSuspensos, limitesDaNoite, pontosNoDesafio } from './dates'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
@@ -1380,17 +1380,13 @@ export class SupabaseApi implements ForroApi {
 
   // ---- Duplas de dança ----
 
-  /** Início e fim do dia em ISO, para filtrar check-ins por data. */
-  private limitesDoDia(data: string) {
-    return {
-      de: new Date(`${data}T00:00:00`).toISOString(),
-      ate: new Date(`${data}T23:59:59.999`).toISOString(),
-    }
-  }
-
   async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
     const uid = await this.requireUid()
-    const { de, ate } = this.limitesDoDia(data)
+    // Noite de forró, não dia do calendário: quem chega às 23h e quem
+    // chega à 1h estão na mesma noite e precisam poder se marcar.
+    const noite = limitesDaNoite(data)
+    const de = noite.de.toISOString()
+    const ate = noite.ate.toISOString()
     const checkins = ok(
       await this.sb
         .from('checkins')

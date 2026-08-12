@@ -7,10 +7,10 @@ import { useToast } from '../context/ToastContext'
 import {
   challengePhase,
   desafiosQueContam,
+  diaDaNoite,
   diasSuspensos,
   janelaDoCheckin,
   suspensaoDoDia,
-  toISODate,
 } from '../lib/dates'
 import { compressImage } from '../lib/image'
 import {
@@ -239,8 +239,79 @@ export function CheckinPage() {
     }
   }
 
-  const hojeISO = toISODate(agora)
-  const jaPosteiHoje = meusCheckins.some((d) => toISODate(d) === hojeISO)
+  const noiteAtual = diaDaNoite(agora)
+  const jaPosteiHoje = meusCheckins.some((d) => diaDaNoite(d) === noiteAtual)
+
+  /** Quem tem local e está longe demais — é o que dá para consertar andando. */
+  const longe = situacaoLocal.filter((s) => s.distancia !== null && !s.dentro)
+
+  /**
+   * UM aviso, não cinco.
+   *
+   * Antes cada situação (valendo ponto, longe do local, já pontuou,
+   * aula cancelada, desafio que não participo, nada aberto) tinha seu
+   * próprio cartão, e vários apareciam juntos — empurrando a câmera,
+   * que é o motivo da tela existir, para fora do celular. Aqui vence a
+   * informação mais acionável, e o resto fica nos detalhes.
+   */
+  const status: { tom: 'ok' | 'info' | 'aviso'; emoji: string; texto: string } =
+    aindaPontuamAqui.length > 0
+      ? {
+          tom: 'ok',
+          emoji: '✅',
+          texto:
+            aindaPontuamAqui.length === 1
+              ? `Valendo ponto em ${aindaPontuamAqui[0].titulo}`
+              : `Valendo ponto em ${aindaPontuamAqui.length} desafios`,
+        }
+      : longe.length > 0
+        ? {
+            tom: 'aviso',
+            emoji: '📍',
+            texto: `Você está a ${distanciaLegivel(longe[0].distancia ?? 0)} de ${
+              longe[0].desafio.local?.nome || 'onde o desafio conta'
+            } — de lá, a foto marca ponto.`,
+          }
+        : jaPontuaram.length > 0
+          ? {
+              tom: 'info',
+              emoji: '👍',
+              texto:
+                'Seu ponto desta noite já foi contado. A foto entra no feed do mesmo jeito.',
+            }
+          : suspensaoAgora
+            ? {
+                tom: 'aviso',
+                emoji: '🚫',
+                texto: `Hoje não tem forró${
+                  suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''
+                } — a foto não marca ponto.`,
+              }
+            : foraDeles.length > 0
+              ? {
+                  tom: 'info',
+                  emoji: '🏆',
+                  texto:
+                    'Tem desafio rolando agora que você não entrou. Pode postar — a foto já fica valendo se você entrar depois.',
+                }
+              : {
+                  tom: 'aviso',
+                  emoji: '⚠️',
+                  texto:
+                    'Nenhum desafio com janela aberta agora. A foto entra no feed, mas não marca ponto.',
+                }
+
+  // amber-800 e não 700: sobre o fundo em /10 o 700 dá 4,23:1, abaixo
+  // do mínimo de 4,5:1 para texto pequeno.
+  const CORES = {
+    ok: 'bg-emerald-500/10 text-emerald-800',
+    info: 'bg-azul-500/10 text-azul-700',
+    aviso: 'bg-amber-500/10 text-amber-800',
+  }
+
+  // Só vale abrir detalhes quando há mais de um desafio em jogo ou algum
+  // com trava de local — fora isso o resumo já disse tudo.
+  const valeDetalhar = abertosAgora.length > 1 || meusComLocal.length > 0
 
   return (
     <div className="space-y-4">
@@ -250,116 +321,35 @@ export function CheckinPage() {
           tenham feito check-in, então antes disso nem faria sentido. */}
       {jaPosteiHoje && (
         <>
-          <MarcarDuplas data={hojeISO} />
+          <MarcarDuplas data={noiteAtual} />
           <Link className="btn-ghost block text-center" to="/">
             Ir para o feed
           </Link>
         </>
       )}
 
-      {aindaPontuamAqui.length > 0 && (
-        <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
-          ✅ Valendo ponto agora:{' '}
-          <strong>{aindaPontuamAqui.map((c) => c.titulo).join(', ')}</strong>
+      <div
+        className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm ${CORES[status.tom]}`}
+      >
+        <span aria-hidden>{status.emoji}</span>
+        <p className="flex-1">{status.texto}</p>
+      </div>
+
+      {/* GPS falhou: tem botão, então não cabe no resumo. */}
+      {erroLocal && comLocal.length > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+          <p className="flex-1">
+            📍 {erroLocal} — sem isso a foto não marca ponto nos desafios com
+            local, nem se você entrar depois.
+          </p>
+          <button
+            className="shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold"
+            onClick={() => void buscarLocal()}
+          >
+            Tentar de novo
+          </button>
         </div>
       )}
-
-      {comLocal.length > 0 && (
-        <div className="rounded-2xl bg-preto/5 px-4 py-3 text-sm">
-          {buscandoLocal && (
-            <p className="text-tinta-600">📍 Conferindo onde você está…</p>
-          )}
-
-          {erroLocal && (
-            <div className="space-y-2">
-              <p className="text-amber-700">
-                📍 {erroLocal}. Estes desafios só contam ponto para quem
-                está no local:{' '}
-                <strong>{comLocal.map((c) => c.titulo).join(', ')}</strong>.
-                Você ainda pode postar, mas não vai marcar ponto neles —{' '}
-                <strong>nem se entrar depois</strong>, porque a conferência
-                do local só dá para fazer na hora da foto.
-              </p>
-              <button className="btn-ghost" onClick={() => void buscarLocal()}>
-                Tentar de novo
-              </button>
-            </div>
-          )}
-
-          {posicao && (
-            <ul className="space-y-1.5">
-              {situacaoLocal.map(({ desafio, distancia, dentro }) => (
-                <li key={desafio.id} className="flex items-start gap-2">
-                  <span>{dentro ? '📍' : '🚫'}</span>
-                  <span className={dentro ? 'text-emerald-800' : 'text-amber-700'}>
-                    {dentro ? (
-                      <>
-                        Você está em{' '}
-                        <strong>
-                          {desafio.local?.nome || 'local do desafio'}
-                        </strong>{' '}
-                        — <strong>{desafio.titulo}</strong> conta ponto.
-                      </>
-                    ) : (
-                      <>
-                        Você está a{' '}
-                        <strong>{distanciaLegivel(distancia ?? 0)}</strong> de{' '}
-                        <strong>
-                          {desafio.local?.nome || 'local do desafio'}
-                        </strong>
-                        . <strong>{desafio.titulo}</strong> só conta ponto lá.
-                      </>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {jaPontuaram.length > 0 && (
-        <div className="rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
-          👍 Você já pontuou nesta janela em{' '}
-          <strong>{jaPontuaram.map((c) => c.titulo).join(', ')}</strong>. Vale
-          1 ponto por janela, então esta foto entra no feed mas{' '}
-          <strong>não conta ponto de novo</strong>.
-        </div>
-      )}
-
-      {/* Rolando agora sem eu participar: a foto já fica valendo, então
-          o aviso convida em vez de dizer que não conta. Entrar continua
-          sendo escolha — a competição não é obrigatória. */}
-      {foraDeles.length > 0 && (
-        <div className="rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
-          🏆 Está rolando agora, e você não está participando:{' '}
-          <strong>{foraDeles.map((c) => c.titulo).join(', ')}</strong>. Pode
-          postar tranquilo — <strong>esta foto já fica valendo</strong>, e se
-          você entrar depois ela conta junto com as anteriores.{' '}
-          <Link className="font-bold underline" to="/desafios">
-            Ver desafios
-          </Link>
-        </div>
-      )}
-
-      {aindaPontuam.length === 0 &&
-        jaPontuaram.length === 0 &&
-        foraDeles.length === 0 &&
-        (suspensaoAgora ? (
-          <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
-            🚫 <strong>Hoje não tem forró</strong>
-            {suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''} — a
-            aula foi cancelada, então <strong>nenhum desafio conta ponto</strong>{' '}
-            nesta data. Você pode postar mesmo assim, mas não entra na
-            presença.
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
-            ⚠️ Nenhum desafio está com janela de check-in aberta agora. Você
-            pode postar mesmo assim, mas a foto{' '}
-            <strong>não marcará ponto</strong>.
-          </div>
-        ))}
 
       {!limite.pode && limite.liberaEm && (
         <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
@@ -406,21 +396,15 @@ export function CheckinPage() {
               onCapture={(b) => void aoCapturar(b)}
               permitirFotoTeste={api.mode === 'demo'}
             />
-            <p className="px-2 text-center text-xs text-tinta-500">
-              A foto é tirada na hora, dentro do app — nada de foto antiga da
-              galeria 😉
-              {limite.restantes <= 2 && (
-                <>
-                  {' '}
-                  Você ainda pode postar{' '}
-                  <strong>
-                    {limite.restantes}{' '}
-                    {limite.restantes === 1 ? 'foto' : 'fotos'}
-                  </strong>{' '}
-                  nas próximas horas.
-                </>
-              )}
-            </p>
+            {limite.restantes <= 2 && (
+              <p className="px-2 text-center text-xs text-tinta-500">
+                Você ainda pode postar{' '}
+                <strong>
+                  {limite.restantes} {limite.restantes === 1 ? 'foto' : 'fotos'}
+                </strong>{' '}
+                nas próximas horas.
+              </p>
+            )}
           </>
         )
       )}
@@ -447,6 +431,36 @@ export function CheckinPage() {
       >
         {enviando ? 'Publicando…' : 'Publicar check-in 🎉'}
       </button>
+
+      {/* O detalhe desafio a desafio interessa a pouca gente e quase
+          nunca — fica embaixo, fechado, para quem quiser conferir. */}
+      {valeDetalhar && (
+        <details className="rounded-2xl bg-preto/5 px-4 py-3 text-sm">
+          <summary className="cursor-pointer text-xs font-bold text-tinta-600">
+            Como está cada desafio agora
+          </summary>
+          <ul className="mt-2 space-y-1.5 text-xs text-tinta-600">
+            {abertosAgora.map((c) => {
+              const s = situacaoLocal.find((x) => x.desafio.id === c.id)
+              return (
+                <li key={c.id}>
+                  <strong className="text-tinta-900">{c.titulo}</strong>
+                  {!c.sou_membro && ' — você não entrou nele'}
+                  {c.sou_membro &&
+                    jaPontuaram.some((j) => j.id === c.id) &&
+                    ' — ponto já contado nesta noite'}
+                  {s &&
+                    (s.distancia === null
+                      ? ' — conferindo sua localização…'
+                      : s.dentro
+                        ? ` — você está em ${c.local?.nome || 'no local'}`
+                        : ` — a ${distanciaLegivel(s.distancia)} de ${c.local?.nome || 'onde conta'}`)}
+                </li>
+              )
+            })}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
