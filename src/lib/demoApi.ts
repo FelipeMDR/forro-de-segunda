@@ -741,7 +741,13 @@ export class DemoApi implements ForroApi {
   // ---- Perfil ----
 
   async getProfile(id: string) {
-    return this.db.profiles.find((p) => p.id === id) ?? null
+    const p = this.db.profiles.find((x) => x.id === id)
+    // Cópia, não o objeto do banco. As escritas do demo alteram o
+    // registro no lugar; devolvendo a mesma referência, um setState com
+    // ela é ignorado pelo React e a tela fica mostrando o dado velho —
+    // era o que fazia o nome salvar sem o título do perfil mudar. Em
+    // produção cada busca já traz um objeto novo.
+    return p ? { ...p } : null
   }
 
   async getMyRole(): Promise<Papel> {

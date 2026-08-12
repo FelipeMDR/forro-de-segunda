@@ -19,16 +19,23 @@ import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
 import type { Badge, CheckinFavorito } from '../lib/types'
 
 /**
- * E-mail de recuperação e troca de senha.
+ * Nome, e-mail de recuperação e senha — tudo que a pessoa edita da
+ * própria conta, num cartão só.
+ *
+ * O telefone morava aqui como "seu login" e saiu: agora quem entra é o
+ * e-mail, e o número virou uma linha que a pessoa não pode mudar nem
+ * usar para nada. Turma e telefone seguem sendo da organização.
  *
  * O e-mail é o que torna possível recuperar a senha sozinho: sem ele o
  * link do "esqueci minha senha" não teria para onde ir. Contas criadas
  * antes da migração 013 nasceram sem e-mail, então o cartão cobra o
  * cadastro em vez de só oferecer.
  */
-function SegurancaCard() {
+function DadosEAcessoCard() {
   const { api, profile, refreshProfile } = useAuth()
   const toast = useToast()
+  const [nome, setNome] = useState(profile?.nome ?? '')
+  const [salvandoNome, setSalvandoNome] = useState(false)
   const [email, setEmail] = useState(profile?.email ?? '')
   const [senha, setSenha] = useState('')
   const [confirmar, setConfirmar] = useState('')
@@ -39,11 +46,25 @@ function SegurancaCard() {
   const [salvandoSenha, setSalvandoSenha] = useState(false)
 
   useEffect(() => {
+    setNome(profile?.nome ?? '')
     setEmail(profile?.email ?? '')
   }, [profile])
 
   if (!profile) return null
   const semEmail = !profile.email
+
+  const salvarNome = async () => {
+    setSalvandoNome(true)
+    try {
+      await api.updateProfile({ nome: nome.trim() })
+      await refreshProfile()
+      toast('Nome atualizado! ✨')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setSalvandoNome(false)
+    }
+  }
 
   const salvarEmail = async () => {
     setSalvandoEmail(true)
@@ -83,20 +104,44 @@ function SegurancaCard() {
   return (
     <div className="card space-y-4 p-5">
       <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
-        Acesso e senha
+        Meus dados e acesso
       </h2>
 
-      {semEmail && (
-        <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-xs text-amber-800">
-          <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
-          novidade, então hoje, se você esquecer a senha, só a organização
-          consegue te destravar. Com um e-mail aqui, você resolve sozinho.
-          Se der erro ao salvar, fale com a organização: contas bem antigas
-          precisam de um ajuste que só ela faz.
-        </p>
-      )}
-
       <div>
+        <label className="label" htmlFor="perfil-nome">
+          Nome
+        </label>
+        <input
+          id="perfil-nome"
+          className="input"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+        />
+        <p className="mt-1.5 text-xs text-tinta-500">
+          Suas turmas quem define é a organização — fale com eles se algo
+          mudou.
+        </p>
+        <button
+          className="btn-ghost mt-2 w-full"
+          disabled={salvandoNome || !nome.trim() || nome === profile.nome}
+          onClick={() => void salvarNome()}
+        >
+          {salvandoNome ? 'Salvando…' : 'Salvar nome'}
+        </button>
+      </div>
+
+      <div className="space-y-4 border-t border-preto/10 pt-4">
+        {semEmail && (
+          <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-xs text-amber-800">
+            <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
+            novidade, então hoje, se você esquecer a senha, só a organização
+            consegue te destravar. Com um e-mail aqui, você resolve sozinho.
+            Se der erro ao salvar, fale com a organização: contas bem antigas
+            precisam de um ajuste que só ela faz.
+          </p>
+        )}
+
+        <div>
         <label className="label" htmlFor="perfil-email">
           E-mail para recuperar a senha
         </label>
@@ -128,6 +173,7 @@ function SegurancaCard() {
         >
           {salvandoEmail ? 'Salvando…' : 'Salvar e-mail'}
         </button>
+        </div>
       </div>
 
       <div className="border-t border-preto/10 pt-4">
@@ -172,17 +218,11 @@ export function ProfilePage() {
   const toast = useToast()
   const avatarInput = useRef<HTMLInputElement>(null)
 
-  const [nome, setNome] = useState(profile?.nome ?? '')
-  const [salvando, setSalvando] = useState(false)
   const [stats, setStats] = useState<PerfilStats | null>(null)
   const [badges, setBadges] = useState<Badge[] | null>(null)
   const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
   const [pushAtivo, setPushAtivo] = useState(false)
   const [semestreEncerrado, setSemestreEncerrado] = useState(false)
-
-  useEffect(() => {
-    setNome(profile?.nome ?? '')
-  }, [profile])
 
   // O perfil da sessão é carregado no login e fica em cache. Se a
   // organização mudar sua turma ou seus cargos depois disso, a tela
@@ -238,19 +278,6 @@ export function ProfilePage() {
         </button>
       </div>
     )
-  }
-
-  const salvar = async () => {
-    setSalvando(true)
-    try {
-      await api.updateProfile({ nome: nome.trim() })
-      await refreshProfile()
-      toast('Perfil atualizado! ✨')
-    } catch (e) {
-      toast((e as Error).message, 'erro')
-    } finally {
-      setSalvando(false)
-    }
   }
 
   const trocarAvatar = async (file: File | undefined) => {
@@ -334,41 +361,7 @@ export function ProfilePage() {
         vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
       />
 
-      <div className="card space-y-4 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
-          Meus dados
-        </h2>
-        <div>
-          <label className="label" htmlFor="nome">
-            Nome
-          </label>
-          <input
-            id="nome"
-            className="input"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-          />
-        </div>
-        <div>
-          <span className="label">Telefone (seu login)</span>
-          <p className="rounded-xl border border-preto/10 bg-fundo px-3.5 py-2.5 text-sm text-tinta-600">
-            {profile.telefone ?? '—'}
-          </p>
-          <p className="mt-1.5 text-xs text-tinta-500">
-            Telefone e turmas são gerenciados pela organização — fale com eles
-            se algo mudou.
-          </p>
-        </div>
-        <button
-          className="btn-primary w-full"
-          disabled={salvando || !nome.trim()}
-          onClick={() => void salvar()}
-        >
-          Salvar alterações
-        </button>
-      </div>
-
-      <SegurancaCard />
+      <DadosEAcessoCard />
 
       {/* Lugar fixo para instalar: o convite do feed é dispensável, e
           quem dispensou não tinha mais como voltar atrás. */}
