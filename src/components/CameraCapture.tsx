@@ -296,13 +296,23 @@ export function CameraCapture({
       )}
 
       {/* Faixa de cima: sair da câmera e os avisos, sobre um degradê que
-          garante leitura seja qual for a cena atrás. */}
+          garante leitura seja qual for a cena atrás.
+          O ✕ fica sobreposto (não dividindo a largura com o aviso): antes
+          os dois dividiam a linha, e o aviso — puxado para a direita pelo
+          espaço que sobrava do botão — ficava visivelmente descentralizado
+          da tela. Cada um centraliza no seu próprio eixo agora. */}
       <div
-        className="relative z-10 flex items-start gap-3 bg-gradient-to-b from-black/70 via-black/40 to-transparent px-4 pb-10"
+        className="relative z-10 bg-gradient-to-b from-black/70 via-black/40 to-transparent px-4 pb-10"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
       >
-        {botaoFechar}
-        <div className="flex-1 space-y-2">{topo}</div>
+        <div className="absolute left-4" style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}>
+          {botaoFechar}
+        </div>
+        {topo && (
+          <div className="mx-auto flex max-w-[calc(100%-6rem)] flex-col items-center gap-2 pt-1 text-center">
+            {topo}
+          </div>
+        )}
       </div>
 
       {/* Empurra os controles para baixo sem capturar toques */}
