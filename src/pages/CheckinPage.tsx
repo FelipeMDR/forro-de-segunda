@@ -13,6 +13,7 @@ import {
   janelaDoCheckin,
   suspensaoDoDia,
 } from '../lib/dates'
+import { avisarCheckinPublicado } from '../lib/eventos'
 import { compressImage } from '../lib/image'
 import {
   distanciaLegivel,
@@ -285,6 +286,10 @@ export function CheckinPage() {
       setLegenda('')
       setMeusCheckins((atual) => [...atual, new Date()])
       setEtapa('pronto')
+      // O botão do menu de baixo mora fora desta árvore e precisa saber
+      // agora, senão ficaria oferecendo "fazer check-in" ao lado da
+      // confirmação de que ele acabou de ser feito.
+      avisarCheckinPublicado()
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
