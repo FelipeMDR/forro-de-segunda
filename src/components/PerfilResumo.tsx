@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Spinner } from './Spinner'
 import { formatRelative } from '../lib/dates'
@@ -78,6 +79,31 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
  * tudo através do `CheckinCard` de sempre, em vez de um visualizador à
  * parte que precisava reimplementar cada um desses pedaços.
  */
+/**
+ * Título de seção do perfil.
+ *
+ * Fica FORA do cartão. Distintivos e favoritos moravam cada um dentro de
+ * uma caixa branca, e o perfil virava uma pilha de caixas dentro de
+ * caixas: o cartão da seção, e dentro dele os cartõezinhos de cada item.
+ * Agora o título flutua sobre o fundo e só os itens têm superfície.
+ */
+function TituloSecao({
+  children,
+  extra,
+}: {
+  children: ReactNode
+  extra?: ReactNode
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 px-1">
+      <h2 className="text-xs font-extrabold uppercase tracking-wide text-tinta-500">
+        {children}
+      </h2>
+      {extra}
+    </div>
+  )
+}
+
 export function FavoritosGrid({
   favoritos,
   vazio,
@@ -89,30 +115,31 @@ export function FavoritosGrid({
   mostrarLimite?: boolean
 }) {
   return (
-    <div className="card space-y-3 p-5">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
-          ⭐ Favoritos{' '}
-          {favoritos && favoritos.length > 0 && `(${favoritos.length})`}
-        </h2>
-        {mostrarLimite && favoritos && (
-          <span className="text-[10px] font-bold text-tinta-400">
-            {favoritos.length}/{LIMITE_FAVORITOS}
-          </span>
-        )}
-      </div>
+    <section className="space-y-2">
+      <TituloSecao
+        extra={
+          mostrarLimite && favoritos ? (
+            <span className="text-[10px] font-bold text-tinta-400">
+              {favoritos.length}/{LIMITE_FAVORITOS}
+            </span>
+          ) : undefined
+        }
+      >
+        ⭐ Favoritos{' '}
+        {favoritos && favoritos.length > 0 && `(${favoritos.length})`}
+      </TituloSecao>
 
       {favoritos === null ? (
         <Spinner />
       ) : favoritos.length === 0 ? (
-        <p className="text-sm text-tinta-500">{vazio}</p>
+        <p className="px-1 text-sm text-tinta-500">{vazio}</p>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {favoritos.map((f) => (
             <Link
               key={f.id}
               to={`/publicacao/${f.id}`}
-              className="overflow-hidden rounded-xl bg-fundo"
+              className="overflow-hidden rounded-2xl bg-papel"
               aria-label={
                 f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`
               }
@@ -133,7 +160,7 @@ export function FavoritosGrid({
           ))}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -145,20 +172,20 @@ export function BadgeGrid({
   vazio: string
 }) {
   return (
-    <div className="card space-y-3 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
+    <section className="space-y-2">
+      <TituloSecao>
         🎖️ Distintivos {badges && badges.length > 0 && `(${badges.length})`}
-      </h2>
+      </TituloSecao>
       {badges === null ? (
         <Spinner />
       ) : badges.length === 0 ? (
-        <p className="text-sm text-tinta-500">{vazio}</p>
+        <p className="px-1 text-sm text-tinta-500">{vazio}</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {badges.map((b) => (
             <div
               key={b.id}
-              className="flex items-center gap-2.5 rounded-xl bg-fundo px-3 py-2.5"
+              className="card flex items-center gap-2.5 p-3"
               title={b.descricao}
             >
               <span className="shrink-0 text-2xl">{b.emoji}</span>
@@ -172,6 +199,6 @@ export function BadgeGrid({
           ))}
         </div>
       )}
-    </div>
+    </section>
   )
 }

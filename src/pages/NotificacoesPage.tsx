@@ -157,9 +157,11 @@ function LinhaNotificacao({ n }: { n: Notificacao }) {
     </p>
   )
 
+  // Sem cartão em volta, o respiro horizontal já vem da página; a
+  // margem negativa só alarga a área tocável para além do texto.
   if (n.tipo === 'dupla' || !n.checkin_id) {
     return (
-      <div className="flex items-start gap-3 p-4">
+      <div className="flex items-start gap-3 py-3.5">
         <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
           <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
         </Link>
@@ -174,7 +176,7 @@ function LinhaNotificacao({ n }: { n: Notificacao }) {
   return (
     <Link
       to={`/publicacao/${n.checkin_id}`}
-      className="flex items-start gap-3 p-4 transition hover:bg-preto/5"
+      className="-mx-2 flex items-start gap-3 rounded-xl px-2 py-3.5 transition hover:bg-preto/5"
     >
       <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
       <div className="min-w-0 flex-1">
@@ -340,10 +342,14 @@ export function NotificacoesPage() {
             </section>
           )}
 
+          {/* Sem cartão em volta: uma caixa branca por bloco fazia o
+              painel virar uma pilha de caixas, e a lista é justamente o
+              lugar onde nada precisa de moldura. As linhas se separam
+              por um fio, e a superfície fica só na miniatura. */}
           {porDia.map((grupo) => (
-            <section key={grupo.rotulo} className="space-y-2">
+            <section key={grupo.rotulo} className="space-y-1">
               <TituloBloco>{grupo.rotulo}</TituloBloco>
-              <div className="card divide-y divide-preto/10">
+              <div className="divide-y divide-preto/10">
                 {grupo.itens.map((n) => (
                   <LinhaNotificacao key={n.id} n={n} />
                 ))}

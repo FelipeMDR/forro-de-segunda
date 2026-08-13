@@ -10,6 +10,7 @@ import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
+import { ContaPage } from './pages/ContaPage'
 import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
@@ -60,6 +61,8 @@ export default function App() {
               <Route path="/publicacao/:id" element={<PublicacaoPage />} />
               <Route path="/retrospectiva" element={<RetrospectivaPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
+              {/* Antes de /perfil/:id, senão "conta" viraria um id */}
+              <Route path="/perfil/conta" element={<ContaPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />
             </Route>

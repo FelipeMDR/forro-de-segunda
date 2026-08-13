@@ -12,206 +12,9 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeBadges } from '../lib/badges'
-import { CartaoInstalar } from '../components/BotaoInstalar'
 import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
-import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
 import type { Badge, CheckinFavorito } from '../lib/types'
-
-/**
- * Nome, e-mail de recuperação e senha — tudo que a pessoa edita da
- * própria conta, num cartão só.
- *
- * O telefone morava aqui como "seu login" e saiu: agora quem entra é o
- * e-mail, e o número virou uma linha que a pessoa não pode mudar nem
- * usar para nada. Turma e telefone seguem sendo da organização.
- *
- * O e-mail é o que torna possível recuperar a senha sozinho: sem ele o
- * link do "esqueci minha senha" não teria para onde ir. Contas criadas
- * antes da migração 013 nasceram sem e-mail, então o cartão cobra o
- * cadastro em vez de só oferecer.
- */
-function DadosEAcessoCard() {
-  const { api, profile, refreshProfile } = useAuth()
-  const toast = useToast()
-  const [nome, setNome] = useState(profile?.nome ?? '')
-  const [salvandoNome, setSalvandoNome] = useState(false)
-  const [email, setEmail] = useState(profile?.email ?? '')
-  const [senha, setSenha] = useState('')
-  const [confirmar, setConfirmar] = useState('')
-  const [salvandoEmail, setSalvandoEmail] = useState(false)
-  // Endereço que já foi pedido mas ainda espera o clique no link. Fica
-  // como aviso fixo, não toast: é uma instrução de vários passos.
-  const [aguardandoLink, setAguardandoLink] = useState<string | null>(null)
-  const [salvandoSenha, setSalvandoSenha] = useState(false)
-
-  useEffect(() => {
-    setNome(profile?.nome ?? '')
-    setEmail(profile?.email ?? '')
-  }, [profile])
-
-  if (!profile) return null
-  const semEmail = !profile.email
-
-  const salvarNome = async () => {
-    setSalvandoNome(true)
-    try {
-      await api.updateProfile({ nome: nome.trim() })
-      await refreshProfile()
-      toast('Nome atualizado! ✨')
-    } catch (e) {
-      toast((e as Error).message, 'erro')
-    } finally {
-      setSalvandoNome(false)
-    }
-  }
-
-  const salvarEmail = async () => {
-    setSalvandoEmail(true)
-    try {
-      if ((await api.trocarEmail(email)) === 'confirmar') {
-        setAguardandoLink(email.trim())
-      } else {
-        setAguardandoLink(null)
-        await refreshProfile()
-        toast('E-mail salvo! Agora dá para recuperar a senha por ele 📬')
-      }
-    } catch (e) {
-      toast((e as Error).message, 'erro')
-    } finally {
-      setSalvandoEmail(false)
-    }
-  }
-
-  const salvarSenha = async () => {
-    if (senha !== confirmar) {
-      toast('As senhas não conferem', 'erro')
-      return
-    }
-    setSalvandoSenha(true)
-    try {
-      await api.trocarSenha(senha)
-      setSenha('')
-      setConfirmar('')
-      toast('Senha alterada! 🔑')
-    } catch (e) {
-      toast((e as Error).message, 'erro')
-    } finally {
-      setSalvandoSenha(false)
-    }
-  }
-
-  return (
-    <div className="card space-y-4 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
-        Meus dados e acesso
-      </h2>
-
-      <div>
-        <label className="label" htmlFor="perfil-nome">
-          Nome
-        </label>
-        <input
-          id="perfil-nome"
-          className="input"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-        />
-        <p className="mt-1.5 text-xs text-tinta-500">
-          Suas turmas quem define é a organização — fale com eles se algo
-          mudou.
-        </p>
-        <button
-          className="btn-ghost mt-2 w-full"
-          disabled={salvandoNome || !nome.trim() || nome === profile.nome}
-          onClick={() => void salvarNome()}
-        >
-          {salvandoNome ? 'Salvando…' : 'Salvar nome'}
-        </button>
-      </div>
-
-      <div className="space-y-4 border-t border-preto/10 pt-4">
-        {semEmail && (
-          <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-xs text-amber-800">
-            <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
-            novidade, então hoje, se você esquecer a senha, só a organização
-            consegue te destravar. Com um e-mail aqui, você resolve sozinho.
-            Se der erro ao salvar, fale com a organização: contas bem antigas
-            precisam de um ajuste que só ela faz.
-          </p>
-        )}
-
-        <div>
-        <label className="label" htmlFor="perfil-email">
-          E-mail para recuperar a senha
-        </label>
-        <input
-          id="perfil-email"
-          type="email"
-          className="input"
-          placeholder="voce@email.com"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <p className="mt-1.5 text-xs text-tinta-500">
-          Atenção: depois de cadastrar, é <strong>com o e-mail</strong> que
-          você entra no app — o telefone deixa de valer no login.
-        </p>
-        {aguardandoLink && (
-          <p className="mt-2 rounded-xl bg-azul-500/10 px-3 py-3 text-xs text-azul-700">
-            <strong>Falta confirmar.</strong> Mandamos um link para{' '}
-            <strong className="break-all">{aguardandoLink}</strong>. Enquanto
-            você não clicar nele, seu login continua o de antes — inclusive
-            se você fechar o app agora.
-          </p>
-        )}
-        <button
-          className="btn-ghost mt-2 w-full"
-          disabled={salvandoEmail || !email.trim() || email === profile.email}
-          onClick={() => void salvarEmail()}
-        >
-          {salvandoEmail ? 'Salvando…' : 'Salvar e-mail'}
-        </button>
-        </div>
-      </div>
-
-      <div className="border-t border-preto/10 pt-4">
-        <label className="label" htmlFor="perfil-senha">
-          Nova senha (mín. 6 caracteres)
-        </label>
-        <input
-          id="perfil-senha"
-          type="password"
-          className="input"
-          autoComplete="new-password"
-          minLength={6}
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-        />
-        <label className="label mt-3" htmlFor="perfil-senha-2">
-          Confirmar nova senha
-        </label>
-        <input
-          id="perfil-senha-2"
-          type="password"
-          className="input"
-          autoComplete="new-password"
-          minLength={6}
-          value={confirmar}
-          onChange={(e) => setConfirmar(e.target.value)}
-        />
-        <button
-          className="btn-ghost mt-2 w-full"
-          disabled={salvandoSenha || senha.length < 6}
-          onClick={() => void salvarSenha()}
-        >
-          {salvandoSenha ? 'Salvando…' : 'Trocar senha'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 export function ProfilePage() {
   const { api, userId, profile, refreshProfile } = useAuth()
@@ -221,7 +24,6 @@ export function ProfilePage() {
   const [stats, setStats] = useState<PerfilStats | null>(null)
   const [badges, setBadges] = useState<Badge[] | null>(null)
   const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
-  const [pushAtivo, setPushAtivo] = useState(false)
   const [semestreEncerrado, setSemestreEncerrado] = useState(false)
 
   // O perfil da sessão é carregado no login e fica em cache. Se a
@@ -261,7 +63,6 @@ export function ProfilePage() {
         console.error('[perfil] falha ao carregar favoritos', e)
         setFavoritos([])
       })
-    void isPushEnabled().then(setPushAtivo)
     void api
       .semestreEncerrado()
       .then(setSemestreEncerrado)
@@ -292,26 +93,19 @@ export function ProfilePage() {
     }
   }
 
-  const ativarPush = async () => {
-    const ok = await enablePush(api)
-    setPushAtivo(ok)
-    toast(
-      ok
-        ? 'Lembretes ativados! Te avisamos quando tiver forró 🎶'
-        : 'Não foi possível ativar as notificações',
-      ok ? 'ok' : 'erro',
-    )
-  }
-
-  const reiniciarDemo = () => {
-    localStorage.removeItem('fds-demo-db-v4')
-    localStorage.removeItem('fds-demo-uid')
-    window.location.reload()
-  }
-
   return (
     <div className="space-y-4">
-      <div className="card flex flex-col items-center gap-3 p-6">
+      <div className="card relative flex flex-col items-center gap-3 p-6">
+        {/* A engrenagem leva para dados e acesso, que saiu daqui. No
+            canto e discreta: é usada uma vez por semestre, enquanto o
+            resto do cartão é o que a pessoa vem ver. */}
+        <Link
+          to="/perfil/conta"
+          aria-label="Meus dados e acesso"
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-preto/5 text-lg transition active:scale-90"
+        >
+          ⚙️
+        </Link>
         <button
           onClick={() => avatarInput.current?.click()}
           className="relative"
@@ -339,13 +133,15 @@ export function ProfilePage() {
 
         {/* Só quando o semestre fecha. Durante o semestre a retrospectiva
             seria um balanço pela metade; ela some sozinha quando a
-            matrícula nova devolve as turmas. */}
+            matrícula nova devolve as turmas.
+            Gradiente a partir do azul-600: sobre o 500 oficial o branco
+            dá 3,49:1, e este texto é pequeno (precisa de 4,5:1). */}
         {semestreEncerrado && (
           <Link
             to="/retrospectiva"
-            className="w-full rounded-xl bg-azul-500/10 px-4 py-3 text-center text-sm font-bold text-azul-700"
+            className="w-full rounded-xl bg-gradient-to-br from-azul-600 to-marinho-500 px-4 py-3 text-center text-sm font-bold text-white"
           >
-            ✨ Ver minha retrospectiva do semestre
+            ✨ Ver retrospectiva do semestre
           </Link>
         )}
       </div>
@@ -360,42 +156,6 @@ export function ProfilePage() {
         mostrarLimite
         vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
       />
-
-      <DadosEAcessoCard />
-
-      {/* Lugar fixo para instalar: o convite do feed é dispensável, e
-          quem dispensou não tinha mais como voltar atrás. */}
-      <CartaoInstalar />
-
-      {pushSupported() && (
-        <div className="card flex items-center gap-3 p-5">
-          <span className="text-2xl">🔔</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold">Lembrete de aula</p>
-            <p className="text-xs text-tinta-500">
-              "Hoje tem forró!" direto no seu celular
-            </p>
-          </div>
-          {pushAtivo ? (
-            <span className="text-xs font-bold text-verde-800">ativado ✓</span>
-          ) : (
-            <button className="btn-ghost" onClick={() => void ativarPush()}>
-              Ativar
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <button className="btn-ghost w-full" onClick={() => void api.signOut()}>
-          Sair da conta
-        </button>
-        {api.mode === 'demo' && (
-          <button className="btn-danger w-full" onClick={reiniciarDemo}>
-            Reiniciar demonstração (apaga os dados locais)
-          </button>
-        )}
-      </div>
     </div>
   )
 }
