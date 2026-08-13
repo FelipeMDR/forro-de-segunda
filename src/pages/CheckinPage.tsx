@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
 import { MarcarDuplas } from '../components/MarcarDuplas'
+import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
@@ -26,6 +27,24 @@ import {
 } from '../lib/limites'
 import type { Challenge, Feriado } from '../lib/types'
 
+/**
+ * O check-in é um caminho de três passos, não uma página só.
+ *
+ * Antes tudo dividia a mesma tela rolável: câmera, legenda, aviso de
+ * status e a grade de duplas. Cada pedaço aparecia na hora errada — a
+ * legenda pedindo texto antes de existir foto, a grade de duplas
+ * disputando espaço com a câmera.
+ *
+ *   camera  → enquadrar e disparar
+ *   revisar → ver a foto, escrever a legenda, publicar
+ *   pronto  → confirmação e "com quem você dançou?"
+ *
+ * `pronto` também é o estado de repouso: é onde cai quem fecha a câmera
+ * no ✕, quem chega já tendo postado nesta noite, e quem bateu o limite
+ * de fotos por janela.
+ */
+type Etapa = 'camera' | 'revisar' | 'pronto'
+
 export function CheckinPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
@@ -36,12 +55,23 @@ export function CheckinPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [legenda, setLegenda] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [cameraAberta, setCameraAberta] = useState(false)
+  // null enquanto não dá para decidir qual passo mostrar. Sem isso a
+  // câmera abriria na cara de quem já postou, e fecharia em seguida.
+  const [etapa, setEtapa] = useState<Etapa | null>(null)
+  /**
+   * O que aconteceu com a foto que ACABOU de ser publicada.
+   *
+   * Precisa ser guardado no momento do envio: assim que o check-in
+   * entra em `meusCheckins`, ele passa a ser "ponto já contado" e a
+   * mensagem viraria outra. Também distingue "acabei de publicar" de
+   * "cheguei aqui e já tinha postado".
+   */
+  const [resultado, setResultado] = useState<string | null>(null)
   // Os check-ins de hoje chegam do servidor e decidem se ainda dá para
   // postar. Abrir a câmera antes disso arriscaria abri-la para quem já
   // bateu o limite, e fechá-la na cara da pessoa logo em seguida.
   const [carregado, setCarregado] = useState(false)
-  const jaAbriuSozinha = useRef(false)
+  const jaDecidiu = useRef(false)
   // Muda sozinho com o tempo (o respiro de 5 min vence), então precisa
   // de um tique para a tela destravar sem o aluno recarregar a página.
   const [agora, setAgora] = useState(() => new Date())
@@ -208,9 +238,9 @@ export function CheckinPage() {
         if (old) URL.revokeObjectURL(old)
         return URL.createObjectURL(comprimida)
       })
-      // Fecha a câmera: a partir daqui a tela é de revisão, onde entra a
-      // legenda. Escrever com a câmera ligada só gastaria bateria.
-      setCameraAberta(false)
+      // A câmera fecha aqui: a partir deste ponto a tela é de revisão.
+      // Escrever a legenda com a câmera ligada só gastaria bateria.
+      setEtapa('revisar')
     } catch (e) {
       toast((e as Error).message, 'erro')
     }
@@ -224,30 +254,37 @@ export function CheckinPage() {
     })
   }
 
+  /** Volta ao passo 1 jogando fora a foto — "tirar outra" e a seta. */
+  const voltarParaCamera = () => {
+    descartarFoto()
+    setEtapa('camera')
+  }
+
   const publicar = async () => {
     if (!foto) return
     setEnviando(true)
     try {
       await api.createCheckin(foto, legenda, posicao)
-      toast(
+      // O recado do que valeu deixou de ser um toast: ele some sozinho,
+      // e é justamente a resposta da pergunta que trouxe a pessoa aqui.
+      // Agora fica escrito na tela de confirmação.
+      setResultado(
         aindaPontuamAqui.length > 0
-          ? `Check-in confirmado! Valeu ponto em ${aindaPontuamAqui.length} ${
-              aindaPontuamAqui.length === 1 ? 'desafio' : 'desafios'
-            } 🎉`
+          ? 'Sua presença na noite já conta 🎉'
           : jaPontuaram.length > 0
-            ? 'Foto publicada! O ponto de hoje já tinha sido contado 😉'
+            ? 'Seu ponto desta noite já tinha sido contado 😉'
             : suspensaoAgora
-              ? 'Foto publicada! Como a aula de hoje foi cancelada, ela não conta ponto 🚫'
+              ? 'Hoje não tem forró, então a foto não marca ponto 🚫'
               : foraDeles.length > 0
-                ? 'Foto publicada! Ela já fica valendo caso você entre no desafio 🏆'
-                : 'Foto publicada! (nenhum desafio com janela aberta agora)',
+                ? 'Já fica valendo caso você entre no desafio 🏆'
+                : 'Nenhum desafio aberto agora — a foto entra no feed 📸',
       )
-      // Não sai da tela: o melhor momento para marcar com quem se
-      // dançou é agora, com a noite fresca. A pessoa navega quando
-      // quiser — ou nem marca, que também está ok.
+      // O melhor momento para marcar com quem se dançou é agora, com a
+      // noite fresca — é o que o passo 3 oferece.
       descartarFoto()
       setLegenda('')
       setMeusCheckins((atual) => [...atual, new Date()])
+      setEtapa('pronto')
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -329,52 +366,147 @@ export function CheckinPage() {
   // com trava de local — fora isso o resumo já disse tudo.
   const valeDetalhar = abertosAgora.length > 1 || meusComLocal.length > 0
 
-  // Chegar em /checkin é dizer "quero tirar uma foto": a câmera abre
-  // sozinha, como no botão de câmera de qualquer app. Uma vez só — se a
-  // pessoa fechar, quem reabre é ela, pelo botão.
+  /**
+   * Em qual passo a tela abre.
+   *
+   * Chegar em /checkin é dizer "quero tirar uma foto", então a câmera
+   * abre sozinha — mas só para quem ainda tem foto a dar nesta noite.
+   * Quem já postou, ou bateu o limite, cai no passo 3, que é onde estão
+   * as duplas e a saída para o feed. Decide uma vez só: depois disso
+   * quem manda no passo é a pessoa.
+   */
   useEffect(() => {
-    if (jaAbriuSozinha.current || !carregado || !limite.pode || foto) return
-    jaAbriuSozinha.current = true
-    setCameraAberta(true)
-  }, [carregado, limite.pode, foto])
+    if (jaDecidiu.current || !carregado) return
+    jaDecidiu.current = true
+    setEtapa(jaPosteiHoje || !limite.pode ? 'pronto' : 'camera')
+  }, [carregado, jaPosteiHoje, limite.pode])
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
+  if (etapa === null) return <Spinner texto="Preparando o check-in…" />
 
-      {/* Só depois de ter foto no dia: marcar dupla exige que os dois
-          tenham feito check-in, então antes disso nem faria sentido. */}
-      {jaPosteiHoje && (
-        <>
-          <MarcarDuplas data={noiteAtual} />
-          <Link className="btn-ghost block text-center" to="/">
-            Ir para o feed
-          </Link>
-        </>
-      )}
+  // ---- Passo 1: a câmera, em tela cheia por cima de tudo ----
+  if (etapa === 'camera') {
+    return (
+      <CameraCapture
+        onCapture={(b) => void aoCapturar(b)}
+        // Fechar não é cancelar o check-in: cai no passo 3, que é o
+        // estado de repouso da tela (duplas e saída para o feed).
+        onFechar={() => setEtapa('pronto')}
+        permitirFotoTeste={api.mode === 'demo'}
+        topo={
+          <>
+            {/* Mesmas cores da página: a faixa da câmera é clara, então
+                não há motivo para um visual só dela. */}
+            <div
+              className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${CORES[status.tom]}`}
+            >
+              <span aria-hidden>{status.emoji}</span>
+              <p className="flex-1">{status.texto}</p>
+            </div>
+            {erroLocal && comLocal.length > 0 && (
+              <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-800">
+                <p className="flex-1">📍 {erroLocal}</p>
+                <button
+                  className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
+                  onClick={() => void buscarLocal()}
+                >
+                  Tentar de novo
+                </button>
+              </div>
+            )}
+          </>
+        }
+      />
+    )
+  }
 
-      <div
-        className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm ${CORES[status.tom]}`}
-      >
-        <span aria-hidden>{status.emoji}</span>
-        <p className="flex-1">{status.texto}</p>
-      </div>
-
-      {/* GPS falhou: tem botão, então não cabe no resumo. */}
-      {erroLocal && comLocal.length > 0 && (
-        <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-          <p className="flex-1">
-            📍 {erroLocal} — sem isso a foto não marca ponto nos desafios com
-            local, nem se você entrar depois.
-          </p>
+  // ---- Passo 2: revisar a foto e escrever a legenda ----
+  if (etapa === 'revisar' && preview) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
           <button
-            className="shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold"
-            onClick={() => void buscarLocal()}
+            onClick={voltarParaCamera}
+            disabled={enviando}
+            aria-label="Voltar para a câmera"
+            className="-ml-1 shrink-0 rounded-full px-2 py-1 text-lg text-tinta-600 transition active:scale-90 disabled:opacity-50"
           >
-            Tentar de novo
+            ←
+          </button>
+          <h1 className="text-xl font-extrabold">Revisar o check-in</h1>
+        </div>
+
+        <div className="card overflow-hidden">
+          <img
+            src={preview}
+            alt="Prévia do check-in"
+            className="aspect-[4/5] w-full object-cover"
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="legenda">
+            Legenda (opcional)
+          </label>
+          <textarea
+            id="legenda"
+            className="input resize-none"
+            rows={2}
+            maxLength={200}
+            placeholder="Escreva algo sobre a noite…"
+            value={legenda}
+            onChange={(e) => setLegenda(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2 border-t border-preto/10 pt-4">
+          <button
+            className="btn-primary w-full py-3.5 text-base"
+            disabled={enviando || !limite.pode}
+            onClick={() => void publicar()}
+          >
+            {enviando ? 'Publicando…' : 'Publicar check-in'}
+          </button>
+          <button
+            className="w-full py-2 text-center text-sm font-bold text-tinta-600 disabled:opacity-50"
+            disabled={enviando}
+            onClick={voltarParaCamera}
+          >
+            Tirar outra
           </button>
         </div>
-      )}
+      </div>
+    )
+  }
+
+  // ---- Passo 3: confirmação, duplas e saída ----
+  // Também é o repouso: quem fecha a câmera, quem já postou nesta noite
+  // e quem bateu o limite param aqui. O título diz qual dos casos é.
+  const acabouDePublicar = resultado !== null
+  const titulo = acabouDePublicar
+    ? 'Check-in registrado!'
+    : jaPosteiHoje
+      ? 'Sua presença de hoje já está registrada'
+      : 'Nada publicado ainda'
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col items-center gap-2 pt-2 text-center">
+        <span
+          aria-hidden
+          className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+            acabouDePublicar || jaPosteiHoje
+              ? 'bg-verde-500/20 text-verde-800'
+              : 'bg-preto/5 text-tinta-500'
+          }`}
+        >
+          {acabouDePublicar || jaPosteiHoje ? '✓' : '📸'}
+        </span>
+        <h1 className="text-xl font-extrabold">{titulo}</h1>
+        {/* verde-800 e azul-700 têm contraste medido sobre o fundo claro */}
+        <p className="text-sm text-azul-700">
+          {resultado ?? `${status.emoji} ${status.texto}`}
+        </p>
+      </div>
 
       {!limite.pode && limite.liberaEm && (
         <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
@@ -394,73 +526,25 @@ export function CheckinPage() {
         </div>
       )}
 
-      {/* Etapa 2: a foto já existe, agora é revisar e escrever. A legenda
-          só aparece aqui — pedir texto antes da foto era ocupar a tela
-          com o passo errado. */}
-      {preview ? (
-        <>
-          <div className="card overflow-hidden">
-            <img
-              src={preview}
-              alt="Prévia do check-in"
-              className="aspect-[4/5] w-full object-cover"
-            />
-          </div>
+      {/* Marcar dupla exige que os dois tenham dado check-in, então isto
+          só faz sentido depois da foto — e é aqui que a noite está mais
+          fresca na memória. */}
+      {jaPosteiHoje && <MarcarDuplas data={noiteAtual} />}
 
-          <div>
-            <label className="label" htmlFor="legenda">
-              Legenda (opcional)
-            </label>
-            <textarea
-              id="legenda"
-              className="input resize-none"
-              rows={2}
-              maxLength={200}
-              placeholder="Como foi a aula de hoje?"
-              value={legenda}
-              onChange={(e) => setLegenda(e.target.value)}
-            />
-          </div>
-
+      {/* GPS falhou e ainda dá para tirar outra: aí sim é acionável. */}
+      {erroLocal && comLocal.length > 0 && limite.pode && (
+        <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+          <p className="flex-1">
+            📍 {erroLocal} — sem isso a foto não marca ponto nos desafios com
+            local.
+          </p>
           <button
-            className="btn-primary w-full py-3.5 text-base"
-            disabled={enviando || !limite.pode}
-            onClick={() => void publicar()}
+            className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
+            onClick={() => void buscarLocal()}
           >
-            {enviando ? 'Publicando…' : 'Publicar check-in 🎉'}
+            Tentar de novo
           </button>
-
-          <button
-            className="btn-ghost w-full"
-            disabled={enviando}
-            onClick={() => {
-              descartarFoto()
-              setCameraAberta(true)
-            }}
-          >
-            Tirar outra 🔄
-          </button>
-        </>
-      ) : (
-        limite.pode && (
-          <>
-            <button
-              className="btn-primary w-full py-3.5 text-base"
-              onClick={() => setCameraAberta(true)}
-            >
-              Abrir a câmera 📸
-            </button>
-            {limite.restantes <= 2 && (
-              <p className="px-2 text-center text-xs text-tinta-500">
-                Você ainda pode postar{' '}
-                <strong>
-                  {limite.restantes} {limite.restantes === 1 ? 'foto' : 'fotos'}
-                </strong>{' '}
-                nas próximas horas.
-              </p>
-            )}
-          </>
-        )
+        </div>
       )}
 
       {/* O detalhe desafio a desafio interessa a pouca gente e quase
@@ -493,39 +577,30 @@ export function CheckinPage() {
         </details>
       )}
 
-      {/* Tela cheia por cima de tudo, inclusive do menu de baixo — sair
-          é pelo ✕. Os avisos vão junto, desenhados sobre a imagem, para
-          a pessoa saber se a foto vale ponto enquanto enquadra. */}
-      {cameraAberta && (
-        <CameraCapture
-          onCapture={(b) => void aoCapturar(b)}
-          onFechar={() => setCameraAberta(false)}
-          permitirFotoTeste={api.mode === 'demo'}
-          topo={
-            <>
-              {/* Mesmas cores da página: a faixa da câmera é clara, então
-                  não há motivo para um visual só dela. */}
-              <div
-                className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${CORES[status.tom]}`}
-              >
-                <span aria-hidden>{status.emoji}</span>
-                <p className="flex-1">{status.texto}</p>
-              </div>
-              {erroLocal && comLocal.length > 0 && (
-                <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-800">
-                  <p className="flex-1">📍 {erroLocal}</p>
-                  <button
-                    className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
-                    onClick={() => void buscarLocal()}
-                  >
-                    Tentar de novo
-                  </button>
-                </div>
-              )}
-            </>
-          }
-        />
-      )}
+      <div className="space-y-2 pt-1">
+        <Link className="btn-ghost block w-full text-center" to="/">
+          Ir para o feed
+        </Link>
+        {limite.pode && (
+          <>
+            <button
+              className="w-full py-2 text-center text-sm font-bold text-tinta-600"
+              onClick={() => setEtapa('camera')}
+            >
+              {jaPosteiHoje ? 'Tirar outra foto 📸' : 'Abrir a câmera 📸'}
+            </button>
+            {limite.restantes <= 2 && (
+              <p className="px-2 text-center text-xs text-tinta-500">
+                Você ainda pode postar{' '}
+                <strong>
+                  {limite.restantes} {limite.restantes === 1 ? 'foto' : 'fotos'}
+                </strong>{' '}
+                nas próximas horas.
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
