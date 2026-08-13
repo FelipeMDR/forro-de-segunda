@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { Avatar } from './Avatar'
+import { combinaBusca } from '../lib/busca'
 import type { ParceiroPossivel } from '../lib/types'
+
+/**
+ * Quantos rostos aparecem antes de "ver todos" — três linhas de quatro.
+ *
+ * Numa noite cheia de espaço livre são 50 pessoas: a grade inteira
+ * passaria de 900px e empurraria a câmera, o aviso e o botão de publicar
+ * para fora da tela. Quem dança com 5 pessoas não precisa das outras 45
+ * na cara; quem precisa, busca pelo nome.
+ */
+const LIMITE_ROSTOS = 12
 
 /**
  * Grade de rostos de quem também fez check-in na noite, para marcar
@@ -20,6 +31,8 @@ export function MarcarDuplas({ data }: { data: string }) {
   const toast = useToast()
   const [pessoas, setPessoas] = useState<ParceiroPossivel[] | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+  const [verTodos, setVerTodos] = useState(false)
 
   const carregar = useCallback(async () => {
     try {
@@ -35,7 +48,32 @@ export function MarcarDuplas({ data }: { data: string }) {
     void carregar()
   }, [carregar])
 
+  /**
+   * Marcados na frente: são a resposta que a pessoa acabou de dar, e no
+   * meio de 50 rostos eles sumiriam — inclusive para desmarcar.
+   */
+  const ordenadas = useMemo(
+    () =>
+      [...(pessoas ?? [])].sort(
+        (a, b) =>
+          Number(b.marcado) - Number(a.marcado) || a.nome.localeCompare(b.nome),
+      ),
+    [pessoas],
+  )
+
+  const encontradas = useMemo(
+    () => ordenadas.filter((p) => combinaBusca(busca, [p.nome])),
+    [ordenadas, busca],
+  )
+
   if (!pessoas || pessoas.length === 0) return null
+
+  // Buscar já é pedir para ver o que casa — não faz sentido cortar aí
+  const mostrarTodas = verTodos || busca.trim() !== ''
+  const visiveis = mostrarTodas
+    ? encontradas
+    : encontradas.slice(0, LIMITE_ROSTOS)
+  const escondidas = encontradas.length - visiveis.length
 
   const alternar = async (p: ParceiroPossivel) => {
     setOcupado(p.user_id)
@@ -62,8 +100,21 @@ export function MarcarDuplas({ data }: { data: string }) {
         </p>
       </div>
 
+      {/* A busca só aparece quando a grade não cabe inteira: numa noite
+          de 8 pessoas ela seria um campo a mais sem ter o que filtrar. */}
+      {pessoas.length > LIMITE_ROSTOS && (
+        <input
+          type="search"
+          className="input"
+          placeholder={`Buscar entre ${pessoas.length} pessoas…`}
+          aria-label="Buscar quem deu check-in hoje"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+      )}
+
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-        {pessoas.map((p) => (
+        {visiveis.map((p) => (
           <button
             key={p.user_id}
             onClick={() => void alternar(p)}
@@ -87,6 +138,23 @@ export function MarcarDuplas({ data }: { data: string }) {
           </button>
         ))}
       </div>
+
+      {busca.trim() !== '' && encontradas.length === 0 && (
+        <p className="text-xs text-tinta-500">
+          Ninguém com esse nome deu check-in hoje. Só dá para marcar quem
+          esteve lá.
+        </p>
+      )}
+
+      {escondidas > 0 && (
+        <button
+          type="button"
+          className="w-full text-center text-xs font-bold text-tinta-600 underline"
+          onClick={() => setVerTodos(true)}
+        >
+          Ver todos ({encontradas.length})
+        </button>
+      )}
 
       {marcados > 0 && (
         <p className="text-xs text-tinta-500">
