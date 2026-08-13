@@ -5,32 +5,35 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  * (sem galeria), para evitar fotos antigas. Usa getUserMedia; exige
  * HTTPS (ou localhost) e permissão de câmera.
  *
- * Ocupa a tela inteira, como a câmera de qualquer app de foto. Antes era
- * um cartãozinho 4:5 no meio da página, com legenda e avisos disputando
- * espaço embaixo: o botão de disparo sobrava num lugar qualquer da tela,
- * longe do polegar, e tirar selfie virava ginástica. Aqui o disparo mora
- * na faixa de baixo, onde a mão já está.
+ * Ocupa a tela inteira, com o disparo na faixa de baixo, onde o polegar
+ * já está — antes era um cartãozinho no meio da página, com legenda e
+ * avisos disputando espaço embaixo, e o botão sobrava num ponto qualquer
+ * da tela.
+ *
+ * O quadro aparece INTEIRO, com faixas claras em volta, como na câmera
+ * do celular. Esticá-lo para preencher a tela (`object-cover`) obrigava
+ * a cortar as laterais — num aparelho alto isso vira um zoom de verdade,
+ * e enquadrar o próprio rosto ficava impossível.
  */
 
 /**
- * O recorte do quadro que está realmente aparecendo na tela.
+ * O maior recorte central do quadro num dado formato.
  *
- * O vídeo é desenhado com `object-cover`: numa tela alta e estreita, boa
- * parte das laterais de um quadro 4:3 fica de fora. Capturar o quadro
- * inteiro entregaria uma foto com gente e parede que a pessoa nunca viu
- * ao enquadrar — então a captura recorta igual à tela.
+ * Não depende de layout nenhum: é conta com as dimensões da câmera. Por
+ * isso a moldura desenhada na tela e a foto salva saem sempre iguais —
+ * as duas saem daqui.
  */
-export function recorteVisivel(
+export function recorteCentral(
   larguraQuadro: number,
   alturaQuadro: number,
-  aspectoTela: number,
+  aspecto: number,
 ): { sx: number; sy: number; sw: number; sh: number } {
   let sw = larguraQuadro
   let sh = alturaQuadro
-  if (larguraQuadro / alturaQuadro > aspectoTela) {
-    sw = Math.round(alturaQuadro * aspectoTela)
+  if (larguraQuadro / alturaQuadro > aspecto) {
+    sw = Math.round(alturaQuadro * aspecto)
   } else {
-    sh = Math.round(larguraQuadro / aspectoTela)
+    sh = Math.round(larguraQuadro / aspecto)
   }
   return {
     sx: Math.round((larguraQuadro - sw) / 2),
@@ -43,11 +46,10 @@ export function recorteVisivel(
 /**
  * Onde a foto vai viver: o feed mostra todo check-in em 4:5.
  *
- * Por isso a câmera marca essa área. Capturar a tela cheia (num celular
- * moderno, quase 9:19) entregaria uma foto que o feed cortaria pela
- * metade — a pessoa enquadraria o rosto no alto e ele sumiria depois.
+ * A câmera marca essa área e escurece o resto. Sem a marca, a pessoa
+ * enquadraria o rosto junto da borda e ele sumiria no feed depois.
  */
-export const ASPECTO_FOTO = '4 / 5'
+export const ASPECTO_FOTO = 4 / 5
 
 /**
  * Desenha o recorte no canvas, espelhando quando a fonte está espelhada
@@ -92,21 +94,24 @@ export function CameraCapture({
   onCapture: (foto: Blob) => void
   /** Sair da câmera sem tirar foto. */
   onFechar: () => void
-  /** Avisos desenhados por cima da imagem, no alto da tela. */
+  /** Avisos mostrados na faixa de cima. */
   topo?: ReactNode
   /** Modo demo: oferece uma foto gerada quando a câmera não está disponível. */
   permitirFotoTeste?: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const guiaRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [facing, setFacing] = useState<'environment' | 'user'>('environment')
   const [erro, setErro] = useState<string | null>(null)
   const [pronta, setPronta] = useState(false)
+  // Dimensões do quadro que a câmera está entregando. Só dá para saber
+  // depois que o vídeo carrega, e mudam ao virar a câmera.
+  const [quadro, setQuadro] = useState<{ w: number; h: number } | null>(null)
 
   const abrirCamera = useCallback(async (modo: 'environment' | 'user') => {
     setErro(null)
     setPronta(false)
+    setQuadro(null)
     streamRef.current?.getTracks().forEach((t) => t.stop())
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -167,23 +172,11 @@ export function CameraCapture({
   const capturar = async () => {
     const video = videoRef.current
     if (!video || !pronta) return
-    // Dois passos: primeiro o que a tela mostra do quadro (object-cover
-    // corta as laterais), depois a fatia que a moldura 4:5 marca dentro
-    // disso. A moldura é MEDIDA, não recalculada: assim a foto é sempre
-    // exatamente o que estava dentro dela, dê o CSS o tamanho que der.
-    const visivel = recorteVisivel(
+    const recorte = recorteCentral(
       video.videoWidth,
       video.videoHeight,
-      video.clientWidth / video.clientHeight,
+      ASPECTO_FOTO,
     )
-    const rv = video.getBoundingClientRect()
-    const rg = guiaRef.current?.getBoundingClientRect() ?? rv
-    const recorte = {
-      sx: Math.round(visivel.sx + ((rg.left - rv.left) / rv.width) * visivel.sw),
-      sy: Math.round(visivel.sy + ((rg.top - rv.top) / rv.height) * visivel.sh),
-      sw: Math.round((rg.width / rv.width) * visivel.sw),
-      sh: Math.round((rg.height / rv.height) * visivel.sh),
-    }
     const canvas = document.createElement('canvas')
     canvas.width = recorte.sw
     canvas.height = recorte.sh
@@ -226,27 +219,44 @@ export function CameraCapture({
     <button
       onClick={onFechar}
       aria-label="Fechar câmera"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/50 text-lg text-white backdrop-blur transition active:scale-90"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-preto/5 text-lg text-tinta-700 transition active:scale-90"
     >
       ✕
     </button>
   )
 
+  /** Faixa de cima: sair da câmera, e o aviso centrado na tela. */
+  const faixaDeCima = (
+    <div
+      className="relative shrink-0 px-4 pb-3"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
+    >
+      <div
+        className="absolute left-4"
+        style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+      >
+        {botaoFechar}
+      </div>
+      {topo && (
+        <div className="mx-auto flex max-w-[calc(100%-6rem)] flex-col items-center gap-2 text-center">
+          {topo}
+        </div>
+      )}
+    </div>
+  )
+
   if (erro) {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-black text-white"
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)',
-        }}
+        className="fixed inset-0 z-50 flex flex-col bg-fundo"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
       >
-        <div className="px-4">{botaoFechar}</div>
+        {faixaDeCima}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <span className="text-5xl">📷</span>
-          <p className="text-sm text-white/80">{erro}</p>
+          <p className="text-sm text-tinta-600">{erro}</p>
           <button
-            className="rounded-xl bg-white/15 px-5 py-2.5 text-sm font-bold backdrop-blur"
+            className="btn-ghost"
             onClick={() => void abrirCamera(facing)}
           >
             Tentar de novo
@@ -261,73 +271,77 @@ export function CameraCapture({
     )
   }
 
+  // A moldura sai da MESMA conta da captura, em coordenadas do quadro. O
+  // SVG com `meet` encolhe igual ao `object-contain` do vídeo, então ela
+  // cai exatamente sobre a imagem sem ninguém medir pixel de tela.
+  const recorte = quadro
+    ? recorteCentral(quadro.w, quadro.h, ASPECTO_FOTO)
+    : null
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        className={`absolute inset-0 h-full w-full object-cover ${
-          facing === 'user' ? '-scale-x-100' : ''
-        }`}
-      />
+    <div className="fixed inset-0 z-50 flex flex-col bg-fundo">
+      {faixaDeCima}
 
-      {/* Moldura do que entra na foto. O escurecido de fora é uma sombra
-          gigante da própria moldura — assim ele acompanha qualquer
-          tamanho que o CSS dê a ela, sem conta repetida. */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-        {/* Numa tela alta (todo celular em pé) manda a largura e a altura
-            é deduzida; numa tela larga inverte, senão o 4:5 se perderia e
-            a foto sairia fora do formato — a captura é medida DAQUI. */}
-        <div
-          ref={guiaRef}
-          className="w-full ring-1 ring-inset ring-white/25 [@media(min-aspect-ratio:4/5)]:h-full [@media(min-aspect-ratio:4/5)]:w-auto"
-          style={{
-            aspectRatio: ASPECTO_FOTO,
-            boxShadow: '0 0 0 100vmax rgba(0,0,0,0.45)',
-          }}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          onLoadedMetadata={(e) =>
+            setQuadro({
+              w: e.currentTarget.videoWidth,
+              h: e.currentTarget.videoHeight,
+            })
+          }
+          className={`h-full w-full object-contain ${
+            facing === 'user' ? '-scale-x-100' : ''
+          }`}
         />
-      </div>
 
-      {!pronta && (
-        <div className="absolute inset-0 flex items-center justify-center text-white/60">
-          <span className="animate-pulse text-3xl">📷</span>
-        </div>
-      )}
+        {quadro && recorte && (
+          <svg
+            viewBox={`0 0 ${quadro.w} ${quadro.h}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            aria-hidden
+          >
+            {/* Escurece tudo menos o recorte (regra par-ímpar) */}
+            <path
+              fillRule="evenodd"
+              fill="rgba(0,0,0,0.45)"
+              d={`M0 0 H${quadro.w} V${quadro.h} H0 Z M${recorte.sx} ${recorte.sy} H${
+                recorte.sx + recorte.sw
+              } V${recorte.sy + recorte.sh} H${recorte.sx} Z`}
+            />
+            <rect
+              x={recorte.sx}
+              y={recorte.sy}
+              width={recorte.sw}
+              height={recorte.sh}
+              fill="none"
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth={Math.max(2, quadro.w / 400)}
+            />
+          </svg>
+        )}
 
-      {/* Faixa de cima: sair da câmera e os avisos, sobre um degradê que
-          garante leitura seja qual for a cena atrás.
-          O ✕ fica sobreposto (não dividindo a largura com o aviso): antes
-          os dois dividiam a linha, e o aviso — puxado para a direita pelo
-          espaço que sobrava do botão — ficava visivelmente descentralizado
-          da tela. Cada um centraliza no seu próprio eixo agora. */}
-      <div
-        className="relative z-10 bg-gradient-to-b from-black/70 via-black/40 to-transparent px-4 pb-10"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
-      >
-        <div className="absolute left-4" style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}>
-          {botaoFechar}
-        </div>
-        {topo && (
-          <div className="mx-auto flex max-w-[calc(100%-6rem)] flex-col items-center gap-2 pt-1 text-center">
-            {topo}
+        {!pronta && (
+          <div className="absolute inset-0 flex items-center justify-center text-tinta-400">
+            <span className="animate-pulse text-3xl">📷</span>
           </div>
         )}
       </div>
 
-      {/* Empurra os controles para baixo sem capturar toques */}
-      <div className="pointer-events-none flex-1" />
-
       <div
-        className="relative z-10 flex items-center justify-center gap-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-6 pt-12"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}
+        className="flex shrink-0 items-center justify-center gap-10 px-6 pt-5"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
       >
         <button
           onClick={() =>
             setFacing((f) => (f === 'user' ? 'environment' : 'user'))
           }
           aria-label="Virar câmera"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-xl backdrop-blur transition active:scale-90"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-preto/5 text-xl transition active:scale-90"
         >
           🔄
         </button>
@@ -335,9 +349,9 @@ export function CameraCapture({
           onClick={() => void capturar()}
           disabled={!pronta}
           aria-label="Tirar foto"
-          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-[5px] border-white transition active:scale-90 disabled:opacity-40"
+          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-preto/15 transition active:scale-90 disabled:opacity-40"
         >
-          <span className="block h-14 w-14 rounded-full bg-white" />
+          <span className="block h-14 w-14 rounded-full bg-gradient-to-br from-brasa-500 to-brasa-700" />
         </button>
         {/* Contrapeso do botão de virar, para o disparo ficar centrado */}
         <span className="h-12 w-12" aria-hidden />

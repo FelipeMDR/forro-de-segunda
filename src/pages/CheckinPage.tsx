@@ -503,17 +503,19 @@ export function CheckinPage() {
           permitirFotoTeste={api.mode === 'demo'}
           topo={
             <>
-              {/* Branco sobre preto/70 dá no mínimo 8,5:1 mesmo que a
-                  câmera esteja apontada para uma parede branca. */}
-              <div className="flex items-start gap-2 rounded-2xl bg-black/70 px-3.5 py-2.5 text-sm text-white backdrop-blur">
+              {/* Mesmas cores da página: a faixa da câmera é clara, então
+                  não há motivo para um visual só dela. */}
+              <div
+                className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${CORES[status.tom]}`}
+              >
                 <span aria-hidden>{status.emoji}</span>
                 <p className="flex-1">{status.texto}</p>
               </div>
               {erroLocal && comLocal.length > 0 && (
-                <div className="flex items-center gap-3 rounded-2xl bg-black/70 px-3.5 py-2.5 text-sm text-white backdrop-blur">
+                <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-800">
                   <p className="flex-1">📍 {erroLocal}</p>
                   <button
-                    className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-bold"
+                    className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
                     onClick={() => void buscarLocal()}
                   >
                     Tentar de novo
