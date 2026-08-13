@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
@@ -6,12 +6,77 @@ import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { agrupaPorDia } from '../lib/agrupaPorDia'
 import { formatRelative } from '../lib/dates'
 import { PAGINA_NOTIFICACOES } from '../lib/types'
 import type { Notificacao } from '../lib/types'
 
-/** Linha de "Fulana marcou que dançou com você" — a única acionável. */
-function LinhaDupla({
+/** Título de bloco: PENDÊNCIAS, HOJE, ONTEM… */
+function TituloBloco({
+  children,
+  destaque = false,
+}: {
+  children: ReactNode
+  destaque?: boolean
+}) {
+  return (
+    <h2
+      className={`px-1 text-xs font-extrabold uppercase tracking-wide ${
+        destaque ? 'text-brasa-700' : 'text-tinta-500'
+      }`}
+    >
+      {children}
+    </h2>
+  )
+}
+
+/**
+ * Convite da retrospectiva.
+ *
+ * O balanço do semestre era a tela mais escondida do app: só existia
+ * como um botão dentro do perfil. Aqui ele vira o que sempre foi — um
+ * acontecimento, que chega até a pessoa em vez de esperar ser
+ * procurado.
+ */
+function ConviteRetrospectiva() {
+  return (
+    <Link
+      to="/retrospectiva"
+      // azul-600 e não o 500 oficial: branco sobre o 500 dá 3,49:1, e
+      // este texto é pequeno (precisa de 4,5:1). O 600 leva a 5,07:1 no
+      // ponto mais claro do gradiente, e a marca continua reconhecível.
+      className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-azul-600 to-marinho-500 p-4 text-white shadow-sm"
+    >
+      <span
+        aria-hidden
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-xl"
+      >
+        ✨
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-extrabold leading-tight">
+          Sua retrospectiva do semestre chegou
+        </p>
+        {/* /90 e não /85: o 85 cai para 4,11:1 sobre o azul-600 */}
+        <p className="mt-0.5 text-xs text-white/90">
+          Toque para ver seu balanço
+        </p>
+      </div>
+      <span aria-hidden className="shrink-0 text-white/70">
+        ›
+      </span>
+    </Link>
+  )
+}
+
+/**
+ * Pendência de dupla: a única linha do painel que pede uma resposta.
+ *
+ * Sai da lista comum e ganha cartão próprio no topo, com os dois botões
+ * em tamanho de verdade — antes eram duas pílulas de 12px perdidas no
+ * meio de reações e comentários, que só avisam.
+ */
+function CartaoPendencia({
   n,
   ocupado,
   onConfirmar,
@@ -23,33 +88,34 @@ function LinhaDupla({
   onRecusar: () => void
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm">
-        <strong>{n.autor.nome}</strong>{' '}
-        {n.pendente ? (
-          <>marcou que dançou com você 💃</>
-        ) : (
-          <>dançou com você 💃</>
-        )}
-      </p>
-      {n.pendente && (
-        <div className="flex gap-2">
-          <button
-            className="rounded-full bg-verde-700 px-3 py-1 text-xs font-bold text-white disabled:opacity-60"
-            disabled={ocupado}
-            onClick={onConfirmar}
-          >
-            Confirmar
-          </button>
-          <button
-            className="rounded-full bg-preto/5 px-3 py-1 text-xs font-bold text-tinta-700 disabled:opacity-60"
-            disabled={ocupado}
-            onClick={onRecusar}
-          >
-            Não rolou
-          </button>
-        </div>
-      )}
+    <div className="card space-y-3 border-brasa-500/40 p-4">
+      <div className="flex items-center gap-3">
+        <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
+          <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
+        </Link>
+        <p className="min-w-0 flex-1 text-sm">
+          <strong>{n.autor.nome}</strong> marcou vocês como dupla 💃
+        </p>
+      </div>
+      {/* py-3 leva os dois de 42px para 48: o padrão do `.btn` para
+          quando o botão fica no meio do texto, aqui é o alvo principal
+          da tela e precisa dos 44px mínimos. */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          className="btn-primary py-3"
+          disabled={ocupado}
+          onClick={onConfirmar}
+        >
+          Confirmar
+        </button>
+        <button
+          className="btn-ghost py-3"
+          disabled={ocupado}
+          onClick={onRecusar}
+        >
+          Não rolou
+        </button>
+      </div>
     </div>
   )
 }
@@ -65,25 +131,14 @@ function LinhaDupla({
  * publicação. "Dancei com" não é sobre uma foto, então continua sem
  * link — só a resposta de confirmar/recusar.
  */
-function LinhaNotificacao({
-  n,
-  ocupado,
-  onConfirmar,
-  onRecusar,
-}: {
-  n: Notificacao
-  ocupado: boolean
-  onConfirmar: () => void
-  onRecusar: () => void
-}) {
+function LinhaNotificacao({ n }: { n: Notificacao }) {
   const conteudo =
     n.tipo === 'dupla' ? (
-      <LinhaDupla
-        n={n}
-        ocupado={ocupado}
-        onConfirmar={onConfirmar}
-        onRecusar={onRecusar}
-      />
+      // Pendência não passa por aqui: ela vira cartão no topo. O que
+      // sobra é a dupla já confirmada, que é só um aviso.
+      <p className="text-sm">
+        <strong>{n.autor.nome}</strong> dançou com você 💃
+      </p>
     ) : n.tipo === 'reacao' ? (
       <p className="text-sm">
         <strong>{n.autor.nome}</strong> reagiu à sua foto{' '}
@@ -150,6 +205,7 @@ export function NotificacoesPage() {
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [carregandoMais, setCarregandoMais] = useState(false)
   const [temMais, setTemMais] = useState(true)
+  const [semestreEncerrado, setSemestreEncerrado] = useState(false)
   /** Marcador invisível no fim da lista — carrega mais ao entrar na tela. */
   const sentinela = useRef<HTMLDivElement | null>(null)
 
@@ -204,6 +260,11 @@ export function NotificacoesPage() {
     void carregar()
     // Abriu o painel = viu tudo. O contador zera na próxima leitura.
     void api.marcarNotificacoesVistas().catch(() => {})
+    void api
+      .semestreEncerrado()
+      .then(setSemestreEncerrado)
+      // Sem a migração 017 a tabela não existe — o painel vale sem o convite
+      .catch(() => setSemestreEncerrado(false))
   }, [api, carregar])
 
   // Rolagem infinita: mesma lógica do feed. `rootMargin` positivo busca
@@ -241,11 +302,20 @@ export function NotificacoesPage() {
   if (erro) return <ErrorState erro={erro} onRetry={() => void carregar()} />
   if (itens === null) return <Spinner texto="Carregando…" />
 
+  // Pendências saem da linha do tempo: são as únicas que pedem resposta,
+  // e ficavam soterradas entre reações e comentários, que só avisam.
+  const pendencias = itens.filter((n) => n.pendente)
+  const avisos = itens.filter((n) => !n.pendente)
+  const porDia = agrupaPorDia(avisos, (n) => n.criado_em)
+  const vazio = itens.length === 0 && !semestreEncerrado
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-extrabold">Notificações 🔔</h1>
+      <h1 className="text-xl font-extrabold">🔔 Avisos</h1>
 
-      {itens.length === 0 ? (
+      {semestreEncerrado && <ConviteRetrospectiva />}
+
+      {vazio ? (
         <EmptyState emoji="🌵" titulo="Nada por aqui ainda">
           <p className="text-sm text-tinta-500">
             Curtidas, comentários e marcações de dança aparecem aqui.
@@ -253,17 +323,33 @@ export function NotificacoesPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="card divide-y divide-preto/10">
-            {itens.map((n) => (
-              <LinhaNotificacao
-                key={n.id}
-                n={n}
-                ocupado={ocupado === n.id}
-                onConfirmar={() => void responder(n, true)}
-                onRecusar={() => void responder(n, false)}
-              />
-            ))}
-          </div>
+          {pendencias.length > 0 && (
+            <section className="space-y-2">
+              <TituloBloco destaque>
+                ⚡ {pendencias.length === 1 ? 'Pendência' : 'Pendências'}
+              </TituloBloco>
+              {pendencias.map((n) => (
+                <CartaoPendencia
+                  key={n.id}
+                  n={n}
+                  ocupado={ocupado === n.id}
+                  onConfirmar={() => void responder(n, true)}
+                  onRecusar={() => void responder(n, false)}
+                />
+              ))}
+            </section>
+          )}
+
+          {porDia.map((grupo) => (
+            <section key={grupo.rotulo} className="space-y-2">
+              <TituloBloco>{grupo.rotulo}</TituloBloco>
+              <div className="card divide-y divide-preto/10">
+                {grupo.itens.map((n) => (
+                  <LinhaNotificacao key={n.id} n={n} />
+                ))}
+              </div>
+            </section>
+          ))}
 
           {temMais && (
             <div ref={sentinela} className="flex justify-center py-4">
