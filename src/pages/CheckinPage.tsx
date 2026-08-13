@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
 import { MarcarDuplas } from '../components/MarcarDuplas'
@@ -36,6 +36,12 @@ export function CheckinPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [legenda, setLegenda] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [cameraAberta, setCameraAberta] = useState(false)
+  // Os check-ins de hoje chegam do servidor e decidem se ainda dá para
+  // postar. Abrir a câmera antes disso arriscaria abri-la para quem já
+  // bateu o limite, e fechá-la na cara da pessoa logo em seguida.
+  const [carregado, setCarregado] = useState(false)
+  const jaAbriuSozinha = useRef(false)
   // Muda sozinho com o tempo (o respiro de 5 min vence), então precisa
   // de um tique para a tela destravar sem o aluno recarregar a página.
   const [agora, setAgora] = useState(() => new Date())
@@ -61,6 +67,9 @@ export function CheckinPage() {
         .checkinsDe(userId)
         .then((cs) => setMeusCheckins(cs.map((c) => new Date(c.criado_em))))
         .catch(() => setMeusCheckins([]))
+        .finally(() => setCarregado(true))
+    } else {
+      setCarregado(true)
     }
   }, [api, userId])
 
@@ -199,9 +208,20 @@ export function CheckinPage() {
         if (old) URL.revokeObjectURL(old)
         return URL.createObjectURL(comprimida)
       })
+      // Fecha a câmera: a partir daqui a tela é de revisão, onde entra a
+      // legenda. Escrever com a câmera ligada só gastaria bateria.
+      setCameraAberta(false)
     } catch (e) {
       toast((e as Error).message, 'erro')
     }
+  }
+
+  const descartarFoto = () => {
+    setFoto(null)
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return null
+    })
   }
 
   const publicar = async () => {
@@ -225,12 +245,8 @@ export function CheckinPage() {
       // Não sai da tela: o melhor momento para marcar com quem se
       // dançou é agora, com a noite fresca. A pessoa navega quando
       // quiser — ou nem marca, que também está ok.
-      setFoto(null)
+      descartarFoto()
       setLegenda('')
-      setPreview((old) => {
-        if (old) URL.revokeObjectURL(old)
-        return null
-      })
       setMeusCheckins((atual) => [...atual, new Date()])
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -313,6 +329,15 @@ export function CheckinPage() {
   // com trava de local — fora isso o resumo já disse tudo.
   const valeDetalhar = abertosAgora.length > 1 || meusComLocal.length > 0
 
+  // Chegar em /checkin é dizer "quero tirar uma foto": a câmera abre
+  // sozinha, como no botão de câmera de qualquer app. Uma vez só — se a
+  // pessoa fechar, quem reabre é ela, pelo botão.
+  useEffect(() => {
+    if (jaAbriuSozinha.current || !carregado || !limite.pode || foto) return
+    jaAbriuSozinha.current = true
+    setCameraAberta(true)
+  }, [carregado, limite.pode, foto])
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-extrabold">Check-in da aula 📸</h1>
@@ -369,33 +394,62 @@ export function CheckinPage() {
         </div>
       )}
 
+      {/* Etapa 2: a foto já existe, agora é revisar e escrever. A legenda
+          só aparece aqui — pedir texto antes da foto era ocupar a tela
+          com o passo errado. */}
       {preview ? (
-        <div className="card overflow-hidden">
-          <img
-            src={preview}
-            alt="Prévia do check-in"
-            className="aspect-[4/5] w-full object-cover"
-          />
+        <>
+          <div className="card overflow-hidden">
+            <img
+              src={preview}
+              alt="Prévia do check-in"
+              className="aspect-[4/5] w-full object-cover"
+            />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="legenda">
+              Legenda (opcional)
+            </label>
+            <textarea
+              id="legenda"
+              className="input resize-none"
+              rows={2}
+              maxLength={200}
+              placeholder="Como foi a aula de hoje?"
+              value={legenda}
+              onChange={(e) => setLegenda(e.target.value)}
+            />
+          </div>
+
           <button
-            className="btn-ghost m-3"
+            className="btn-primary w-full py-3.5 text-base"
+            disabled={enviando || !limite.pode}
+            onClick={() => void publicar()}
+          >
+            {enviando ? 'Publicando…' : 'Publicar check-in 🎉'}
+          </button>
+
+          <button
+            className="btn-ghost w-full"
+            disabled={enviando}
             onClick={() => {
-              setFoto(null)
-              setPreview((old) => {
-                if (old) URL.revokeObjectURL(old)
-                return null
-              })
+              descartarFoto()
+              setCameraAberta(true)
             }}
           >
             Tirar outra 🔄
           </button>
-        </div>
+        </>
       ) : (
         limite.pode && (
           <>
-            <CameraCapture
-              onCapture={(b) => void aoCapturar(b)}
-              permitirFotoTeste={api.mode === 'demo'}
-            />
+            <button
+              className="btn-primary w-full py-3.5 text-base"
+              onClick={() => setCameraAberta(true)}
+            >
+              Abrir a câmera 📸
+            </button>
             {limite.restantes <= 2 && (
               <p className="px-2 text-center text-xs text-tinta-500">
                 Você ainda pode postar{' '}
@@ -408,29 +462,6 @@ export function CheckinPage() {
           </>
         )
       )}
-
-      <div>
-        <label className="label" htmlFor="legenda">
-          Legenda (opcional)
-        </label>
-        <textarea
-          id="legenda"
-          className="input resize-none"
-          rows={2}
-          maxLength={200}
-          placeholder="Como foi a aula de hoje?"
-          value={legenda}
-          onChange={(e) => setLegenda(e.target.value)}
-        />
-      </div>
-
-      <button
-        className="btn-primary w-full py-3.5 text-base"
-        disabled={!foto || enviando || !limite.pode}
-        onClick={() => void publicar()}
-      >
-        {enviando ? 'Publicando…' : 'Publicar check-in 🎉'}
-      </button>
 
       {/* O detalhe desafio a desafio interessa a pouca gente e quase
           nunca — fica embaixo, fechado, para quem quiser conferir. */}
@@ -460,6 +491,38 @@ export function CheckinPage() {
             })}
           </ul>
         </details>
+      )}
+
+      {/* Tela cheia por cima de tudo, inclusive do menu de baixo — sair
+          é pelo ✕. Os avisos vão junto, desenhados sobre a imagem, para
+          a pessoa saber se a foto vale ponto enquanto enquadra. */}
+      {cameraAberta && (
+        <CameraCapture
+          onCapture={(b) => void aoCapturar(b)}
+          onFechar={() => setCameraAberta(false)}
+          permitirFotoTeste={api.mode === 'demo'}
+          topo={
+            <>
+              {/* Branco sobre preto/70 dá no mínimo 8,5:1 mesmo que a
+                  câmera esteja apontada para uma parede branca. */}
+              <div className="flex items-start gap-2 rounded-2xl bg-black/70 px-3.5 py-2.5 text-sm text-white backdrop-blur">
+                <span aria-hidden>{status.emoji}</span>
+                <p className="flex-1">{status.texto}</p>
+              </div>
+              {erroLocal && comLocal.length > 0 && (
+                <div className="flex items-center gap-3 rounded-2xl bg-black/70 px-3.5 py-2.5 text-sm text-white backdrop-blur">
+                  <p className="flex-1">📍 {erroLocal}</p>
+                  <button
+                    className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-bold"
+                    onClick={() => void buscarLocal()}
+                  >
+                    Tentar de novo
+                  </button>
+                </div>
+              )}
+            </>
+          }
+        />
       )}
     </div>
   )
