@@ -603,7 +603,6 @@ const DISTINTIVO_VAZIO: DistintivoDefInput = {
   descricao: '',
 }
 
-const OPCOES_TOP_N = [1, 3, 5, 10] as const
 
 /**
  * Distintivos personalizados: a organização cria (emoji + título +
@@ -1010,17 +1009,16 @@ function PainelEntrega({
               </option>
             ))}
           </select>
-          <select
-            className="input w-24"
+          <input
+            type="number"
+            min={1}
+            className="input w-20"
             value={topN}
-            onChange={(e) => setTopN(Number(e.target.value))}
-          >
-            {OPCOES_TOP_N.map((n) => (
-              <option key={n} value={n}>
-                Top {n}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => {
+              const n = Math.trunc(Number(e.target.value))
+              setTopN(n >= 1 ? n : 1)
+            }}
+          />
         </div>
         <button
           type="button"
