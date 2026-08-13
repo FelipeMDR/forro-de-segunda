@@ -281,8 +281,19 @@ export interface ForroApi {
   parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]>
 
   // ---- Notificações ----
-  /** Curtidas, comentários e marcações que apontam para mim. */
-  listNotificacoes(): Promise<Notificacao[]>
+  /**
+   * Curtidas, comentários e marcações que apontam para mim.
+   *
+   * Sem `opcoes`, devolve o comportamento antigo (um lote generoso, sem
+   * cursor) — é o que `contarNaoLidas` precisa, já que "não lidas" é
+   * sobre tudo que existe, não só a primeira página. Com `limite` e
+   * `antesDe`, pagina como o feed: pega a próxima fatia mais antiga que
+   * o cursor.
+   */
+  listNotificacoes(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<Notificacao[]>
   /** Quantas são mais novas que a última vez que abri o painel. */
   contarNaoLidas(): Promise<number>
   /** Carimba o painel como visto agora. */

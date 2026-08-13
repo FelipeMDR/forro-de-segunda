@@ -1307,8 +1307,26 @@ export class SupabaseApi implements ForroApi {
    * Monta a lista a partir do que já existe no banco: reações e
    * comentários nas MINHAS fotos, e marcações de dupla apontando para
    * mim. Sem tabela própria, sem gatilhos, sem limpeza.
+   *
+   * Sem tabela própria também não há UM cursor: o resultado é o
+   * intercalado de três fontes independentes. A paginação funciona
+   * assim mesmo, pedindo a cada fonte suas `limite` mais recentes antes
+   * do cursor e cortando o total no `limite` depois de juntar — o item
+   * de posição N no resultado global sempre está entre os N mais
+   * recentes de QUALQUER fonte que o tenha gerado, então buscar `limite`
+   * de cada uma garante que a fatia final está correta, nunca faltando
+   * nem duplicando um item.
    */
-  async listNotificacoes(): Promise<Notificacao[]> {
+  async listNotificacoes(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<Notificacao[]> {
+    // 50 preserva o comportamento de antes de existir paginação: é o
+    // que `contarNaoLidas` usa, e ali "não lida" é sobre tudo que
+    // existe, não só a primeira página.
+    const limite = opcoes?.limite ?? 50
+    const antesDe = opcoes?.antesDe
+
     const uid = await this.requireUid()
     const meus = ok(
       await this.sb
@@ -1324,39 +1342,53 @@ export class SupabaseApi implements ForroApi {
     // comments, porque nenhuma das duas tabelas guarda a foto.
     const fotoPor = new Map(meus.map((c) => [c.id, c.foto_url]))
 
+    let reacoesQ = ids.length
+      ? this.sb
+          .from('reactions')
+          .select(
+            'checkin_id, user_id, tipo, criado_em, perfil:profiles!user_id(nome, avatar_url)',
+          )
+          .in('checkin_id', ids)
+          .neq('user_id', uid)
+      : null
+    let comentariosQ = ids.length
+      ? this.sb
+          .from('comments')
+          .select(
+            'id, checkin_id, user_id, texto, criado_em, perfil:profiles!user_id(nome, avatar_url)',
+          )
+          .in('checkin_id', ids)
+          .neq('user_id', uid)
+      : null
+    let duplasQ = this.sb
+      .from('duplas')
+      .select(
+        'id, data, de_user, confirmada, criado_em, perfil:profiles!de_user(nome, avatar_url)',
+      )
+      .eq('para_user', uid)
+
+    if (antesDe) {
+      if (reacoesQ) reacoesQ = reacoesQ.lt('criado_em', antesDe)
+      if (comentariosQ) comentariosQ = comentariosQ.lt('criado_em', antesDe)
+      duplasQ = duplasQ.lt('criado_em', antesDe)
+    }
+
     const [reacoes, comentarios, duplas] = await Promise.all([
-      ids.length
-        ? this.sb
-            .from('reactions')
-            .select(
-              'checkin_id, user_id, tipo, criado_em, perfil:profiles!user_id(nome, avatar_url)',
-            )
-            .in('checkin_id', ids)
-            .neq('user_id', uid)
+      reacoesQ
+        ? reacoesQ
             .order('criado_em', { ascending: false })
-            .limit(50)
+            .limit(limite)
             .then((r) => (r.data ?? []) as unknown as ReacaoNotif[])
         : Promise.resolve([] as ReacaoNotif[]),
-      ids.length
-        ? this.sb
-            .from('comments')
-            .select(
-              'id, checkin_id, user_id, texto, criado_em, perfil:profiles!user_id(nome, avatar_url)',
-            )
-            .in('checkin_id', ids)
-            .neq('user_id', uid)
+      comentariosQ
+        ? comentariosQ
             .order('criado_em', { ascending: false })
-            .limit(50)
+            .limit(limite)
             .then((r) => (r.data ?? []) as unknown as ComentarioNotif[])
         : Promise.resolve([] as ComentarioNotif[]),
-      this.sb
-        .from('duplas')
-        .select(
-          'id, data, de_user, confirmada, criado_em, perfil:profiles!de_user(nome, avatar_url)',
-        )
-        .eq('para_user', uid)
+      duplasQ
         .order('criado_em', { ascending: false })
-        .limit(50)
+        .limit(limite)
         .then((r) => (r.data ?? []) as unknown as DuplaNotif[]),
     ])
 
@@ -1402,7 +1434,12 @@ export class SupabaseApi implements ForroApi {
         pendente: !d.confirmada,
       })),
     ]
-    return itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+    // Cada fonte já veio limitada a `limite`; cortar de novo aqui é o
+    // que descarta o excedente do merge e mantém a página no tamanho
+    // certo — ver o comentário da função sobre por que isso é seguro.
+    return itens
+      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+      .slice(0, limite)
   }
 
   async contarNaoLidas(): Promise<number> {

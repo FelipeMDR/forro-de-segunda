@@ -60,6 +60,9 @@ export function turmaLabel(turmas: TurmaMembro[]): string | null {
  */
 export const PAGINA_FEED = 12
 
+/** Mesma lógica do PAGINA_FEED, para o painel de notificações. */
+export const PAGINA_NOTIFICACOES = 15
+
 export interface FeedItem {
   id: string
   user_id: string

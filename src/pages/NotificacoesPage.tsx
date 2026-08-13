@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
@@ -7,6 +7,7 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
+import { PAGINA_NOTIFICACOES } from '../lib/types'
 import type { Notificacao } from '../lib/types'
 
 /** Linha de "Fulana marcou que dançou com você" — a única acionável. */
@@ -147,22 +148,80 @@ export function NotificacoesPage() {
   const [itens, setItens] = useState<Notificacao[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const [carregandoMais, setCarregandoMais] = useState(false)
+  const [temMais, setTemMais] = useState(true)
+  /** Marcador invisível no fim da lista — carrega mais ao entrar na tela. */
+  const sentinela = useRef<HTMLDivElement | null>(null)
 
+  /**
+   * Recarrega só a PRIMEIRA página e funde com o que já está na tela —
+   * mesmo truque do feed. Sem isso, confirmar uma dupla refaria a
+   * consulta inteira e perderia o lugar de quem já rolou várias páginas.
+   */
   const carregar = useCallback(async () => {
     try {
       setErro(null)
-      setItens(await api.listNotificacoes())
+      const novos = await api.listNotificacoes({ limite: PAGINA_NOTIFICACOES })
+      setItens((atual) => {
+        if (!atual) {
+          setTemMais(novos.length === PAGINA_NOTIFICACOES)
+          return novos
+        }
+        const idsNovos = new Set(novos.map((n) => n.id))
+        const corte = novos[novos.length - 1]?.criado_em
+        // Descarta o que estava na faixa recarregada e não voltou: é o
+        // que faz uma dupla recusada sumir da tela.
+        const cauda = atual.filter(
+          (n) => !idsNovos.has(n.id) && (!corte || n.criado_em < corte),
+        )
+        return [...novos, ...cauda]
+      })
     } catch (e) {
       console.error('[notificações] falha ao carregar', e)
       setErro((e as Error).message || 'Erro desconhecido')
     }
   }, [api])
 
+  const carregarMais = useCallback(async () => {
+    if (!itens || itens.length === 0 || carregandoMais) return
+    setCarregandoMais(true)
+    try {
+      const antesDe = itens[itens.length - 1].criado_em
+      const proximos = await api.listNotificacoes({
+        limite: PAGINA_NOTIFICACOES,
+        antesDe,
+      })
+      setItens((atual) => [...(atual ?? []), ...proximos])
+      setTemMais(proximos.length === PAGINA_NOTIFICACOES)
+    } catch (e) {
+      console.error('[notificações] falha ao carregar mais', e)
+    } finally {
+      setCarregandoMais(false)
+    }
+  }, [api, itens, carregandoMais])
+
   useEffect(() => {
     void carregar()
     // Abriu o painel = viu tudo. O contador zera na próxima leitura.
     void api.marcarNotificacoesVistas().catch(() => {})
   }, [api, carregar])
+
+  // Rolagem infinita: mesma lógica do feed. `rootMargin` positivo busca
+  // um pouco ANTES do fim de verdade, para a próxima página já estar
+  // pronta quando a rolagem chegar lá.
+  useEffect(() => {
+    if (!temMais) return
+    const el = sentinela.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entradas) => {
+        if (entradas[0]?.isIntersecting) void carregarMais()
+      },
+      { rootMargin: '600px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [temMais, carregarMais])
 
   const responder = async (n: Notificacao, aceitar: boolean) => {
     if (!n.data) return
@@ -193,17 +252,27 @@ export function NotificacoesPage() {
           </p>
         </EmptyState>
       ) : (
-        <div className="card divide-y divide-preto/10">
-          {itens.map((n) => (
-            <LinhaNotificacao
-              key={n.id}
-              n={n}
-              ocupado={ocupado === n.id}
-              onConfirmar={() => void responder(n, true)}
-              onRecusar={() => void responder(n, false)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="card divide-y divide-preto/10">
+            {itens.map((n) => (
+              <LinhaNotificacao
+                key={n.id}
+                n={n}
+                ocupado={ocupado === n.id}
+                onConfirmar={() => void responder(n, true)}
+                onRecusar={() => void responder(n, false)}
+              />
+            ))}
+          </div>
+
+          {temMais && (
+            <div ref={sentinela} className="flex justify-center py-4">
+              {carregandoMais && (
+                <p className="text-xs text-tinta-500">Carregando mais…</p>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

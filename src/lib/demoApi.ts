@@ -1381,7 +1381,10 @@ export class DemoApi implements ForroApi {
 
   // ---- Notificações ----
 
-  async listNotificacoes(): Promise<Notificacao[]> {
+  async listNotificacoes(opcoes?: {
+    limite?: number
+    antesDe?: string
+  }): Promise<Notificacao[]> {
     const uid = this.uid()
     const meus = new Set(
       this.db.checkins.filter((c) => c.user_id === uid).map((c) => c.id),
@@ -1439,7 +1442,16 @@ export class DemoApi implements ForroApi {
           pendente: !d.confirmada,
         })),
     ]
-    return itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+    const ordenados = itens.sort((a, b) =>
+      b.criado_em.localeCompare(a.criado_em),
+    )
+    // O demo monta a lista inteira de uma vez (é só filtrar arrays em
+    // memória) — a paginação aqui é só recortar o resultado já pronto,
+    // sem o malabarismo de fonte-por-fonte que o Supabase precisa.
+    const filtrados = opcoes?.antesDe
+      ? ordenados.filter((n) => n.criado_em < opcoes.antesDe!)
+      : ordenados
+    return opcoes?.limite ? filtrados.slice(0, opcoes.limite) : filtrados
   }
 
   async contarNaoLidas(): Promise<number> {
