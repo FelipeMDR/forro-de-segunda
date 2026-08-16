@@ -87,6 +87,13 @@ from (values
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.proname = 'telefones_batem'
     )
+  ),
+  (
+    '022 — telefone: DDD obrigatório, comparação com/sem 9',
+    exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'telefone_ddd'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

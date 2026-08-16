@@ -1,4 +1,4 @@
-import { ultimos8 } from './phone'
+import { achaPorTelefone, agrupaPorTelefone, nucleoTelefone } from './phone'
 import type { AlunoCadastrado, Profile } from './types'
 
 /**
@@ -11,10 +11,10 @@ import type { AlunoCadastrado, Profile } from './types'
  */
 export interface PessoaNaChamada {
   /**
-   * Últimos 8 dígitos do telefone: é ele que identifica a pessoa, não o
-   * nome. Não os 10 (ver `ultimos8` em phone.ts) — a lista às vezes traz
-   * o número sem o 9º dígito do celular, e comparar por 10 perderia o
-   * vínculo com quem já tem conta.
+   * Linha do telefone (8 dígitos, sem DDD nem o 9º dígito): é ela que
+   * identifica a pessoa, não o nome. A checagem de quem já tem conta é
+   * mais cuidadosa que isso — ver `nucleoTelefone` em phone.ts — porque
+   * aí o DDD importa.
    */
   chave: string
   nome: string | null
@@ -34,23 +34,22 @@ export const SEM_TURMA = '__sem_turma__'
 /**
  * Agrupa a chamada por pessoa e marca quem já criou conta.
  *
- * O par é feito pelos 8 últimos dígitos do telefone (mesma regra do
- * Postgres, `telefones_batem`), e não pelo nome: nome repete, vem em
- * branco no CSV e muda de grafia.
+ * O par é feito por telefone — DDD + linha, absorvendo o 9º dígito
+ * opcional do celular (mesma regra do Postgres, `telefones_batem`) — e
+ * não pelo nome: nome repete, vem em branco no CSV e muda de grafia.
  */
 export function agruparChamada(
   alunos: AlunoCadastrado[],
   perfis: Profile[],
 ): PessoaNaChamada[] {
-  const comConta = new Set(
-    perfis
-      .map((p) => (p.telefone ? ultimos8(p.telefone) : ''))
-      .filter((t) => t.length === 8),
+  const gruposPerfis = agrupaPorTelefone(
+    perfis.filter((p): p is Profile & { telefone: string } => !!p.telefone),
+    (p) => p.telefone,
   )
 
   const porTelefone = new Map<string, PessoaNaChamada>()
   for (const a of alunos) {
-    const chave = ultimos8(a.telefone)
+    const chave = nucleoTelefone(a.telefone).linha
     let pessoa = porTelefone.get(chave)
     if (!pessoa) {
       pessoa = {
@@ -59,7 +58,7 @@ export function agruparChamada(
         telefone: a.telefone,
         linhas: [],
         turmas: [],
-        temConta: comConta.has(chave),
+        temConta: achaPorTelefone(gruposPerfis, a.telefone) !== undefined,
       }
       porTelefone.set(chave, pessoa)
     }

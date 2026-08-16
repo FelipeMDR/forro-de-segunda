@@ -15,46 +15,126 @@ export function normalizeTelefone(t: string): string {
   return digits.length > 10 ? digits.slice(-10) : digits
 }
 
+/** DDD (2 dígitos) e LINHA (8 dígitos, sem o 9º dígito do celular). */
+export interface NucleoTelefone {
+  /** null = o número foi digitado sem DDD — hoje isso não é mais aceito
+   * no cadastro (ver `telefoneValido`), mas números antigos, gravados
+   * antes dessa exigência, ainda existem no banco. */
+  ddd: string | null
+  /** '' quando não dá para identificar 8 dígitos de linha. */
+  linha: string
+}
+
 /**
- * Só os 8 últimos dígitos: a linha, sem DDD e sem o 9º dígito do
- * celular.
+ * Separa DDD e linha, absorvendo o 9º dígito opcional do celular —
+ * esteja ele presente ou não, dos dois lados da comparação.
  *
- * Exportada (não só uso interno de `telefonesIguais`) porque também
- * serve como CHAVE de agrupamento em Map/Set — ver `matricula.ts`, que
- * precisa juntar em massa (perfis × lista de chamada × CSV importado) e
- * não pode comparar par a par. Duas chamadas com o mesmo telefone
- * SEMPRE geram esta mesma chave; é o mesmo critério de
- * `telefonesIguais`, só que como valor em vez de comparação.
+ * Olha só a QUANTIDADE de dígitos depois de tirar tudo que não é
+ * número (espaço, parênteses, traço — "(11) 981234-5678", "1198765432",
+ * "11 98765-4321" viram todos o mesmo tipo de sequência antes de
+ * chegar aqui):
+ *
+ *   11 dígitos → DDD + 9 + linha  → descarta o 9
+ *   10 dígitos → DDD + linha      → já está pronto
+ *    9 dígitos →      9 + linha   → descarta o 9, sem DDD
+ *    8 dígitos →          linha   → já está pronto, sem DDD
+ *
+ * Números com código de país (+55) na frente não são tratados à parte:
+ * ninguém digita "+55" numa ficha de chamada, e tentar adivinhar
+ * quando um "55" é código de país e quando é DDD (35 é vizinho, mas 55
+ * também é um DDD de verdade, do Rio Grande do Sul) traria mais erro
+ * do que resolveria.
  */
-export function ultimos8(t: string): string {
-  return t.replace(/\D/g, '').slice(-8)
+export function nucleoTelefone(t: string): NucleoTelefone {
+  const d = t.replace(/\D/g, '')
+  if (d.length === 11) return { ddd: d.slice(0, 2), linha: d.slice(3) }
+  if (d.length === 10) return { ddd: d.slice(0, 2), linha: d.slice(2) }
+  if (d.length === 9) return { ddd: null, linha: d.slice(1) }
+  if (d.length === 8) return { ddd: null, linha: d }
+  return { ddd: null, linha: '' }
 }
 
 /**
  * Dois números são o mesmo telefone?
  *
- * Compara pelos 8 últimos dígitos, não pelos 10. A lista de chamada é
- * digitada à mão, ano após ano, e às vezes vem sem o 9º dígito do
- * celular (ex.: "3599998888" em vez de "35999998888") enquanto a pessoa
- * cadastra normalmente, com o 9. Comparando os 10 últimos dígitos essa
- * dupla não bate: cortar pela direita desalinha tudo a partir do 9, e
- * "1234-5678" com 9 vira "91234-567" sem ele — dígito a dígito diferente
- * mesmo sendo o mesmo número. Descartar DDD e o 9 junto resolve, porque
- * os 8 dígitos finais são estáveis nos dois formatos.
+ * O projeto recebe gente de fora de Itajubá, então o DDD importa de
+ * verdade — dois alunos podem ter a mesma linha final em cidades
+ * diferentes, e não são a mesma pessoa. Por isso, quando os DOIS
+ * números têm DDD, ele PRECISA bater.
  *
- * Comparar só por 8 dígitos aceita colisão entre DDDs diferentes com a
- * mesma terminação — risco real em nível nacional, mas o projeto é de
- * uma cidade só, então dois alunos com o mesmo final de linha e DDDs
- * diferentes é praticamente impossível.
+ * A exceção é número antigo, gravado antes de o DDD virar obrigatório
+ * no cadastro (`telefoneValido`): aceita pela linha sozinha, porque não
+ * tem DDD nenhum para comparar — é o melhor que dá para fazer sem
+ * inventar um DDD que ninguém informou.
  */
 export function telefonesIguais(a: string, b: string): boolean {
-  const da = ultimos8(a)
-  const db = ultimos8(b)
-  return da.length === 8 && da === db
+  const na = nucleoTelefone(a)
+  const nb = nucleoTelefone(b)
+  if (na.linha.length !== 8 || na.linha !== nb.linha) return false
+  if (na.ddd && nb.ddd) return na.ddd === nb.ddd
+  return true
 }
 
+/**
+ * Telefone válido para CADASTRAR (lista de chamada, conta nova): exige
+ * DDD. Um número sem DDD hoje pode ser de qualquer cidade, e o projeto
+ * não é mais de gente só de Itajubá — sem o DDD não dá para saber se
+ * duas pessoas com a mesma linha são a mesma pessoa ou só coincidência.
+ */
 export function telefoneValido(t: string): boolean {
-  return normalizeTelefone(t).length >= 8
+  const { ddd, linha } = nucleoTelefone(t)
+  return ddd !== null && linha.length === 8
+}
+
+/**
+ * Agrupa itens por telefone para juntar listas grandes (perfis × lista
+ * de chamada × CSV importado) sem comparar par a par — mesmo critério
+ * de `telefonesIguais`, como estrutura em vez de função.
+ *
+ * Agrupa pela LINHA (sempre bem definida, 8 dígitos) e guarda o DDD de
+ * cada item ao lado; a compatibilidade de DDD é resolvida depois, só
+ * dentro do balde de cada linha — que na prática quase sempre tem um
+ * item só. É isso que permite números antigos sem DDD continuarem
+ * casando com o cadastro novo, que já vem com DDD.
+ */
+export function agrupaPorTelefone<T>(
+  itens: T[],
+  telefoneDe: (item: T) => string,
+): Map<string, Array<{ ddd: string | null; item: T }>> {
+  const porLinha = new Map<string, Array<{ ddd: string | null; item: T }>>()
+  for (const item of itens) {
+    const { ddd, linha } = nucleoTelefone(telefoneDe(item))
+    if (linha.length !== 8) continue
+    const lista = porLinha.get(linha) ?? []
+    lista.push({ ddd, item })
+    porLinha.set(linha, lista)
+  }
+  return porLinha
+}
+
+/** Primeiro item do grupo compatível com este telefone (ver `agrupaPorTelefone`). */
+export function achaPorTelefone<T>(
+  porLinha: Map<string, Array<{ ddd: string | null; item: T }>>,
+  telefone: string,
+): T | undefined {
+  const alvo = nucleoTelefone(telefone)
+  if (alvo.linha.length !== 8) return undefined
+  const candidatos = porLinha.get(alvo.linha) ?? []
+  return candidatos.find((c) => !alvo.ddd || !c.ddd || c.ddd === alvo.ddd)
+    ?.item
+}
+
+/** Todos os itens do grupo compatíveis com este telefone. */
+export function achaTodosPorTelefone<T>(
+  porLinha: Map<string, Array<{ ddd: string | null; item: T }>>,
+  telefone: string,
+): T[] {
+  const alvo = nucleoTelefone(telefone)
+  if (alvo.linha.length !== 8) return []
+  const candidatos = porLinha.get(alvo.linha) ?? []
+  return candidatos
+    .filter((c) => !alvo.ddd || !c.ddd || c.ddd === alvo.ddd)
+    .map((c) => c.item)
 }
 
 /**

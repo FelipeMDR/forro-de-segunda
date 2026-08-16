@@ -1,5 +1,5 @@
 import type { LinhaAluno } from './csvImport'
-import { ultimos8 } from './phone'
+import { achaPorTelefone, achaTodosPorTelefone, agrupaPorTelefone, nucleoTelefone } from './phone'
 import type { AlunoCadastrado, PapelDanca, Profile } from './types'
 
 export interface TurmaMatricula {
@@ -19,10 +19,11 @@ export interface TurmaMatricula {
  */
 export interface PessoaMatricula {
   /**
-   * Últimos 8 dígitos do telefone — a identidade da pessoa. Não os 10
-   * (ver `ultimos8` em phone.ts): a planilha de um semestre pode vir com
-   * o 9º dígito do celular e a de outro sem, e comparar por 10 perderia
-   * o vínculo — a pessoa que já tem conta viraria "nova" na chamada.
+   * Linha do telefone (8 dígitos, sem DDD nem o 9º dígito) — a
+   * identidade da pessoa DENTRO deste arquivo, para juntar as linhas do
+   * CSV que são a mesma pessoa em turmas diferentes. A comparação com
+   * quem JÁ tem conta ou já está na chamada é mais cuidadosa que isso —
+   * ver `nucleoTelefone` em phone.ts — porque aí o DDD importa.
    */
   chave: string
   nome: string | null
@@ -40,9 +41,9 @@ const nomeTurma = (t: string | null | undefined) => (t ? t.trim() : null)
 /**
  * Monta o plano da matrícula do semestre a partir do CSV.
  *
- * A comparação é pelos 8 últimos dígitos do telefone (mesma regra do
- * Postgres, `telefones_batem`), e não por nome — nome repete, vem em
- * branco e muda de grafia.
+ * A comparação é por telefone — DDD + linha, absorvendo o 9º dígito
+ * opcional do celular (mesma regra do Postgres, `telefones_batem`) — e
+ * não por nome, que repete, vem em branco e muda de grafia.
  *
  * O arquivo **substitui** as turmas da pessoa em vez de somar: é assim
  * que uma planilha por semestre funciona, senão quem passa de Iniciante
@@ -55,30 +56,21 @@ export function planejarMatricula(
   alunos: AlunoCadastrado[],
   perfis: Profile[],
 ): PessoaMatricula[] {
-  const perfilPorTelefone = new Map<string, Profile>()
-  for (const p of perfis) {
-    if (!p.telefone) continue
-    const chave = ultimos8(p.telefone)
-    if (chave.length === 8) perfilPorTelefone.set(chave, p)
-  }
-
-  const chamadaPorTelefone = new Map<string, AlunoCadastrado[]>()
-  for (const a of alunos) {
-    const chave = ultimos8(a.telefone)
-    const lista = chamadaPorTelefone.get(chave) ?? []
-    lista.push(a)
-    chamadaPorTelefone.set(chave, lista)
-  }
+  const gruposPerfis = agrupaPorTelefone(
+    perfis.filter((p): p is Profile & { telefone: string } => !!p.telefone),
+    (p) => p.telefone,
+  )
+  const gruposChamada = agrupaPorTelefone(alunos, (a) => a.telefone)
 
   const plano = new Map<string, PessoaMatricula>()
   const papeisAntigos = new Map<string, TurmaMatricula[]>()
 
   for (const linha of linhas) {
-    const chave = ultimos8(linha.telefone)
+    const chave = nucleoTelefone(linha.telefone).linha
     let pessoa = plano.get(chave)
     if (!pessoa) {
-      const perfil = perfilPorTelefone.get(chave)
-      const linhasChamada = chamadaPorTelefone.get(chave) ?? []
+      const perfil = achaPorTelefone(gruposPerfis, linha.telefone)
+      const linhasChamada = achaTodosPorTelefone(gruposChamada, linha.telefone)
       pessoa = {
         chave,
         nome:

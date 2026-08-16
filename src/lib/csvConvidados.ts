@@ -1,5 +1,5 @@
 import { dividirLinhaCSV } from './csvImport'
-import { telefoneValido } from './phone'
+import { nucleoTelefone, telefoneValido } from './phone'
 
 export interface LinhaConvidado {
   nome: string
@@ -59,7 +59,11 @@ export function parseConvidadosCSV(texto: string): ResultadoConvidados {
       avisos.push(`Linha ${i + 1}: telefone inválido ("${telefone}") — pulada`)
       continue
     }
-    const chave = telefone.replace(/\D/g, '').slice(-10)
+    // Pela linha, não pelos dígitos crus — ver o mesmo comentário em
+    // parseAlunosCSV: duas grafias do mesmo número (com/sem o 9º
+    // dígito) não podem escapar da checagem de duplicidade.
+    const nucleo = nucleoTelefone(telefone)
+    const chave = `${nucleo.ddd}${nucleo.linha}`
     if (vistos.has(chave)) {
       avisos.push(`Linha ${i + 1}: telefone repetido — pulada`)
       continue

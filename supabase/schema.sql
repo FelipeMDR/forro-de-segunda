@@ -307,20 +307,52 @@ as $$
   end;
 $$;
 
--- Dois números são o mesmo telefone? Compara só os 8 últimos dígitos
--- (sem DDD, sem o 9º dígito do celular) — a lista de chamada é digitada
--- à mão e às vezes vem sem o 9, enquanto a pessoa cadastra com ele; os
--- 10 últimos dígitos não batem nesse caso (cortar pela direita desalinha
--- tudo a partir do 9), mas os 8 finais são estáveis nos dois formatos.
--- Ver migração 021 para o histórico completo.
+-- DDD (2 dígitos) do telefone, ou null se o número não tem DDD (formato
+-- antigo, hoje não mais aceito no cadastro — ver telefoneValido).
+create or replace function public.telefone_ddd(t text)
+returns text
+language sql immutable
+as $$
+  select case length(regexp_replace(coalesce(t, ''), '\D', '', 'g'))
+    when 11 then left(regexp_replace(coalesce(t, ''), '\D', '', 'g'), 2)
+    when 10 then left(regexp_replace(coalesce(t, ''), '\D', '', 'g'), 2)
+    else null
+  end;
+$$;
+
+-- Os 8 dígitos da linha, sem DDD e sem o 9º dígito do celular.
+create or replace function public.telefone_linha(t text)
+returns text
+language sql immutable
+as $$
+  select case length(regexp_replace(coalesce(t, ''), '\D', '', 'g'))
+    when 11 then substring(regexp_replace(coalesce(t, ''), '\D', '', 'g') from 4 for 8)
+    when 10 then right(regexp_replace(coalesce(t, ''), '\D', '', 'g'), 8)
+    when 9 then right(regexp_replace(coalesce(t, ''), '\D', '', 'g'), 8)
+    when 8 then regexp_replace(coalesce(t, ''), '\D', '', 'g')
+    else ''
+  end;
+$$;
+
+-- Dois números são o mesmo telefone? A linha (8 dígitos, sem o 9º
+-- dígito do celular) tem que bater sempre. O DDD também tem que bater
+-- QUANDO os dois números o informam — o projeto recebe gente de fora de
+-- Itajubá, então dois alunos com a mesma linha em cidades diferentes
+-- não podem ser tratados como a mesma pessoa. Número antigo sem DDD
+-- (antes de ele virar obrigatório) casa só pela linha. Ver migração 022
+-- para o histórico completo.
 create or replace function public.telefones_batem(a text, b text)
 returns boolean
 language sql immutable
 as $$
   select
-    length(right(regexp_replace(coalesce(a, ''), '\D', '', 'g'), 8)) = 8
-    and right(regexp_replace(coalesce(a, ''), '\D', '', 'g'), 8)
-      = right(regexp_replace(coalesce(b, ''), '\D', '', 'g'), 8);
+    public.telefone_linha(a) <> ''
+    and public.telefone_linha(a) = public.telefone_linha(b)
+    and (
+      public.telefone_ddd(a) is null
+      or public.telefone_ddd(b) is null
+      or public.telefone_ddd(a) = public.telefone_ddd(b)
+    );
 $$;
 
 -- A que noite de forró um instante pertence: das 05:00 às 04:59 do dia
@@ -391,7 +423,7 @@ declare
   tem_na_lista boolean;
   conta boolean;
 begin
-  if length(normalizar_telefone(tel)) < 8 then
+  if public.telefone_ddd(tel) is null then
     return jsonb_build_object('existe', false, 'nome', null, 'ja_tem_conta', false);
   end if;
   select nome into a from alunos_cadastrados
@@ -425,8 +457,8 @@ declare
 begin
   tel := new.raw_user_meta_data ->> 'telefone';
   select nome into nome_lista from alunos_cadastrados
-  where public.telefones_batem(telefone, tel)
-    and length(normalizar_telefone(coalesce(tel, ''))) >= 8
+  where public.telefone_ddd(tel) is not null
+    and public.telefones_batem(telefone, tel)
   limit 1;
 
   insert into profiles (id, nome, avatar_url, telefone)
@@ -446,8 +478,8 @@ begin
   insert into profile_turmas (user_id, turma, papel_danca)
   select new.id, a.turma, a.papel_danca
   from alunos_cadastrados a
-  where public.telefones_batem(a.telefone, tel)
-    and length(normalizar_telefone(coalesce(tel, ''))) >= 8
+  where public.telefone_ddd(tel) is not null
+    and public.telefones_batem(a.telefone, tel)
   on conflict (user_id, turma) do nothing;
 
   insert into roles (user_id, papel) values (new.id, 'aluno')

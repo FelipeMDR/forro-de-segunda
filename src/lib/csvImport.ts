@@ -1,4 +1,4 @@
-import { telefoneValido } from './phone'
+import { nucleoTelefone, telefoneValido } from './phone'
 import type { PapelDanca } from './types'
 
 export interface LinhaAluno {
@@ -100,8 +100,12 @@ export function parseAlunosCSV(
       avisos.push(`Linha ${i + 1}: telefone inválido ("${telefone}") — pulada`)
       continue
     }
-    // Duplicado = mesmo telefone NA MESMA turma (múltiplas turmas são ok)
-    const chave = `${telefone.replace(/\D/g, '').slice(-10)}|${turma.toLowerCase()}`
+    // Duplicado = mesmo telefone NA MESMA turma (múltiplas turmas são ok).
+    // Pela linha (não pelos dígitos crus): duas grafias do mesmo número
+    // na planilha — uma com o 9º dígito, outra sem — não podem escapar
+    // da checagem de duplicidade.
+    const nucleo = nucleoTelefone(telefone)
+    const chave = `${nucleo.ddd}${nucleo.linha}|${turma.toLowerCase()}`
     if (vistos.has(chave)) {
       avisos.push(
         `Linha ${i + 1}: telefone repetido na mesma turma — pulada`,
