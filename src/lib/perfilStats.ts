@@ -21,10 +21,9 @@ export async function carregarPerfilStats(
   turmas: TurmaMembro[],
   cargos: string[] = [],
 ): Promise<{ stats: PerfilStats; badges: Badge[] }> {
-  const [checkins, eventos, nDesafios, distintivosCustom, parceiros] =
+  const [checkins, nDesafios, distintivosCustom, parceiros] =
     await Promise.all([
       api.checkinsDe(userId),
-      api.listEvents(),
       api.contarDesafios(userId),
       api.distintivosDe(userId),
       // Sem a migração 016 a tabela não existe — o perfil vale sem isso
@@ -46,7 +45,6 @@ export async function carregarPerfilStats(
       cargos,
       distintivosCustom,
       checkinDates: datas,
-      events: eventos,
       parceiros: parceiros.length,
     }),
   }

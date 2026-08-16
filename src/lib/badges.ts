@@ -1,10 +1,10 @@
-import { diasDistintos, toISODate } from './dates'
+import { diasDistintos } from './dates'
 import { emojiCargo } from './types'
-import type { AgendaEvent, Badge, TurmaMembro } from './types'
+import type { Badge, TurmaMembro } from './types'
 
 /**
  * Distintivos do perfil vêm de duas fontes: os DERIVADOS automaticamente
- * dos dados (turma, cargo, presença, eventos) e os PERSONALIZADOS, que a
+ * dos dados (turma, cargo, presença, rodízio) e os PERSONALIZADOS, que a
  * organização cria e concede manualmente (ver DistintivoDef) — inclusive
  * pra reconhecer o topo do ranking de um desafio, já que não existe mais
  * um distintivo automático de "campeão".
@@ -38,7 +38,6 @@ export function computeBadges(input: {
   /** Distintivos personalizados já concedidos a essa pessoa. */
   distintivosCustom?: Badge[]
   checkinDates: Date[]
-  events: AgendaEvent[]
   /**
    * Pares confirmados pelos dois lados. Só os confirmados entram: se
    * marcação de mão única contasse, dava para inflar o próprio número
@@ -106,19 +105,6 @@ export function computeBadges(input: {
         descricao: `${parceiros} ${
           parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
         }`,
-      })
-    }
-  }
-
-  // 3. Presença em eventos (check-in no dia de um evento de data única)
-  const diasComCheckin = new Set(input.checkinDates.map((d) => toISODate(d)))
-  for (const e of input.events) {
-    if (e.data && diasComCheckin.has(e.data)) {
-      badges.push({
-        id: `evento-${e.id}`,
-        emoji: '🎉',
-        titulo: e.titulo,
-        descricao: 'Presença confirmada no evento',
       })
     }
   }

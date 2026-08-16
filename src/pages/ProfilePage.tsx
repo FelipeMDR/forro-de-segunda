@@ -51,7 +51,6 @@ export function ProfilePage() {
             turmas: profile.turmas,
             cargos: profile.cargos,
             checkinDates: [],
-            events: [],
           }),
         )
       })
