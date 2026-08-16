@@ -1,4 +1,4 @@
-import type { AgendaEvent, Challenge, Feriado } from './types'
+import type { AberturaAntecipada, AgendaEvent, Challenge, Feriado } from './types'
 
 export function addDays(d: Date, n: number): Date {
   const r = new Date(d)
@@ -104,6 +104,37 @@ export function suspensaoDoDia(
 }
 
 /**
+ * Data ISO → horário (minutos desde 00:00) em que o espaço abriu mais
+ * cedo naquele dia. Duas aberturas na mesma data (não deveria acontecer,
+ * mas o cadastro não impede) ficam com a mais cedo das duas — é sempre
+ * a que mais favorece quem chegou primeiro.
+ */
+export function mapaAberturas(
+  aberturas: AberturaAntecipada[],
+): Map<string, number> {
+  const mapa = new Map<string, number>()
+  for (const a of aberturas) {
+    const minutos = parseTime(a.hora_abertura)
+    const atual = mapa.get(a.data)
+    if (atual === undefined || minutos < atual) mapa.set(a.data, minutos)
+  }
+  return mapa
+}
+
+/** Abertura antecipada que afeta aquele dia, se houver (para exibir o motivo). */
+export function aberturaDoDia(
+  dataISO: string,
+  aberturas: AberturaAntecipada[],
+): AberturaAntecipada | null {
+  return (
+    aberturas
+      .filter((a) => a.data === dataISO)
+      .sort((a, b) => a.hora_abertura.localeCompare(b.hora_abertura))[0] ??
+    null
+  )
+}
+
+/**
  * Dia (ISO) em que começou a janela do desafio que contém o instante
  * `d`, ou null se `d` não cai em nenhuma janela.
  *
@@ -126,10 +157,18 @@ export function janelaDoCheckin(
   d: Date,
   c: Challenge,
   suspensos?: ReadonlySet<string>,
+  // Data ISO → minutos da abertura antecipada naquele dia (ver
+  // `mapaAberturas`). Só ADIANTA o início de uma janela que já existia
+  // naquele dia da semana — nunca cria janela nem mexe no fim.
+  aberturas?: ReadonlyMap<string, number>,
 ): string | null {
   const minutos = d.getHours() * 60 + d.getMinutes()
   const dentroDoPeriodo = (dia: string) =>
     dia >= c.data_inicio && dia <= c.data_fim && !suspensos?.has(dia)
+  const inicioEfetivo = (dia: string, inicio: number) => {
+    const abertura = aberturas?.get(dia)
+    return abertura !== undefined && abertura < inicio ? abertura : inicio
+  }
 
   for (const j of c.janelas) {
     const inicio = parseTime(j.hora_inicio)
@@ -137,19 +176,23 @@ export function janelaDoCheckin(
     const overnight = fim < inicio
 
     if (!overnight) {
-      if (minutos < inicio || minutos > fim) continue
       if (d.getDay() !== j.dia_semana) continue
       const dia = toISODate(d)
+      if (minutos < inicioEfetivo(dia, inicio) || minutos > fim) continue
       if (dentroDoPeriodo(dia)) return dia
       continue
     }
 
     // Ponta da noite: check-in no próprio dia em que a janela abre
-    if (minutos >= inicio && d.getDay() === j.dia_semana) {
+    if (d.getDay() === j.dia_semana) {
       const dia = toISODate(d)
-      if (dentroDoPeriodo(dia)) return dia
+      if (minutos >= inicioEfetivo(dia, inicio) && dentroDoPeriodo(dia)) {
+        return dia
+      }
     }
-    // Ponta da manhã seguinte: ainda conta para o dia anterior
+    // Ponta da manhã seguinte: ainda conta para o dia anterior. Não
+    // depende do início da janela (só do fim), então a abertura
+    // antecipada não entra aqui — ela nunca adianta ou atrasa o fim.
     if (minutos <= fim) {
       const anterior = addDays(d, -1)
       if (anterior.getDay() === j.dia_semana) {
@@ -166,8 +209,9 @@ export function contaParaDesafio(
   d: Date,
   c: Challenge,
   suspensos?: ReadonlySet<string>,
+  aberturas?: ReadonlyMap<string, number>,
 ): boolean {
-  return janelaDoCheckin(d, c, suspensos) !== null
+  return janelaDoCheckin(d, c, suspensos, aberturas) !== null
 }
 
 /** Desafios para os quais um check-in feito em `criadoEm` marca ponto. */
@@ -175,9 +219,10 @@ export function desafiosQueContam(
   criadoEm: string | Date,
   desafios: Challenge[],
   suspensos?: ReadonlySet<string>,
+  aberturas?: ReadonlyMap<string, number>,
 ): Challenge[] {
   const d = typeof criadoEm === 'string' ? new Date(criadoEm) : criadoEm
-  return desafios.filter((c) => contaParaDesafio(d, c, suspensos))
+  return desafios.filter((c) => contaParaDesafio(d, c, suspensos, aberturas))
 }
 
 /**
@@ -189,10 +234,11 @@ export function pontosNoDesafio(
   datas: Date[],
   c: Challenge,
   suspensos?: ReadonlySet<string>,
+  aberturas?: ReadonlyMap<string, number>,
 ): number {
   const janelas = new Set<string>()
   for (const d of datas) {
-    const j = janelaDoCheckin(d, c, suspensos)
+    const j = janelaDoCheckin(d, c, suspensos, aberturas)
     if (j) janelas.add(j)
   }
   return janelas.size
@@ -217,6 +263,29 @@ export function suspensoesDoDesafio(
         f.data <= c.data_fim &&
         dias.has(new Date(`${f.data}T12:00:00`).getDay()),
     )
+    .sort((a, b) => a.data.localeCompare(b.data))
+}
+
+/**
+ * Aberturas antecipadas que realmente afetam um desafio: dentro do
+ * período dele, num dia da semana em que ele tem janela, e mais cedo do
+ * que o horário normal daquele dia — senão a abertura não mudou nada
+ * para ESTE desafio em particular, mesmo valendo para outro.
+ */
+export function aberturasDoDesafio(
+  c: Challenge,
+  aberturas: AberturaAntecipada[],
+): AberturaAntecipada[] {
+  const inicioPorDia = new Map(
+    c.janelas.map((j) => [j.dia_semana, parseTime(j.hora_inicio)]),
+  )
+  return aberturas
+    .filter((a) => {
+      if (a.data < c.data_inicio || a.data > c.data_fim) return false
+      const diaSemana = new Date(`${a.data}T12:00:00`).getDay()
+      const inicioNormal = inicioPorDia.get(diaSemana)
+      return inicioNormal !== undefined && parseTime(a.hora_abertura) < inicioNormal
+    })
     .sort((a, b) => a.data.localeCompare(b.data))
 }
 

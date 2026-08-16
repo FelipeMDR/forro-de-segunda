@@ -346,6 +346,30 @@ export interface FeriadoInput {
 }
 
 /**
+ * O oposto do feriado: abrir o espaço livre MAIS CEDO que o normal —
+ * comum quando uma aula anterior é cancelada e o salão libera antes da
+ * hora. Sem isso, quem chegasse e desse check-in nesse intervalo extra
+ * apareceria no feed, mas não pontuaria: a janela do desafio só começa
+ * no horário de sempre.
+ *
+ * Só adianta o INÍCIO da janela naquele dia — nunca atrasa nem encurta
+ * nada. Um desafio que já abriria mais cedo que `hora_abertura`, ou que
+ * não tem janela naquele dia da semana, simplesmente não é afetado.
+ */
+export interface AberturaAntecipada {
+  id: string
+  data: string // "YYYY-MM-DD"
+  hora_abertura: string // "HH:MM"
+  motivo: string | null
+}
+
+export interface AberturaAntecipadaInput {
+  data: string
+  hora_abertura: string
+  motivo: string
+}
+
+/**
  * Linha da lista de chamada: telefone → turma (+ papel na dança).
  * O mesmo telefone pode aparecer em várias linhas (uma por turma).
  */

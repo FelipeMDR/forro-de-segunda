@@ -3,6 +3,7 @@ import {
   addDays,
   diaDaNoite,
   diasSuspensos,
+  mapaAberturas,
   pontosNoDesafio,
   proximaOcorrencia,
   toISODate,
@@ -19,6 +20,8 @@ import {
   turmaLabel,
 } from './types'
 import type {
+  AberturaAntecipada,
+  AberturaAntecipadaInput,
   AgendaEvent,
   AgendaEventInput,
   AlunoCadastrado,
@@ -122,6 +125,8 @@ interface DB {
   feriados: Feriado[]
   /** Ausente nos bancos demo antigos — vale como lista vazia. */
   confirmacoes?: { user_id: string; evento_id: string; data: string }[]
+  /** O oposto do feriado: espaço aberto mais cedo naquele dia. */
+  aberturas?: AberturaAntecipada[]
   duplas?: {
     id: string
     data: string
@@ -1195,8 +1200,10 @@ export class DemoApi implements ForroApi {
     const memberIds = this.db.members
       .filter((m) => m.challenge_id === challenge.id)
       .map((m) => m.user_id)
-    // Aula cancelada = sem janela naquele dia, ninguém pontua
+    // Aula cancelada = sem janela naquele dia, ninguém pontua. Espaço
+    // aberto mais cedo é o oposto: a janela adianta naquele dia.
     const suspensos = diasSuspensos(this.db.feriados)
+    const aberturas = mapaAberturas(this.db.aberturas ?? [])
     return memberIds
       .map((uid) => {
         const p = this.db.profiles.find((x) => x.id === uid)
@@ -1216,6 +1223,7 @@ export class DemoApi implements ForroApi {
             .map((c) => new Date(c.criado_em)),
           challenge,
           suspensos,
+          aberturas,
         )
         return {
           user_id: uid,
@@ -1273,6 +1281,30 @@ export class DemoApi implements ForroApi {
 
   async deleteFeriado(id: string) {
     this.db.feriados = this.db.feriados.filter((f) => f.id !== id)
+    this.persist()
+  }
+
+  async listAberturas(): Promise<AberturaAntecipada[]> {
+    return [...(this.db.aberturas ?? [])].sort((a, b) =>
+      a.data.localeCompare(b.data),
+    )
+  }
+
+  async saveAbertura(a: AberturaAntecipadaInput) {
+    this.db.aberturas = [
+      ...(this.db.aberturas ?? []),
+      {
+        id: uuid(),
+        data: a.data,
+        hora_abertura: a.hora_abertura,
+        motivo: a.motivo.trim() || null,
+      },
+    ]
+    this.persist()
+  }
+
+  async deleteAbertura(id: string) {
+    this.db.aberturas = (this.db.aberturas ?? []).filter((a) => a.id !== id)
     this.persist()
   }
 

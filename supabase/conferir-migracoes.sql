@@ -63,6 +63,23 @@ from (values
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.proname = 'noite_do_checkin'
     )
+  ),
+  (
+    '019 — consentimento LGPD no cadastro',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profiles'
+        and column_name = 'termos_aceitos_em'
+    )
+    and exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'aceitar_termos'
+    )
+  ),
+  (
+    '020 — abertura antecipada (oposto do feriado)',
+    to_regclass('public.aberturas_antecipadas') is not null
   )
 ) as t(migracao, aplicada)
 order by migracao;

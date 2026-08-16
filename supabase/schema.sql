@@ -158,6 +158,19 @@ create table if not exists public.feriados (
   criado_em timestamptz not null default now()
 );
 
+-- O oposto do feriado: o espaço abriu mais cedo que o normal naquele
+-- dia (ex.: uma aula anterior foi cancelada e o salão liberou antes da
+-- hora). Adianta o início da janela dos desafios nesse dia — nunca
+-- atrasa, nunca cria janela onde não havia uma. Sem turma: o desafio
+-- não pertence a turma nenhuma, então a abertura também não.
+create table if not exists public.aberturas_antecipadas (
+  id uuid primary key default gen_random_uuid(),
+  data date not null,
+  hora_abertura time not null,
+  motivo text,
+  criado_em timestamptz not null default now()
+);
+
 -- Histórico de "Encerrar semestre" — é daqui que a retrospectiva sabe
 -- quando o semestre atual começou, em vez de chutar pelo calendário.
 create table if not exists public.semestres (
@@ -514,6 +527,7 @@ alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.events enable row level security;
 alter table public.feriados enable row level security;
+alter table public.aberturas_antecipadas enable row level security;
 alter table public.confirmacoes_presenca enable row level security;
 alter table public.duplas enable row level security;
 alter table public.semestres enable row level security;
@@ -628,6 +642,14 @@ create policy "events_write" on public.events
 create policy "feriados_select" on public.feriados
   for select to authenticated using (true);
 create policy "feriados_write" on public.feriados
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- aberturas antecipadas: mesma regra dos feriados
+create policy "aberturas_antecipadas_select" on public.aberturas_antecipadas
+  for select to authenticated using (true);
+create policy "aberturas_antecipadas_write" on public.aberturas_antecipadas
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());

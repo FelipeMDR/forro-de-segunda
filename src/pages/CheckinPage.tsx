@@ -6,12 +6,15 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
+  aberturaDoDia,
   challengePhase,
   desafiosQueContam,
   diaDaNoite,
   diasSuspensos,
   janelaDoCheckin,
+  mapaAberturas,
   suspensaoDoDia,
+  toISODate,
 } from '../lib/dates'
 import { avisarCheckinPublicado } from '../lib/eventos'
 import { compressImage } from '../lib/image'
@@ -26,7 +29,7 @@ import {
   limiteCheckin,
   LIMITE_POR_JANELA,
 } from '../lib/limites'
-import type { Challenge, Feriado } from '../lib/types'
+import type { AberturaAntecipada, Challenge, Feriado } from '../lib/types'
 
 /**
  * O check-in é um caminho de três passos, não uma página só.
@@ -51,6 +54,7 @@ export function CheckinPage() {
   const toast = useToast()
   const [desafios, setDesafios] = useState<Challenge[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
+  const [aberturas, setAberturas] = useState<AberturaAntecipada[]>([])
   const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
   const [foto, setFoto] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -93,6 +97,7 @@ export function CheckinPage() {
   useEffect(() => {
     void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
     void api.listFeriados().then(setFeriados).catch(() => setFeriados([]))
+    void api.listAberturas().then(setAberturas).catch(() => setAberturas([]))
     if (userId) {
       void api
         .checkinsDe(userId)
@@ -111,6 +116,7 @@ export function CheckinPage() {
   }, [preview])
 
   const suspensos = useMemo(() => diasSuspensos(feriados), [feriados])
+  const aberturasMapa = useMemo(() => mapaAberturas(aberturas), [aberturas])
 
   const ativos = useMemo(
     () => desafios.filter((c) => challengePhase(c) === 'ativo'),
@@ -127,8 +133,8 @@ export function CheckinPage() {
   // agora — em desafio com local, o veredito não tem como ser feito
   // depois, já que a coordenada não é guardada (migração 014).
   const abertosAgora = useMemo(
-    () => desafiosQueContam(new Date(), ativos, suspensos),
-    [ativos, suspensos],
+    () => desafiosQueContam(new Date(), ativos, suspensos, aberturasMapa),
+    [ativos, suspensos, aberturasMapa],
   )
   const valendoAgora = useMemo(
     () => abertosAgora.filter((c) => c.sou_membro),
@@ -162,15 +168,17 @@ export function CheckinPage() {
     const aindaPontuam: Challenge[] = []
     const jaPontuaram: Challenge[] = []
     for (const c of valendoAgora) {
-      const janelaAtual = janelaDoCheckin(agora, c, suspensos)
+      const janelaAtual = janelaDoCheckin(agora, c, suspensos, aberturasMapa)
       const jaContou =
         janelaAtual !== null &&
-        meusCheckins.some((d) => janelaDoCheckin(d, c, suspensos) === janelaAtual)
+        meusCheckins.some(
+          (d) => janelaDoCheckin(d, c, suspensos, aberturasMapa) === janelaAtual,
+        )
       if (jaContou) jaPontuaram.push(c)
       else aindaPontuam.push(c)
     }
     return { aindaPontuam, jaPontuaram }
-  }, [valendoAgora, meusCheckins, suspensos])
+  }, [valendoAgora, meusCheckins, suspensos, aberturasMapa])
 
   // Desafios abertos agora que exigem estar no local — inclusive os que
   // não participo, senão a foto não seria avaliada e entrar depois não
@@ -493,6 +501,12 @@ export function CheckinPage() {
       ? 'Sua presença de hoje já está registrada'
       : 'Nada publicado ainda'
 
+  // Só reforça a explicação quando ela muda alguma coisa agora: existe
+  // abertura hoje E ela é o motivo de algo estar valendo. Fora disso a
+  // nota ficaria pairando sem servir pra nada.
+  const aberturaAtiva =
+    abertosAgora.length > 0 ? aberturaDoDia(toISODate(agora), aberturas) : null
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col items-center gap-2 pt-2 text-center">
@@ -511,6 +525,13 @@ export function CheckinPage() {
         <p className="text-sm text-azul-700">
           {resultado ?? `${status.emoji} ${status.texto}`}
         </p>
+        {aberturaAtiva && (
+          <p className="text-xs text-tinta-500">
+            🕐 O espaço abriu mais cedo hoje, às {aberturaAtiva.hora_abertura}
+            {aberturaAtiva.motivo ? ` (${aberturaAtiva.motivo})` : ''} — check-ins
+            desde então contam normalmente.
+          </p>
+        )}
       </div>
 
       {!limite.pode && limite.liberaEm && (

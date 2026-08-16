@@ -1,6 +1,8 @@
 import type { Coordenada } from './geo'
 import type { PessoaMatricula } from './matricula'
 import type {
+  AberturaAntecipada,
+  AberturaAntecipadaInput,
   AgendaEvent,
   AgendaEventInput,
   AlunoCadastrado,
@@ -248,6 +250,14 @@ export interface ForroApi {
   listFeriados(): Promise<Feriado[]>
   saveFeriado(f: FeriadoInput): Promise<void>
   deleteFeriado(id: string): Promise<void>
+  /**
+   * O oposto do feriado: o espaço abriu mais cedo que o normal naquele
+   * dia (ex.: uma aula anterior foi cancelada). Adianta o início da
+   * janela dos desafios — nunca atrasa nem cria janela nova.
+   */
+  listAberturas(): Promise<AberturaAntecipada[]>
+  saveAbertura(a: AberturaAntecipadaInput): Promise<void>
+  deleteAbertura(id: string): Promise<void>
   /**
    * Quem confirmou presença nas datas pedidas. Traz nome e avatar
    * porque a graça é ver as caras de quem vai, não só a contagem.

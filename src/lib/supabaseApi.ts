@@ -1,6 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { EmailNaoConfirmado, type ForroApi } from './api'
-import { diasSuspensos, limitesDaNoite, pontosNoDesafio } from './dates'
+import {
+  diasSuspensos,
+  limitesDaNoite,
+  mapaAberturas,
+  pontosNoDesafio,
+} from './dates'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
@@ -8,6 +13,8 @@ import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone
 import { VERSAO_TERMOS } from './termos'
 import { PAGINA_FEED, turmaLabel } from './types'
 import type {
+  AberturaAntecipada,
+  AberturaAntecipadaInput,
   AgendaEvent,
   AgendaEventInput,
   AlunoCadastrado,
@@ -1251,15 +1258,20 @@ export class SupabaseApi implements ForroApi {
       datasPor.set(c.user_id, lista)
     }
     // Dias em que a aula foi cancelada não têm janela: não houve forró,
-    // então ninguém pontua (migração 012). A tabela é pequena e o
-    // ranking é uma tela só — não vale um cache aqui.
-    const suspensos = diasSuspensos(
-      await this.listFeriados().catch(() => [] as Feriado[]),
-    )
+    // então ninguém pontua (migração 012). Dias em que o espaço abriu
+    // mais cedo (migração 020) ganham o oposto: a janela adianta, e
+    // check-ins feitos antes do horário normal passam a contar. As duas
+    // tabelas são pequenas e o ranking é uma tela só — não vale cache.
+    const [suspensos, aberturas] = await Promise.all([
+      this.listFeriados()
+        .then(diasSuspensos)
+        .catch(() => new Set<string>()),
+      this.listAberturas().then(mapaAberturas).catch(() => new Map()),
+    ])
 
     const pontos = new Map<string, number>()
     for (const [uid, datas] of datasPor) {
-      pontos.set(uid, pontosNoDesafio(datas, challenge, suspensos))
+      pontos.set(uid, pontosNoDesafio(datas, challenge, suspensos, aberturas))
     }
 
     return membros
@@ -1335,6 +1347,36 @@ export class SupabaseApi implements ForroApi {
 
   async deleteFeriado(id: string) {
     ok(await this.sb.from('feriados').delete().eq('id', id))
+  }
+
+  async listAberturas(): Promise<AberturaAntecipada[]> {
+    // Sem a migração 020 a tabela não existe — o app segue sem o
+    // ajuste, que era o comportamento de sempre.
+    const { data, error } = await this.sb
+      .from('aberturas_antecipadas')
+      .select('*')
+      .order('data')
+    if (error) return []
+    return (data as unknown as Array<Record<string, unknown>>).map((a) => ({
+      id: a.id as string,
+      data: a.data as string,
+      hora_abertura: horaCurta(a.hora_abertura),
+      motivo: (a.motivo as string) ?? null,
+    }))
+  }
+
+  async saveAbertura(a: AberturaAntecipadaInput) {
+    ok(
+      await this.sb.from('aberturas_antecipadas').insert({
+        data: a.data,
+        hora_abertura: a.hora_abertura,
+        motivo: a.motivo.trim() || null,
+      }),
+    )
+  }
+
+  async deleteAbertura(id: string) {
+    ok(await this.sb.from('aberturas_antecipadas').delete().eq('id', id))
   }
 
   async confirmacoesDe(datas: string[]): Promise<ConfirmacaoPresenca[]> {

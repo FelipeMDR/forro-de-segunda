@@ -37,6 +37,8 @@ import {
   type AgendaEventInput,
   type AlunoCadastrado,
   type AttendanceRow,
+  type AberturaAntecipada,
+  type AberturaAntecipadaInput,
   type Cargo,
   type Challenge,
   type DistintivoDef,
@@ -513,6 +515,170 @@ function SecaoFeriados({
                 onClick={() => void excluir(f.id)}
                 className="p-1.5 text-tinta-400 hover:text-red-600"
                 aria-label={`Remover cancelamento de ${formatDate(f.data)}`}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const ABERTURA_VAZIA: AberturaAntecipadaInput = {
+  data: toISODate(new Date()),
+  hora_abertura: '',
+  motivo: '',
+}
+
+/**
+ * O oposto do feriado: às vezes uma aula é cancelada e o espaço livre
+ * abre mais cedo. Sem registrar isso, quem chega e faz check-in nesse
+ * intervalo extra some do ranking — a janela do desafio só começa no
+ * horário de sempre.
+ *
+ * Pensada pra ser preenchida NA HORA, pelo celular: a data já vem em
+ * hoje, então normalmente só falta digitar o horário.
+ */
+function SecaoAberturas({
+  aberturas,
+  onChanged,
+}: {
+  aberturas: AberturaAntecipada[]
+  onChanged: () => void
+}) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [aberto, setAberto] = useState(false)
+  const [form, setForm] = useState<AberturaAntecipadaInput>({
+    ...ABERTURA_VAZIA,
+  })
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault()
+    setSalvando(true)
+    try {
+      await api.saveAbertura(form)
+      toast(
+        `Abertura registrada! Check-ins desde as ${form.hora_abertura} já contam. 🕐`,
+      )
+      setForm({ ...ABERTURA_VAZIA })
+      setAberto(false)
+      onChanged()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const excluir = async (id: string) => {
+    try {
+      await api.deleteAbertura(id)
+      onChanged()
+      toast('Abertura removida — a janela volta ao horário normal')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const hoje = toISODate(new Date())
+
+  return (
+    <section className="card space-y-3 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
+          🕐 Abertura antecipada
+        </h2>
+        <button
+          className="btn-ghost px-3 py-1.5 text-xs"
+          onClick={() => setAberto((v) => !v)}
+        >
+          {aberto ? 'Fechar' : '+ Novo'}
+        </button>
+      </div>
+      <p className="text-xs text-tinta-500">
+        Pra quando uma aula é cancelada e o espaço abre mais cedo. Adianta o
+        início da janela dos desafios naquele dia — quem já fez check-in no
+        intervalo passa a contar sozinho, sem precisar mexer em mais nada.
+      </p>
+
+      {aberto && (
+        <form onSubmit={salvar} className="space-y-3 rounded-xl bg-fundo p-4">
+          <div>
+            <label className="label" htmlFor="ab-data">
+              Data
+            </label>
+            <input
+              id="ab-data"
+              type="date"
+              className="input"
+              value={form.data}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="ab-hora">
+              Abriu a partir de
+            </label>
+            <input
+              id="ab-hora"
+              type="time"
+              className="input"
+              value={form.hora_abertura}
+              onChange={(e) =>
+                setForm({ ...form, hora_abertura: e.target.value })
+              }
+              required
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="ab-motivo">
+              Motivo (opcional)
+            </label>
+            <input
+              id="ab-motivo"
+              className="input"
+              placeholder='Ex.: "Aula do Intermediário foi cancelada"'
+              value={form.motivo}
+              onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+            />
+          </div>
+          <button className="btn-primary w-full" disabled={salvando}>
+            {salvando ? 'Salvando…' : 'Registrar abertura'}
+          </button>
+        </form>
+      )}
+
+      {aberturas.length === 0 ? (
+        <p className="text-sm text-tinta-500">
+          Nenhuma abertura antecipada cadastrada.
+        </p>
+      ) : (
+        <div className="divide-y divide-preto/10">
+          {aberturas.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 py-2.5">
+              <span className="text-lg">🕐</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold">
+                  {formatDate(a.data)} às {a.hora_abertura}
+                  {a.data < hoje && (
+                    <span className="ml-1.5 text-[10px] font-normal text-tinta-400">
+                      (passado)
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-tinta-500">
+                  {a.motivo || 'Sem motivo informado'}
+                </p>
+              </div>
+              <button
+                onClick={() => void excluir(a.id)}
+                className="p-1.5 text-tinta-400 hover:text-red-600"
+                aria-label={`Remover abertura de ${formatDate(a.data)}`}
               >
                 ✕
               </button>
@@ -2027,6 +2193,7 @@ export function AdminPage() {
   const [turmas, setTurmas] = useState<Turma[]>([])
   const [cargos, setCargos] = useState<Cargo[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
+  const [aberturas, setAberturas] = useState<AberturaAntecipada[]>([])
   const [mes, setMes] = useState(mesAtual())
   const [presencas, setPresencas] = useState<AttendanceRow[] | null>(null)
   const [desafios, setDesafios] = useState<Challenge[]>([])
@@ -2042,6 +2209,10 @@ export function AdminPage() {
 
   const carregarFeriados = useCallback(async () => {
     setFeriados(await api.listFeriados())
+  }, [api])
+
+  const carregarAberturas = useCallback(async () => {
+    setAberturas(await api.listAberturas())
   }, [api])
 
   const carregarPresencas = useCallback(
@@ -2061,6 +2232,7 @@ export function AdminPage() {
     void carregarTurmas().catch(falhou('turmas'))
     void carregarCargos().catch(falhou('cargos'))
     void carregarFeriados().catch(falhou('feriados'))
+    void carregarAberturas().catch(falhou('aberturas'))
     void api.listChallenges().then(setDesafios).catch(falhou('desafios'))
     void api.listReports().then(setReports).catch(falhou('denúncias'))
     void carregarPresencas(mes).catch(falhou('frequência'))
@@ -2172,6 +2344,10 @@ export function AdminPage() {
             feriados={feriados}
             turmas={turmas}
             onChanged={() => void carregarFeriados()}
+          />
+          <SecaoAberturas
+            aberturas={aberturas}
+            onChanged={() => void carregarAberturas()}
           />
         </>
       )}

@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { downloadCSV } from '../lib/csv'
 import {
+  aberturasDoDesafio,
   challengePhase,
   daysLeft,
   formatDate,
@@ -18,6 +19,7 @@ import { ParticipantesDesafio } from '../components/ParticipantesDesafio'
 import { colocacoes } from '../lib/ranking'
 import {
   DIAS_ABREV,
+  type AberturaAntecipada,
   type Challenge,
   type Feriado,
   type RankingEntry,
@@ -33,6 +35,9 @@ export function ChallengeDetailPage() {
   const [desafio, setDesafio] = useState<Challenge | null | undefined>()
   const [ranking, setRanking] = useState<RankingEntry[]>([])
   const [feriados, setFeriados] = useState<Feriado[]>([])
+  const [aberturasAntecipadas, setAberturasAntecipadas] = useState<
+    AberturaAntecipada[]
+  >([])
   const [erro, setErro] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -45,6 +50,9 @@ export function ChallengeDetailPage() {
       const c = await api.getChallenge(id)
       setDesafio(c)
       setFeriados(await api.listFeriados().catch(() => [] as Feriado[]))
+      setAberturasAntecipadas(
+        await api.listAberturas().catch(() => [] as AberturaAntecipada[]),
+      )
       if (c) setRanking(await api.getRanking(c))
     } catch (e) {
       console.error('[desafio] falha ao carregar', e)
@@ -74,6 +82,7 @@ export function ChallengeDetailPage() {
   const fase = challengePhase(desafio)
   const restantes = daysLeft(desafio.data_fim)
   const suspensoes = suspensoesDoDesafio(desafio, feriados)
+  const aberturas = aberturasDoDesafio(desafio, aberturasAntecipadas)
   const classificacao = colocacoes(ranking)
   const lider = classificacao[0]?.entrada
   const minhaColocacao = classificacao.find(
@@ -183,6 +192,22 @@ export function ChallengeDetailPage() {
                       {formatDate(f.data)}
                     </strong>
                     {f.motivo && ` · ${f.motivo}`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          {aberturas.length > 0 && (
+            <div>
+              <p className="mb-1">🕐 Abriu mais cedo (conta desde então):</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pl-1">
+                {aberturas.map((a) => (
+                  <p key={a.id}>
+                    <strong className="text-tinta-700">
+                      {formatDate(a.data)}
+                    </strong>{' '}
+                    às {a.hora_abertura}
+                    {a.motivo && ` · ${a.motivo}`}
                   </p>
                 ))}
               </div>
