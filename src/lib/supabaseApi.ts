@@ -5,6 +5,7 @@ import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
+import { VERSAO_TERMOS } from './termos'
 import { PAGINA_FEED, turmaLabel } from './types'
 import type {
   AgendaEvent,
@@ -244,10 +245,16 @@ export class SupabaseApi implements ForroApi {
     }
     // O e-mail informado vira o e-mail da conta: é com ele que a pessoa
     // entra e é para ele que vai o link de "esqueci minha senha".
+    // O aceite viaja como metadado e o gatilho da migração 019 o grava
+    // no perfil junto com o resto: assim não existe instante em que a
+    // conta exista sem o registro do consentimento.
     const { data, error } = await this.sb.auth.signUp({
       email: email.trim(),
       password: senha,
-      options: { data: { telefone }, emailRedirectTo: URL_CONFIRMADO() },
+      options: {
+        data: { telefone, termos_versao: VERSAO_TERMOS },
+        emailRedirectTo: URL_CONFIRMADO(),
+      },
     })
     if (error) throw new Error(traduz(error.message))
     // Endereço já usado por outra conta: com a confirmação ligada o
@@ -263,6 +270,15 @@ export class SupabaseApi implements ForroApi {
     // Sem sessão = "Confirm email" ligado: a conta existe, mas só vale
     // depois do clique. Não é erro; é outro caminho de tela.
     return data.session ? 'entrou' : 'confirmar'
+  }
+
+  async aceitarTermos() {
+    // A função só escreve se ainda estiver em branco: consentimento é
+    // um fato datado, não um campo que se sobrescreve a cada entrada.
+    const { error } = await this.sb.rpc('aceitar_termos', {
+      p_versao: VERSAO_TERMOS,
+    })
+    if (error) throw new Error(traduz(error.message))
   }
 
   async reenviarConfirmacao(email: string) {
@@ -328,6 +344,15 @@ export class SupabaseApi implements ForroApi {
   private static PROFILE_SELECT =
     '*, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)'
 
+  // Igual ao de cima, sem telefone nem e-mail. `getProfile` busca o
+  // perfil de QUALQUER pessoa (é o que abastece /perfil/:id) — com `*`,
+  // telefone e e-mail de quem está sendo visitado viajavam na resposta
+  // da rede mesmo a tela nunca mostrando os dois. RLS libera a leitura
+  // (profiles_select é `using (true)`), então o corte tem que ser aqui,
+  // nas colunas pedidas — não dá para confiar só na tela não exibir.
+  private static PROFILE_SELECT_PUBLICO =
+    'id, nome, avatar_url, criado_em, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)'
+
   private mapProfile(data: Record<string, unknown>): Profile {
     return {
       id: data.id as string,
@@ -335,6 +360,9 @@ export class SupabaseApi implements ForroApi {
       avatar_url: (data.avatar_url as string) ?? null,
       telefone: (data.telefone as string) ?? null,
       email: (data.email as string) ?? null,
+      // Sem a migração 019 a coluna não existe — vira null, e o app
+      // trata isso como "ainda não aceitou".
+      termos_aceitos_em: (data.termos_aceitos_em as string) ?? null,
       criado_em: data.criado_em as string,
       turmas: (data.turmas as TurmaMembro[]) ?? [],
       cargos: ((data.cargos as Array<{ cargo: string }>) ?? []).map(
@@ -362,9 +390,23 @@ export class SupabaseApi implements ForroApi {
   }
 
   async getProfile(id: string): Promise<Profile | null> {
+    // Só o dono vê o próprio telefone e e-mail. Chamado tanto pelo
+    // AuthContext (a própria sessão) quanto por /perfil/:id (qualquer
+    // pessoa) — o mesmo método, então a distinção precisa ser feita aqui.
+    const meuId = await this.getSessionUserId()
+    const ehEuMesmo = meuId !== null && meuId === id
+    // Tipado como `string`, não como literal: com um dos dois selects
+    // certos (mas escolhido em runtime), o gerador de tipos do
+    // supabase-js tenta interpretar a UNIÃO como select literal e
+    // falha ao montar o tipo de retorno. Cru assim, cai no caminho
+    // genérico — que é como o resto do arquivo já lida com `.select()`.
+    const colunas: string = ehEuMesmo
+      ? SupabaseApi.PROFILE_SELECT
+      : SupabaseApi.PROFILE_SELECT_PUBLICO
+
     const { data, error } = await this.sb
       .from('profiles')
-      .select(SupabaseApi.PROFILE_SELECT)
+      .select(colunas)
       .eq('id', id)
       .maybeSingle()
     if (data) return this.mapProfile(data as unknown as Record<string, unknown>)
@@ -372,9 +414,12 @@ export class SupabaseApi implements ForroApi {
     if (error) {
       // Embed falhou: busca o perfil e as turmas separadamente
       console.warn('[perfil] embed falhou, usando consultas simples:', error)
+      const camposFallback: string = ehEuMesmo
+        ? 'id, nome, avatar_url, telefone, email, termos_aceitos_em, criado_em'
+        : 'id, nome, avatar_url, criado_em'
       const { data: simples } = await this.sb
         .from('profiles')
-        .select('id, nome, avatar_url, telefone, criado_em')
+        .select(camposFallback)
         .eq('id', id)
         .maybeSingle()
       if (simples) {
@@ -382,8 +427,21 @@ export class SupabaseApi implements ForroApi {
           this.turmasDe(id),
           this.cargosDe(id),
         ])
+        // Monta o objeto campo a campo (não espalha `simples` direto):
+        // telefone/e-mail dependem de `ehEuMesmo`, não só de terem
+        // vindo na consulta — dupla proteção, mesmo que o select acima
+        // um dia peça coluna a mais por engano.
+        const base = simples as unknown as Record<string, unknown>
         return {
-          ...(simples as Omit<Profile, 'turmas' | 'cargos'>),
+          id: base.id as string,
+          nome: base.nome as string,
+          avatar_url: (base.avatar_url as string) ?? null,
+          telefone: ehEuMesmo ? ((base.telefone as string) ?? null) : null,
+          email: ehEuMesmo ? ((base.email as string) ?? null) : null,
+          termos_aceitos_em: ehEuMesmo
+            ? ((base.termos_aceitos_em as string) ?? null)
+            : null,
+          criado_em: base.criado_em as string,
           turmas,
           cargos,
         }

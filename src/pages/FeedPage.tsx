@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AceiteTermos } from '../components/AceiteTermos'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -376,6 +377,9 @@ export function FeedPage() {
 
   return (
     <div className="space-y-4">
+      {/* Antes de tudo: quem ainda não consentiu precisa ser perguntado
+          na primeira tela que abre, não escondido no perfil. */}
+      <AceiteTermos />
       <InstallPrompt />
       <AgendaCard
         ocorrencias={agenda}

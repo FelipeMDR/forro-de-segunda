@@ -677,6 +677,9 @@ export class DemoApi implements ForroApi {
       cargos: [],
       telefone: telefone.trim(),
       email: email.trim() || null,
+      // Quem passa pela tela de cadastro já aceitou: o botão nem
+      // destrava sem a marcação.
+      termos_aceitos_em: new Date().toISOString(),
       criado_em: new Date().toISOString(),
     }
     this.db.profiles.push(profile)
@@ -706,6 +709,14 @@ export class DemoApi implements ForroApi {
 
   async reenviarConfirmacao(email: string) {
     console.info('[demo] e-mail de confirmação iria para', email)
+  }
+
+  async aceitarTermos() {
+    const p = this.db.profiles.find((x) => x.id === this.uid())
+    if (p && !p.termos_aceitos_em) {
+      p.termos_aceitos_em = new Date().toISOString()
+      this.persist()
+    }
   }
 
   async demoSignUpOrganizador(nome: string, telefone: string, senha: string) {
@@ -742,12 +753,23 @@ export class DemoApi implements ForroApi {
 
   async getProfile(id: string) {
     const p = this.db.profiles.find((x) => x.id === id)
+    if (!p) return null
     // Cópia, não o objeto do banco. As escritas do demo alteram o
     // registro no lugar; devolvendo a mesma referência, um setState com
     // ela é ignorado pelo React e a tela fica mostrando o dado velho —
     // era o que fazia o nome salvar sem o título do perfil mudar. Em
     // produção cada busca já traz um objeto novo.
-    return p ? { ...p } : null
+    //
+    // Só o dono vê o próprio telefone e e-mail — espelha a mesma regra
+    // do supabaseApi. Chamado tanto para a própria sessão (AuthContext)
+    // quanto para qualquer /perfil/:id.
+    const ehEuMesmo = id === this.uid()
+    return {
+      ...p,
+      telefone: ehEuMesmo ? p.telefone : null,
+      email: ehEuMesmo ? p.email : null,
+      termos_aceitos_em: ehEuMesmo ? p.termos_aceitos_em : null,
+    }
   }
 
   async getMyRole(): Promise<Papel> {

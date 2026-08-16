@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CartaoInstalar } from '../components/BotaoInstalar'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
@@ -335,6 +335,20 @@ export function ContaPage() {
       {/* Lugar fixo para instalar: o convite do feed é dispensável, e
           quem dispensou não tinha mais como voltar atrás. */}
       <CartaoInstalar />
+
+      {/* Endereço fixo para reler o aviso — a LGPD dá o direito de
+          consultar a qualquer momento, não só na hora do cadastro. */}
+      <Link
+        to="/privacidade"
+        className="card flex items-center gap-3 p-4 transition hover:bg-preto/5"
+      >
+        <span className="min-w-0 flex-1 text-sm font-bold">
+          Privacidade e uso de dados
+        </span>
+        <span aria-hidden className="shrink-0 text-tinta-400">
+          ›
+        </span>
+      </Link>
 
       <div className="space-y-2 pt-1">
         <button

@@ -106,6 +106,14 @@ export interface ForroApi {
    */
   reenviarConfirmacao(email: string): Promise<void>
   /**
+   * Registra o aceite do aviso de privacidade para quem já tem conta.
+   *
+   * Quem se cadastra depois da exigência aceita na própria tela de
+   * cadastro, e o registro nasce junto da conta. Isto é para as contas
+   * anteriores, que nunca passaram por essa tela.
+   */
+  aceitarTermos(): Promise<void>
+  /**
    * Dispara o e-mail de recuperação de senha. Não diz se a conta
    * existe: responder isso transformaria a tela num verificador de
    * quem é do projeto.

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -22,6 +22,8 @@ export function LoginPage() {
   // null = nada pendente; string = o endereço que precisa confirmar
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [reenviado, setReenviado] = useState(false)
+  /** Consentimento da LGPD — sem ele o cadastro não segue. */
+  const [aceitou, setAceitou] = useState(false)
   // Fluxo "primeira vez": null = ainda não verificou o telefone
   const [verificado, setVerificado] = useState<{
     nome: string | null
@@ -117,6 +119,10 @@ export function LoginPage() {
     e.preventDefault()
     if (senha !== confirmar) {
       toast('As senhas não conferem', 'erro')
+      return
+    }
+    if (!aceitou) {
+      toast('Você precisa aceitar o aviso de privacidade para criar a conta', 'erro')
       return
     }
     setOcupado(true)
@@ -419,7 +425,37 @@ export function LoginPage() {
                 required
               />
             </div>
-            <button className="btn-primary w-full" disabled={ocupado}>
+            {/* O aceite é a condição do cadastro, então mora aqui e não
+                num rodapé de letra miúda: sem marcar, o botão não passa.
+                O link abre numa aba nova para não perder o que já foi
+                digitado no formulário. */}
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-preto/5 p-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-brasa-600"
+                checked={aceitou}
+                onChange={(e) => setAceitou(e.target.checked)}
+              />
+              <span className="text-xs leading-relaxed text-tinta-700">
+                Li e aceito o{' '}
+                <Link
+                  to="/privacidade"
+                  target="_blank"
+                  rel="noopener"
+                  className="font-bold text-azul-700 underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  aviso de privacidade
+                </Link>
+                , e autorizo o uso dos meus dados para registrar minha
+                presença nas aulas.
+              </span>
+            </label>
+
+            <button
+              className="btn-primary w-full"
+              disabled={ocupado || !aceitou}
+            >
               Criar minha conta 🎶
             </button>
           </form>

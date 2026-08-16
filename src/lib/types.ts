@@ -28,6 +28,11 @@ export interface Profile {
    * e-mail sintético e por isso não consegue recuperar a senha sozinha.
    */
   email: string | null
+  /**
+   * Quando a pessoa aceitou o aviso de privacidade. null = conta
+   * anterior à exigência, que ainda precisa aceitar (LGPD).
+   */
+  termos_aceitos_em?: string | null
   criado_em: string
 }
 

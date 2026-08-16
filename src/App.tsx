@@ -15,6 +15,7 @@ import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
 import { NovaSenhaPage } from './pages/NovaSenhaPage'
+import { PrivacidadePage } from './pages/PrivacidadePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { PublicacaoPage } from './pages/PublicacaoPage'
 import { RetrospectivaPage } from './pages/RetrospectivaPage'
@@ -45,6 +46,9 @@ export default function App() {
                 para o login perderia o token que veio na URL. */}
             <Route path="/nova-senha" element={<NovaSenhaPage />} />
             <Route path="/confirmado" element={<ConfirmadoPage />} />
+            {/* Fora do RequireAuth: precisa ser lido ANTES de criar a
+                conta, quando ainda não há sessão. */}
+            <Route path="/privacidade" element={<PrivacidadePage />} />
             <Route
               element={
                 <RequireAuth>
