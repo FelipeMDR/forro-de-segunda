@@ -1,5 +1,5 @@
 import type { LinhaAluno } from './csvImport'
-import { normalizeTelefone } from './phone'
+import { ultimos8 } from './phone'
 import type { AlunoCadastrado, PapelDanca, Profile } from './types'
 
 export interface TurmaMatricula {
@@ -18,7 +18,12 @@ export interface TurmaMatricula {
  * cadastrar.
  */
 export interface PessoaMatricula {
-  /** Telefone normalizado — a identidade da pessoa. */
+  /**
+   * Últimos 8 dígitos do telefone — a identidade da pessoa. Não os 10
+   * (ver `ultimos8` em phone.ts): a planilha de um semestre pode vir com
+   * o 9º dígito do celular e a de outro sem, e comparar por 10 perderia
+   * o vínculo — a pessoa que já tem conta viraria "nova" na chamada.
+   */
   chave: string
   nome: string | null
   telefone: string
@@ -35,8 +40,9 @@ const nomeTurma = (t: string | null | undefined) => (t ? t.trim() : null)
 /**
  * Monta o plano da matrícula do semestre a partir do CSV.
  *
- * A comparação é por telefone normalizado (mesma regra do Postgres), e
- * não por nome — nome repete, vem em branco e muda de grafia.
+ * A comparação é pelos 8 últimos dígitos do telefone (mesma regra do
+ * Postgres, `telefones_batem`), e não por nome — nome repete, vem em
+ * branco e muda de grafia.
  *
  * O arquivo **substitui** as turmas da pessoa em vez de somar: é assim
  * que uma planilha por semestre funciona, senão quem passa de Iniciante
@@ -52,13 +58,13 @@ export function planejarMatricula(
   const perfilPorTelefone = new Map<string, Profile>()
   for (const p of perfis) {
     if (!p.telefone) continue
-    const chave = normalizeTelefone(p.telefone)
-    if (chave.length >= 8) perfilPorTelefone.set(chave, p)
+    const chave = ultimos8(p.telefone)
+    if (chave.length === 8) perfilPorTelefone.set(chave, p)
   }
 
   const chamadaPorTelefone = new Map<string, AlunoCadastrado[]>()
   for (const a of alunos) {
-    const chave = normalizeTelefone(a.telefone)
+    const chave = ultimos8(a.telefone)
     const lista = chamadaPorTelefone.get(chave) ?? []
     lista.push(a)
     chamadaPorTelefone.set(chave, lista)
@@ -68,7 +74,7 @@ export function planejarMatricula(
   const papeisAntigos = new Map<string, TurmaMatricula[]>()
 
   for (const linha of linhas) {
-    const chave = normalizeTelefone(linha.telefone)
+    const chave = ultimos8(linha.telefone)
     let pessoa = plano.get(chave)
     if (!pessoa) {
       const perfil = perfilPorTelefone.get(chave)

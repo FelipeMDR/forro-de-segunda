@@ -18,8 +18,15 @@ export function normalizeTelefone(t: string): string {
 /**
  * Só os 8 últimos dígitos: a linha, sem DDD e sem o 9º dígito do
  * celular.
+ *
+ * Exportada (não só uso interno de `telefonesIguais`) porque também
+ * serve como CHAVE de agrupamento em Map/Set — ver `matricula.ts`, que
+ * precisa juntar em massa (perfis × lista de chamada × CSV importado) e
+ * não pode comparar par a par. Duas chamadas com o mesmo telefone
+ * SEMPRE geram esta mesma chave; é o mesmo critério de
+ * `telefonesIguais`, só que como valor em vez de comparação.
  */
-function ultimos8(t: string): string {
+export function ultimos8(t: string): string {
   return t.replace(/\D/g, '').slice(-8)
 }
 

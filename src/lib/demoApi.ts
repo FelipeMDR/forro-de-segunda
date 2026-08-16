@@ -572,8 +572,8 @@ export class DemoApi implements ForroApi {
     const matches = this.membrosDaLista(telefone)
     // Convidado de festa também pode se cadastrar: a festa é aberta,
     // então quem comprou ingresso pode não estar na lista de chamada.
-    const convite = this.db.convidados.find(
-      (c) => c.telefone === normalizeTelefone(telefone),
+    const convite = this.db.convidados.find((c) =>
+      telefonesIguais(c.telefone, telefone),
     )
     const jaTemConta = this.db.profiles.some(
       (p) => p.telefone && telefonesIguais(p.telefone, telefone),
@@ -665,8 +665,8 @@ export class DemoApi implements ForroApi {
       )
     }
     const matches = this.membrosDaLista(telefone)
-    const convite = this.db.convidados.find(
-      (c) => c.telefone === normalizeTelefone(telefone),
+    const convite = this.db.convidados.find((c) =>
+      telefonesIguais(c.telefone, telefone),
     )
     const profile: Profile = {
       id: uuid(),
@@ -692,10 +692,11 @@ export class DemoApi implements ForroApi {
     this.db.senhas[normalizeTelefone(telefone)] = senha
 
     // Convites viram participação e saem da espera (espelha o trecho
-    // acrescentado a handle_new_user na migração 010)
-    const norm = normalizeTelefone(telefone)
-    for (const convite of this.db.convidados.filter(
-      (c) => c.telefone === norm,
+    // acrescentado a handle_new_user na migração 010). Mesma folga de
+    // `telefonesIguais` — sem ela, um convite que só batia pelos 8
+    // dígitos entraria na conta mas nunca sairia da fila de convidados.
+    for (const convite of this.db.convidados.filter((c) =>
+      telefonesIguais(c.telefone, telefone),
     )) {
       this.db.members.push({
         challenge_id: convite.challenge_id,
@@ -703,7 +704,9 @@ export class DemoApi implements ForroApi {
         entrou_em: new Date().toISOString(),
       })
     }
-    this.db.convidados = this.db.convidados.filter((c) => c.telefone !== norm)
+    this.db.convidados = this.db.convidados.filter(
+      (c) => !telefonesIguais(c.telefone, telefone),
+    )
 
     this.persist()
     this.iniciarSessao(profile.id)

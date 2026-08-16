@@ -1,4 +1,4 @@
-import { normalizeTelefone } from './phone'
+import { ultimos8 } from './phone'
 import type { AlunoCadastrado, Profile } from './types'
 
 /**
@@ -10,7 +10,12 @@ import type { AlunoCadastrado, Profile } from './types'
  * repete. Aqui elas voltam a ser uma pessoa só.
  */
 export interface PessoaNaChamada {
-  /** Telefone normalizado: é ele que identifica a pessoa, não o nome. */
+  /**
+   * Últimos 8 dígitos do telefone: é ele que identifica a pessoa, não o
+   * nome. Não os 10 (ver `ultimos8` em phone.ts) — a lista às vezes traz
+   * o número sem o 9º dígito do celular, e comparar por 10 perderia o
+   * vínculo com quem já tem conta.
+   */
   chave: string
   nome: string | null
   /** Como foi digitado na primeira linha — o que se confere a olho. */
@@ -29,8 +34,9 @@ export const SEM_TURMA = '__sem_turma__'
 /**
  * Agrupa a chamada por pessoa e marca quem já criou conta.
  *
- * O par é feito pelo telefone normalizado (mesma regra do Postgres), e
- * não pelo nome: nome repete, vem em branco no CSV e muda de grafia.
+ * O par é feito pelos 8 últimos dígitos do telefone (mesma regra do
+ * Postgres, `telefones_batem`), e não pelo nome: nome repete, vem em
+ * branco no CSV e muda de grafia.
  */
 export function agruparChamada(
   alunos: AlunoCadastrado[],
@@ -38,13 +44,13 @@ export function agruparChamada(
 ): PessoaNaChamada[] {
   const comConta = new Set(
     perfis
-      .map((p) => (p.telefone ? normalizeTelefone(p.telefone) : ''))
-      .filter((t) => t.length >= 8),
+      .map((p) => (p.telefone ? ultimos8(p.telefone) : ''))
+      .filter((t) => t.length === 8),
   )
 
   const porTelefone = new Map<string, PessoaNaChamada>()
   for (const a of alunos) {
-    const chave = normalizeTelefone(a.telefone)
+    const chave = ultimos8(a.telefone)
     let pessoa = porTelefone.get(chave)
     if (!pessoa) {
       pessoa = {
