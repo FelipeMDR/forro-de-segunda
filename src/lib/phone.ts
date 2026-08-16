@@ -1,18 +1,49 @@
 /**
- * Normalização de telefone para casar o cadastro do app com a lista
- * de chamada: mantém só dígitos e compara pelos 10 últimos (cobre
- * formatos com/sem +55, com/sem DDD 0, espaços, traços etc.).
- * Mesma regra da função `normalizar_telefone` no Postgres.
+ * Normalização de telefone para USO COMO CHAVE: e-mail sintético
+ * (`synthEmail`), senha do modo demo, valor gravado em `telefone`. Mantém
+ * só dígitos e os 10 últimos (cobre formatos com/sem +55, com/sem DDD 0,
+ * espaços, traços etc.). Mesma regra da função `normalizar_telefone` no
+ * Postgres.
+ *
+ * NÃO use isto para decidir se dois números são "o mesmo telefone" — use
+ * `telefonesIguais`. Mudar esta função quebraria o login de quem já tem
+ * conta: o e-mail sintético e a senha guardada foram calculados com a
+ * regra de hoje, e um novo cálculo não bateria mais com o que já existe.
  */
 export function normalizeTelefone(t: string): string {
   const digits = t.replace(/\D/g, '')
   return digits.length > 10 ? digits.slice(-10) : digits
 }
 
+/**
+ * Só os 8 últimos dígitos: a linha, sem DDD e sem o 9º dígito do
+ * celular.
+ */
+function ultimos8(t: string): string {
+  return t.replace(/\D/g, '').slice(-8)
+}
+
+/**
+ * Dois números são o mesmo telefone?
+ *
+ * Compara pelos 8 últimos dígitos, não pelos 10. A lista de chamada é
+ * digitada à mão, ano após ano, e às vezes vem sem o 9º dígito do
+ * celular (ex.: "3599998888" em vez de "35999998888") enquanto a pessoa
+ * cadastra normalmente, com o 9. Comparando os 10 últimos dígitos essa
+ * dupla não bate: cortar pela direita desalinha tudo a partir do 9, e
+ * "1234-5678" com 9 vira "91234-567" sem ele — dígito a dígito diferente
+ * mesmo sendo o mesmo número. Descartar DDD e o 9 junto resolve, porque
+ * os 8 dígitos finais são estáveis nos dois formatos.
+ *
+ * Comparar só por 8 dígitos aceita colisão entre DDDs diferentes com a
+ * mesma terminação — risco real em nível nacional, mas o projeto é de
+ * uma cidade só, então dois alunos com o mesmo final de linha e DDDs
+ * diferentes é praticamente impossível.
+ */
 export function telefonesIguais(a: string, b: string): boolean {
-  const na = normalizeTelefone(a)
-  const nb = normalizeTelefone(b)
-  return na.length >= 8 && na === nb
+  const da = ultimos8(a)
+  const db = ultimos8(b)
+  return da.length === 8 && da === db
 }
 
 export function telefoneValido(t: string): boolean {

@@ -80,6 +80,13 @@ from (values
   (
     '020 — abertura antecipada (oposto do feriado)',
     to_regclass('public.aberturas_antecipadas') is not null
+  ),
+  (
+    '021 — telefone: achar pelos últimos 8 dígitos',
+    exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'telefones_batem'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

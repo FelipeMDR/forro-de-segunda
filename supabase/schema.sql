@@ -292,7 +292,9 @@ as $$
 $$;
 
 -- Normaliza telefone: só dígitos, últimos 10 (cobre +55, DDD, traços…).
--- Mesma regra do lib/phone.ts no app.
+-- Serve para CALCULAR valores (e-mail sintético, chave de senha do
+-- demo) — não para decidir se dois números são o mesmo telefone, que é
+-- o que `telefones_batem` faz. Mesma regra do lib/phone.ts no app.
 create or replace function public.normalizar_telefone(t text)
 returns text
 language sql immutable
@@ -303,6 +305,22 @@ as $$
       then right(regexp_replace(t, '\D', '', 'g'), 10)
     else regexp_replace(t, '\D', '', 'g')
   end;
+$$;
+
+-- Dois números são o mesmo telefone? Compara só os 8 últimos dígitos
+-- (sem DDD, sem o 9º dígito do celular) — a lista de chamada é digitada
+-- à mão e às vezes vem sem o 9, enquanto a pessoa cadastra com ele; os
+-- 10 últimos dígitos não batem nesse caso (cortar pela direita desalinha
+-- tudo a partir do 9), mas os 8 finais são estáveis nos dois formatos.
+-- Ver migração 021 para o histórico completo.
+create or replace function public.telefones_batem(a text, b text)
+returns boolean
+language sql immutable
+as $$
+  select
+    length(right(regexp_replace(coalesce(a, ''), '\D', '', 'g'), 8)) = 8
+    and right(regexp_replace(coalesce(a, ''), '\D', '', 'g'), 8)
+      = right(regexp_replace(coalesce(b, ''), '\D', '', 'g'), 8);
 $$;
 
 -- A que noite de forró um instante pertence: das 05:00 às 04:59 do dia
@@ -377,13 +395,13 @@ begin
     return jsonb_build_object('existe', false, 'nome', null, 'ja_tem_conta', false);
   end if;
   select nome into a from alunos_cadastrados
-  where normalizar_telefone(telefone) = normalizar_telefone(tel)
+  where public.telefones_batem(telefone, tel)
   limit 1;
   tem_na_lista := found;
   select exists (
     select 1 from profiles
     where telefone is not null
-      and normalizar_telefone(telefone) = normalizar_telefone(tel)
+      and public.telefones_batem(telefone, tel)
   ) into conta;
   return jsonb_build_object(
     'existe', tem_na_lista,
@@ -407,7 +425,7 @@ declare
 begin
   tel := new.raw_user_meta_data ->> 'telefone';
   select nome into nome_lista from alunos_cadastrados
-  where normalizar_telefone(telefone) = normalizar_telefone(coalesce(tel, ''))
+  where public.telefones_batem(telefone, tel)
     and length(normalizar_telefone(coalesce(tel, ''))) >= 8
   limit 1;
 
@@ -428,7 +446,7 @@ begin
   insert into profile_turmas (user_id, turma, papel_danca)
   select new.id, a.turma, a.papel_danca
   from alunos_cadastrados a
-  where normalizar_telefone(a.telefone) = normalizar_telefone(coalesce(tel, ''))
+  where public.telefones_batem(a.telefone, tel)
     and length(normalizar_telefone(coalesce(tel, ''))) >= 8
   on conflict (user_id, turma) do nothing;
 
