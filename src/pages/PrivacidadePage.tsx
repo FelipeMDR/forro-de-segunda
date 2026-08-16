@@ -2,15 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo'
 import { VERSAO_TERMOS } from '../lib/termos'
 
-/**
- * Contato do encarregado de dados (LGPD, art. 41).
- *
- * ⚠️ PENDENTE: troque pelo e-mail de verdade do projeto antes de
- * publicar. Não existe nenhum e-mail oficial registrado nos arquivos do
- * repositório — o Gmail usado no SMTP foi configurado direto no painel
- * do Supabase/Google e não passou por nenhum arquivo aqui.
- */
-export const EMAIL_CONTATO = 'PREENCHER-EMAIL-DO-PROJETO@gmail.com'
+/** Contato do encarregado de dados (LGPD, art. 41). */
+export const EMAIL_CONTATO = 'fds.itajuba.suporte@gmail.com'
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
