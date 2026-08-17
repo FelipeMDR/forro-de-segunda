@@ -188,11 +188,13 @@ function seed(): DB {
     telefone: string | null,
     semanas: number,
     cargos: string[] = [],
+    turmasEnsino: string[] = [],
   ): Profile => ({
     id: uuid(),
     nome,
     avatar_url: null,
     turmas,
+    turmas_ensino: turmasEnsino,
     cargos,
     telefone,
     // Contas de exemplo nascem sem e-mail, como as contas antigas de
@@ -207,6 +209,9 @@ function seed(): DB {
     '11 98888-0001',
     12,
     ['Monitor(a)'],
+    // Monitora de uma turma em que não estuda: é o caso que a aba
+    // "Minhas turmas" do feed passou a cobrir (migração 023)
+    ['Iniciante 01'],
   )
   const joao = mkProfile(
     'João do Acordeon',
@@ -225,6 +230,9 @@ function seed(): DB {
     '11 98888-0003',
     20,
     ['Presidência', 'Professor(a)'],
+    // Dá aula nas duas iniciantes e estuda no Avançado/Inter — no feed
+    // ela vê as quatro turmas na mesma aba
+    ['Iniciante 01', 'Iniciante 02'],
   )
   const pedro = mkProfile(
     'Pedro Baião',
@@ -508,6 +516,13 @@ export class DemoApi implements ForroApi {
     const raw = localStorage.getItem(DB_KEY)
     if (raw) {
       this.db = JSON.parse(raw) as DB
+      // Campo novo (turmas de ensino, migração 023): um banco demo
+      // gravado antes dele não tem a lista. Preencher aqui evita
+      // descartar o banco inteiro só por causa de um campo a mais —
+      // quem está com o demo aberto perderia tudo que criou.
+      for (const p of this.db.profiles) {
+        if (!p.turmas_ensino) p.turmas_ensino = []
+      }
     } else {
       // Versões antigas do banco demo são descartadas
       for (const k of [
@@ -679,6 +694,7 @@ export class DemoApi implements ForroApi {
       turmas: matches
         .filter((m): m is typeof m & { turma: string } => m.turma !== null)
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
+      turmas_ensino: [],
       cargos: [],
       telefone: telefone.trim(),
       email: email.trim() || null,
@@ -738,6 +754,7 @@ export class DemoApi implements ForroApi {
       turmas: matches
         .filter((m): m is typeof m & { turma: string } => m.turma !== null)
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
+      turmas_ensino: [],
       cargos: [],
       telefone: telefone.trim() || null,
       email: null,
@@ -1719,6 +1736,24 @@ export class DemoApi implements ForroApi {
     const p = this.db.profiles.find((x) => x.id === userId)
     if (!p) throw new Error('Aluno não encontrado')
     p.turmas = p.turmas.filter((m) => m.turma !== turma)
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async addTurmaEnsino(userId: string, turma: string) {
+    const p = this.db.profiles.find((x) => x.id === userId)
+    if (!p) throw new Error('Aluno não encontrado')
+    if (!p.turmas_ensino.includes(turma)) {
+      p.turmas_ensino = [...p.turmas_ensino, turma]
+    }
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async removeTurmaEnsino(userId: string, turma: string) {
+    const p = this.db.profiles.find((x) => x.id === userId)
+    if (!p) throw new Error('Aluno não encontrado')
+    p.turmas_ensino = p.turmas_ensino.filter((t) => t !== turma)
     this.persist()
     this.notifyFeed()
   }

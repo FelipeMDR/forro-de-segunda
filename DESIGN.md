@@ -131,7 +131,12 @@ De cima para baixo:
    emoji (🎓 aula, 🎉 festa, 🚫 cancelada), título, chip de turma, data
    ou "Hoje" em destaque, horário, descrição, e o botão **"Eu vou"** com
    as caras de quem já confirmou (até 4 avatares sobrepostos + contagem)
-3. **Seletor** "Todo mundo / Minha turma" (só se a pessoa tem turma)
+3. **Seletor** "Todo mundo / Minha turma" (só se a pessoa tem turma).
+   "Minha turma" reúne onde a pessoa **estuda** e onde ela **dá aula** —
+   professor e monitor quase nunca estão matriculados na turma que
+   conduzem, e são justamente quem mais quer acompanhar os alunos. A
+   organização marca quem dá aula em quê no painel (Pessoas → "Dá aula
+   em"); o mesmo conjunto vale para o cartão de agenda.
 4. **Publicações**, rolagem infinita de 12 em 12
 
 **Cartão de publicação** — o componente mais visto do app:

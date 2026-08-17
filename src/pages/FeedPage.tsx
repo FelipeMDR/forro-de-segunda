@@ -287,17 +287,41 @@ export function FeedPage() {
     return () => observer.disconnect()
   }, [temMais, carregarMais])
 
+  /**
+   * As turmas que são "minhas" — onde eu estudo E onde eu dou aula.
+   *
+   * Professor e monitor quase nunca estão matriculados na turma que
+   * conduzem, então antes de juntar as duas listas a aba "Minha turma"
+   * simplesmente não existia para eles: filtrava só pela matrícula, que
+   * era vazia. Quem dá aula é justamente quem mais quer acompanhar as
+   * publicações dos próprios alunos.
+   *
+   * Uma lista só, e não duas abas: para quem só estuda nada muda, e
+   * para quem faz os dois "minhas turmas" é uma ideia única — não vale
+   * um botão a mais na tela do celular para separar os dois papéis.
+   */
+  const minhasTurmas = useMemo(() => {
+    const doPerfil = profile?.turmas.map((m) => m.turma) ?? []
+    const deEnsino = profile?.turmas_ensino ?? []
+    // Set: quem dá aula na mesma turma em que estuda apareceria duas
+    // vezes no rótulo do estado vazio ("Avançado ou Avançado").
+    return [...new Set([...doPerfil, ...deEnsino])]
+  }, [profile])
+
   // Próximos compromissos relevantes pra mim (qualquer turma minha, ou
   // todos), já considerando feriados/cancelamentos: se a próxima aula
   // cair num feriado, mostra "Cancelada" + quando é a próxima válida.
+  //
+  // Vale o mesmo conjunto do feed, incluindo o que eu ensino: a aula que
+  // eu dou é compromisso meu tanto quanto a que eu assisto.
   const agenda = useMemo<OcorrenciaAgenda[]>(() => {
     const agora = new Date()
-    const minhasTurmas = new Set(profile?.turmas.map((m) => m.turma) ?? [])
+    const doInteresse = new Set(minhasTurmas)
     const relevantes = eventos.filter(
-      (e) => !e.turma || minhasTurmas.has(e.turma),
+      (e) => !e.turma || doInteresse.has(e.turma),
     )
     return proximasOcorrenciasAgenda(relevantes, feriados, agora).slice(0, 4)
-  }, [eventos, feriados, profile])
+  }, [eventos, feriados, minhasTurmas])
 
   // As confirmações só interessam para as datas que estão na tela
   const datasDaAgenda = useMemo(
@@ -360,11 +384,6 @@ export function FeedPage() {
     else await api.desmarcarDupla(parceiroId, noiteAtual)
     await carregarDuplas()
   }
-
-  const minhasTurmas = useMemo(
-    () => profile?.turmas.map((m) => m.turma) ?? [],
-    [profile],
-  )
 
   // Filtra por turma em comum, não por turma exata: quem faz duas turmas
   // vê as duas, e continua vendo quem divide qualquer uma delas.

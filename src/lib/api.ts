@@ -387,6 +387,17 @@ export interface ForroApi {
   ): Promise<void>
   /** Remove um vínculo de turma de um aluno (organizador). */
   removeTurmaAluno(userId: string, turma: string): Promise<void>
+  /**
+   * Marca que alguém DÁ AULA numa turma (organizador). Não matricula:
+   * é o vínculo que faz a turma aparecer na aba "Minhas turmas" do feed
+   * de quem ensina, sem contar como aluno em ranking, distintivo de
+   * turma ou lista de chamada.
+   *
+   * `encerrarSemestre` não desfaz isso de propósito — quem dá aula
+   * normalmente continua dando. Ver migração 023.
+   */
+  addTurmaEnsino(userId: string, turma: string): Promise<void>
+  removeTurmaEnsino(userId: string, turma: string): Promise<void>
 
   // ---- Turmas do semestre ----
   listTurmas(): Promise<Turma[]>

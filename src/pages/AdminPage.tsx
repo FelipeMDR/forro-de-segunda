@@ -32,6 +32,7 @@ import {
 import {
   DIAS_SEMANA,
   PAPEIS_DANCA,
+  ehEquipeDoProjeto,
   emojiCargo,
   type AgendaEvent,
   type AgendaEventInput,
@@ -1502,6 +1503,26 @@ function SecaoTurmas({
     }
   }
 
+  const adicionarTurmaEnsino = async (userId: string, turma: string) => {
+    if (!turma) return
+    try {
+      await api.addTurmaEnsino(userId, turma)
+      await carregar()
+      toast('Turma de aula marcada! 🪗')
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const removerTurmaEnsino = async (userId: string, turma: string) => {
+    try {
+      await api.removeTurmaEnsino(userId, turma)
+      await carregar()
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
   // Uma linha por pessoa, não por (pessoa, turma): quem faz três turmas
   // ocupava três linhas e o mesmo nome se repetia pela tela toda.
   const pessoas = agruparChamada(alunos ?? [], perfis)
@@ -1530,6 +1551,10 @@ function SecaoTurmas({
         p.telefone,
         ...p.cargos,
         ...p.turmas.map((t) => t.turma),
+        // Achar "quem dá aula no Iniciante 01" pela busca. Não entra no
+        // filtro por turma ao lado: aquele filtro responde "quem é aluno
+        // dessa turma", e o professor não é.
+        ...p.turmas_ensino,
       ]),
     )
 
@@ -2035,6 +2060,8 @@ function SecaoTurmas({
               onRemove={(turma) => void removerTurmaAluno(p.id, turma)}
               onAddCargo={(cargo) => void darCargo(p.id, cargo)}
               onRemoveCargo={(cargo) => void tirarCargo(p.id, cargo)}
+              onAddEnsino={(turma) => void adicionarTurmaEnsino(p.id, turma)}
+              onRemoveEnsino={(turma) => void removerTurmaEnsino(p.id, turma)}
             />
           ))}
         </div>
@@ -2052,6 +2079,8 @@ function LinhaAlunoApp({
   onRemove,
   onAddCargo,
   onRemoveCargo,
+  onAddEnsino,
+  onRemoveEnsino,
 }: {
   perfil: Profile
   turmas: Turma[]
@@ -2060,6 +2089,8 @@ function LinhaAlunoApp({
   onRemove: (turma: string) => void
   onAddCargo: (cargo: string) => void
   onRemoveCargo: (cargo: string) => void
+  onAddEnsino: (turma: string) => void
+  onRemoveEnsino: (turma: string) => void
 }) {
   const [turma, setTurma] = useState('')
   const [papel, setPapel] = useState<PapelDanca | null>(null)
@@ -2069,6 +2100,9 @@ function LinhaAlunoApp({
   )
   const cargosDisponiveis = cargos.filter(
     (c) => !perfil.cargos.includes(c.nome),
+  )
+  const ensinoDisponiveis = turmas.filter(
+    (t) => !perfil.turmas_ensino.includes(t.nome),
   )
 
   return (
@@ -2179,6 +2213,56 @@ function LinhaAlunoApp({
           >
             Add
           </button>
+        </div>
+      )}
+
+      {/* Turmas em que a pessoa DÁ AULA — não em que estuda.
+          É o que faz a turma aparecer na aba "Minhas turmas" do feed de
+          quem ensina, sem contar como matrícula em ranking, distintivo
+          de turma ou chamada.
+
+          Só aparece para quem tem cargo (ou já dá aula): numa lista de
+          centenas de alunos, um seletor a mais em toda linha seria ruído
+          — e quem dá aula tem cargo de Professor(a)/Monitor(a) de
+          qualquer forma. */}
+      {(ehEquipeDoProjeto(perfil.cargos) || perfil.turmas_ensino.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-preto/5 pt-2">
+          <span className="text-[11px] font-bold text-tinta-500">Dá aula em</span>
+          {perfil.turmas_ensino.length === 0 && (
+            <span className="text-xs text-tinta-400">nenhuma turma</span>
+          )}
+          {perfil.turmas_ensino.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1.5 rounded-full bg-azul-500/15 px-2.5 py-1 text-[11px] font-bold text-azul-700"
+            >
+              🪗 {t}
+              <button
+                onClick={() => onRemoveEnsino(t)}
+                className="text-azul-700/60 hover:text-red-600"
+                aria-label={`${perfil.nome} não dá mais aula na turma ${t}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          {ensinoDisponiveis.length > 0 && (
+            <select
+              className="input w-40 py-1"
+              value=""
+              aria-label={`Marcar turma em que ${perfil.nome} dá aula`}
+              onChange={(e) => {
+                if (e.target.value) onAddEnsino(e.target.value)
+              }}
+            >
+              <option value="">+ Turma…</option>
+              {ensinoDisponiveis.map((t) => (
+                <option key={t.id} value={t.nome}>
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
     </div>

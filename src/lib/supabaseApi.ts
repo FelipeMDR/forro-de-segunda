@@ -375,6 +375,11 @@ export class SupabaseApi implements ForroApi {
       cargos: ((data.cargos as Array<{ cargo: string }>) ?? []).map(
         (c) => c.cargo,
       ),
+      // Não vem do embed: `turma_professores` é da migração 023, e um
+      // embed para tabela que talvez não exista derrubaria a consulta
+      // inteira do perfil. Quem chama preenche depois (ver
+      // `turmasEnsinoDe` / `ensinoPorUsuario`).
+      turmas_ensino: [],
     }
   }
 
@@ -396,6 +401,44 @@ export class SupabaseApi implements ForroApi {
     return ((data ?? []) as Array<{ cargo: string }>).map((c) => c.cargo)
   }
 
+  /**
+   * Turmas em que a pessoa dá aula. Consulta separada e tolerante a
+   * falha: sem a migração 023 a tabela não existe, e nesse caso o perfil
+   * ainda vale — só a aba do professor é que não tem o que mostrar.
+   */
+  private async turmasEnsinoDe(userId: string): Promise<string[]> {
+    const { data, error } = await this.sb
+      .from('turma_professores')
+      .select('turma')
+      .eq('user_id', userId)
+    if (error) {
+      console.warn('[perfil] turmas de ensino indisponíveis:', error)
+      return []
+    }
+    return ((data ?? []) as Array<{ turma: string }>).map((t) => t.turma)
+  }
+
+  /**
+   * Todas as turmas de ensino de uma vez, por pessoa — para as listas do
+   * painel e da busca, que já trazem todos os perfis. A tabela tem uma
+   * linha por professor por turma (dezenas, não milhares), então buscar
+   * inteira sai mais barato que uma consulta por perfil.
+   */
+  private async ensinoPorUsuario(): Promise<Map<string, string[]>> {
+    const mapa = new Map<string, string[]>()
+    const { data, error } = await this.sb
+      .from('turma_professores')
+      .select('user_id, turma')
+    if (error) {
+      console.warn('[perfis] turmas de ensino indisponíveis:', error)
+      return mapa
+    }
+    for (const r of (data ?? []) as Array<{ user_id: string; turma: string }>) {
+      mapa.set(r.user_id, [...(mapa.get(r.user_id) ?? []), r.turma])
+    }
+    return mapa
+  }
+
   async getProfile(id: string): Promise<Profile | null> {
     // Só o dono vê o próprio telefone e e-mail. Chamado tanto pelo
     // AuthContext (a própria sessão) quanto por /perfil/:id (qualquer
@@ -411,12 +454,20 @@ export class SupabaseApi implements ForroApi {
       ? SupabaseApi.PROFILE_SELECT
       : SupabaseApi.PROFILE_SELECT_PUBLICO
 
-    const { data, error } = await this.sb
-      .from('profiles')
-      .select(colunas)
-      .eq('id', id)
-      .maybeSingle()
-    if (data) return this.mapProfile(data as unknown as Record<string, unknown>)
+    // Em paralelo, e não depois: as turmas de ensino vêm de outra tabela
+    // (ver `turmasEnsinoDe`) e não dependem do resultado daqui — em
+    // sequência, isso viraria uma ida a mais à rede em cada abertura de
+    // perfil, no celular, de graça.
+    const [{ data, error }, turmasEnsino] = await Promise.all([
+      this.sb.from('profiles').select(colunas).eq('id', id).maybeSingle(),
+      this.turmasEnsinoDe(id),
+    ])
+    if (data) {
+      return {
+        ...this.mapProfile(data as unknown as Record<string, unknown>),
+        turmas_ensino: turmasEnsino,
+      }
+    }
 
     if (error) {
       // Embed falhou: busca o perfil e as turmas separadamente
@@ -451,6 +502,7 @@ export class SupabaseApi implements ForroApi {
           criado_em: base.criado_em as string,
           turmas,
           cargos,
+          turmas_ensino: turmasEnsino,
         }
       }
     }
@@ -1919,13 +1971,14 @@ export class SupabaseApi implements ForroApi {
         )
         .order('nome'),
     ) as unknown as Array<Record<string, unknown>>
+    const ensino = await this.ensinoPorUsuario()
     return data.map((p) => {
       const {
         telefone: _semTelefone,
         email: _semEmail,
         ...publico
       } = this.mapProfile(p)
-      return publico
+      return { ...publico, turmas_ensino: ensino.get(publico.id) ?? [] }
     })
   }
 
@@ -1936,7 +1989,11 @@ export class SupabaseApi implements ForroApi {
         .select(SupabaseApi.PROFILE_SELECT)
         .order('nome'),
     ) as unknown as Array<Record<string, unknown>>
-    return data.map((p) => this.mapProfile(p))
+    const ensino = await this.ensinoPorUsuario()
+    return data.map((p) => ({
+      ...this.mapProfile(p),
+      turmas_ensino: ensino.get(p.id as string) ?? [],
+    }))
   }
 
   async addTurmaAluno(userId: string, turma: string, papel: PapelDanca | null) {
@@ -1954,6 +2011,24 @@ export class SupabaseApi implements ForroApi {
     ok(
       await this.sb
         .from('profile_turmas')
+        .delete()
+        .eq('user_id', userId)
+        .eq('turma', turma),
+    )
+  }
+
+  async addTurmaEnsino(userId: string, turma: string) {
+    ok(
+      await this.sb
+        .from('turma_professores')
+        .upsert({ user_id: userId, turma }, { onConflict: 'user_id,turma' }),
+    )
+  }
+
+  async removeTurmaEnsino(userId: string, turma: string) {
+    ok(
+      await this.sb
+        .from('turma_professores')
         .delete()
         .eq('user_id', userId)
         .eq('turma', turma),

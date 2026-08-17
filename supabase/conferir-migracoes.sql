@@ -94,6 +94,10 @@ from (values
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.proname = 'telefone_ddd'
     )
+  ),
+  (
+    '023 — turmas em que a pessoa dá aula',
+    to_regclass('public.turma_professores') is not null
   )
 ) as t(migracao, aplicada)
 order by migracao;

@@ -31,6 +31,20 @@ create table if not exists public.profile_turmas (
   primary key (user_id, turma)
 );
 
+-- Turmas em que a pessoa DÁ AULA — não em que estuda (isso é
+-- profile_turmas). Tabela separada porque os dois vínculos significam
+-- coisas diferentes: profile_turmas alimenta o rótulo do feed, o
+-- distintivo de turma, o ranking e a chamada, e um professor lá dentro
+-- passaria a contar como aluno matriculado em todos eles. Ver migração 023.
+create table if not exists public.turma_professores (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  turma text not null,
+  criado_em timestamptz not null default now(),
+  primary key (user_id, turma)
+);
+create index if not exists turma_professores_turma_idx
+  on public.turma_professores (turma);
+
 create table if not exists public.roles (
   user_id uuid primary key references public.profiles(id) on delete cascade,
   papel text not null default 'aluno' check (papel in ('aluno', 'organizador'))
@@ -567,6 +581,7 @@ grant execute on function public.ping() to anon;
 
 alter table public.profiles enable row level security;
 alter table public.profile_turmas enable row level security;
+alter table public.turma_professores enable row level security;
 alter table public.roles enable row level security;
 alter table public.challenges enable row level security;
 alter table public.challenge_janelas enable row level security;
@@ -605,6 +620,16 @@ create policy "profiles_update" on public.profiles
 create policy "profile_turmas_select" on public.profile_turmas
   for select to authenticated using (true);
 create policy "profile_turmas_write" on public.profile_turmas
+  for all to authenticated
+  using (public.is_organizador())
+  with check (public.is_organizador());
+
+-- turma_professores: mesma regra — todos leem (não há nada sensível: o
+-- feed já é visível para qualquer pessoa logada), só organizador
+-- escreve, o que impede alguém de se declarar professor do Avançado
+create policy "turma_professores_select" on public.turma_professores
+  for select to authenticated using (true);
+create policy "turma_professores_write" on public.turma_professores
   for all to authenticated
   using (public.is_organizador())
   with check (public.is_organizador());

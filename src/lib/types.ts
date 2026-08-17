@@ -20,6 +20,16 @@ export interface Profile {
   avatar_url: string | null
   /** Turmas definidas pela organização — aluno não edita. */
   turmas: TurmaMembro[]
+  /**
+   * Turmas em que a pessoa DÁ AULA (professor, monitor). Coisa
+   * diferente de `turmas`, que é onde ela estuda: é por isso que são
+   * dois campos e duas tabelas — quem dá aula no Avançado não é aluno
+   * do Avançado, e não deve ganhar o distintivo nem entrar no ranking
+   * da turma por isso.
+   *
+   * Vazio para quase todo mundo. Só a organização define (migração 023).
+   */
+  turmas_ensino: string[]
   /** Cargos no projeto (Presidência, Professor(a)…) — só a organização define. */
   cargos: string[]
   telefone: string | null
