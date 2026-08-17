@@ -10,7 +10,31 @@ import type { Badge, TurmaMembro } from './types'
  * um distintivo automático de "campeão".
  */
 
-const MARCOS_PRESENCA: Array<[number, string, string]> = [
+/**
+ * Marcos de progresso: `[mínimo, emoji, título]`, do menor para o maior.
+ *
+ * Só o MAIOR alcançado vira distintivo — ver `marcoAlcancado`.
+ */
+type Marco = [number, string, string]
+
+/**
+ * O maior marco já alcançado, ou `undefined` se nenhum foi.
+ *
+ * Os marcos EVOLUEM em vez de acumular: quem tem 50 presenças mostra só
+ * 🥇, e não 👣 + 🥉 + 🥈 + 🥇 de uma vez. Somados, quatro versões da
+ * mesma conquista enchiam a grade do perfil e empurravam para baixo o
+ * que é de fato distinto — cargo, turma e os distintivos que a
+ * organização concede na mão. O número exato continua na descrição.
+ */
+function marcoAlcancado(marcos: Marco[], valor: number): Marco | undefined {
+  let alcancado: Marco | undefined
+  for (const marco of marcos) {
+    if (valor >= marco[0]) alcancado = marco
+  }
+  return alcancado
+}
+
+const MARCOS_PRESENCA: Marco[] = [
   [1, '👣', 'Primeiro check-in'],
   [10, '🥉', '10 presenças'],
   [25, '🥈', '25 presenças'],
@@ -24,7 +48,7 @@ const MARCOS_PRESENCA: Array<[number, string, string]> = [
  * empurra o rodízio, que é cultura do forró — dançar com quem chegou
  * hoje, e não só com quem já se conhece.
  */
-const MARCOS_RODIZIO: Array<[number, string, string]> = [
+const MARCOS_RODIZIO: Marco[] = [
   [3, '🤝', 'Dançou com 3 pessoas'],
   [10, '💫', 'Dançou com 10 pessoas'],
   [25, '🌟', 'Dançou com 25 pessoas'],
@@ -79,34 +103,35 @@ export function computeBadges(input: {
     })
   }
 
-  // 2. Marcos de presença — contam DIAS, não fotos (várias fotos no
-  // mesmo dia valem uma presença, igual ao ranking)
+  // 2. Marco de presença — conta DIAS, não fotos (várias fotos no
+  // mesmo dia valem uma presença, igual ao ranking). Só o maior
+  // alcançado: 🥇 substitui 🥉, não se soma a ele.
   const total = diasDistintos(input.checkinDates)
-  for (const [minimo, emoji, titulo] of MARCOS_PRESENCA) {
-    if (total >= minimo) {
-      badges.push({
-        id: `presenca-${minimo}`,
-        emoji,
-        titulo,
-        // Texto neutro: o mesmo distintivo aparece no perfil dos outros
-        descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
-      })
-    }
+  const presenca = marcoAlcancado(MARCOS_PRESENCA, total)
+  if (presenca) {
+    const [minimo, emoji, titulo] = presenca
+    badges.push({
+      id: `presenca-${minimo}`,
+      emoji,
+      titulo,
+      // Texto neutro: o mesmo distintivo aparece no perfil dos outros
+      descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
+    })
   }
 
   // 2.5 Rodízio — pessoas diferentes com quem a dupla foi confirmada
   const parceiros = input.parceiros ?? 0
-  for (const [minimo, emoji, titulo] of MARCOS_RODIZIO) {
-    if (parceiros >= minimo) {
-      badges.push({
-        id: `rodizio-${minimo}`,
-        emoji,
-        titulo,
-        descricao: `${parceiros} ${
-          parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
-        }`,
-      })
-    }
+  const rodizio = marcoAlcancado(MARCOS_RODIZIO, parceiros)
+  if (rodizio) {
+    const [minimo, emoji, titulo] = rodizio
+    badges.push({
+      id: `rodizio-${minimo}`,
+      emoji,
+      titulo,
+      descricao: `${parceiros} ${
+        parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
+      }`,
+    })
   }
 
   return badges
