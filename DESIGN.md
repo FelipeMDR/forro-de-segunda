@@ -136,7 +136,9 @@ De cima para baixo:
    professor e monitor quase nunca estão matriculados na turma que
    conduzem, e são justamente quem mais quer acompanhar os alunos. A
    organização marca quem dá aula em quê no painel (Pessoas → "Dá aula
-   em"); o mesmo conjunto vale para o cartão de agenda.
+   em"); o mesmo conjunto vale para o cartão de agenda. "Encerrar
+   semestre" zera essas marcações junto com as matrículas — a equipe muda
+   bastante de um semestre para o outro.
 4. **Publicações**, rolagem infinita de 12 em 12
 
 **Cartão de publicação** — o componente mais visto do app:

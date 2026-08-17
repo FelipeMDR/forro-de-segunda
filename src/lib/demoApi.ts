@@ -1699,11 +1699,19 @@ export class DemoApi implements ForroApi {
   }
 
   async encerrarSemestre() {
-    const comTurma = this.db.profiles.filter((p) => p.turmas.length > 0)
-    for (const p of comTurma) p.turmas = []
+    const afetados = this.db.profiles.filter(
+      (p) => p.turmas.length > 0 || p.turmas_ensino.length > 0,
+    )
+    for (const p of afetados) {
+      p.turmas = []
+      // Quem dá aula também é zerado: a equipe tem rotatividade alta
+      // entre semestres, e um vínculo que sobrevive sozinho deixaria
+      // ex-professor vendo o feed da turma de quem assumiu.
+      p.turmas_ensino = []
+    }
     this.db.semestres = [...(this.db.semestres ?? []), new Date().toISOString()]
     this.persist()
-    return comTurma.length
+    return afetados.length
   }
 
   async inicioSemestreAtual(): Promise<string | null> {

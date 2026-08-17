@@ -1457,7 +1457,7 @@ function SecaoTurmas({
       toast(
         n === 0
           ? 'Ninguém estava em turma nenhuma'
-          : `${n} aluno(s) ficaram sem turma. Agora importe a matrícula nova.`,
+          : `${n} pessoa(s) ficaram sem turma. Agora importe a matrícula nova — e remarque quem dá aula.`,
       )
     } catch (err) {
       toast((err as Error).message, 'erro')
@@ -1537,7 +1537,13 @@ function SecaoTurmas({
   const plano = importacao
     ? planejarMatricula(importacao.linhas, alunos ?? [], perfis)
     : []
-  const comTurma = perfis.filter((p) => p.turmas.length > 0).length
+  // Quem perde vínculo ao encerrar o semestre: matrícula OU turma em que
+  // dá aula. Sem o segundo, um professor que não estuda em turma nenhuma
+  // não entrava na contagem — e se só a equipe tivesse vínculo, o botão
+  // de encerrar nem apareceria.
+  const comTurma = perfis.filter(
+    (p) => p.turmas.length > 0 || p.turmas_ensino.length > 0,
+  ).length
 
   const perfisComTurmas = perfis.map((p) => ({
     perfil: p,
@@ -1624,13 +1630,21 @@ function SecaoTurmas({
         {/* Vira o semestre: zera as turmas de todo mundo para a
             matrícula nova entrar limpa. Quem terminou o curso e não
             voltar em nenhuma planilha fica sem turma — continua com
-            conta, pontos e check-ins, só não pertence a uma turma. */}
+            conta, pontos e check-ins, só não pertence a uma turma.
+            Zera também quem dá aula em cada turma: a equipe muda bastante
+            de um semestre para o outro, e isso é remarcado na mão aqui
+            embaixo (não vem em planilha). */}
         {encerrando ? (
           <div className="space-y-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-700">
             <p>
-              Tirar os <strong>{comTurma}</strong> alunos do app das turmas
+              Tirar as <strong>{comTurma}</strong> pessoas do app das turmas
               atuais? Contas, pontos, check-ins e distintivos{' '}
               <strong>não são tocados</strong> — só o vínculo com a turma.
+            </p>
+            <p>
+              Isso inclui quem <strong>dá aula</strong>: essas marcações
+              precisam ser refeitas aqui na lista de baixo, depois da
+              matrícula. A planilha não traz professor nem monitor.
             </p>
             <p>
               Faça isso ao virar o semestre, logo antes de importar a

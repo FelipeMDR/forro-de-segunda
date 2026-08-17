@@ -1936,6 +1936,19 @@ export class SupabaseApi implements ForroApi {
     for (const lote of emLotes(comTurma.map((p) => p.id), 100)) {
       ok(await this.sb.from('profile_turmas').delete().in('user_id', lote))
     }
+
+    // Quem dá aula também é zerado: a equipe do projeto tem rotatividade
+    // alta de um semestre para o outro, e um vínculo de ensino que
+    // sobrevive sozinho deixaria ex-professor vendo o feed da turma de
+    // quem assumiu. Vem depois da matrícula, marcado na mão no painel.
+    //
+    // Se a migração 023 não estiver aplicada, `turmas_ensino` chega
+    // sempre vazio (ver `ensinoPorUsuario`) e este laço não roda —
+    // encerrar o semestre continua funcionando como antes.
+    const comEnsino = perfis.filter((p) => p.turmas_ensino.length > 0)
+    for (const lote of emLotes(comEnsino.map((p) => p.id), 100)) {
+      ok(await this.sb.from('turma_professores').delete().in('user_id', lote))
+    }
     // Fica registrado mesmo se ninguém tinha turma (comTurma vazio):
     // é o carimbo de quando o semestre virou, não uma contagem.
     const uid = await this.getSessionUserId()
@@ -1944,7 +1957,10 @@ export class SupabaseApi implements ForroApi {
         .from('semestres')
         .insert({ encerrado_por: uid }),
     )
-    return comTurma.length
+    // Pessoas afetadas, não soma dos dois grupos: quem estuda numa turma
+    // e dá aula em outra apareceria duas vezes na contagem que a tela
+    // mostra ("N alunos ficaram sem turma").
+    return new Set([...comTurma, ...comEnsino].map((p) => p.id)).size
   }
 
   async inicioSemestreAtual(): Promise<string | null> {

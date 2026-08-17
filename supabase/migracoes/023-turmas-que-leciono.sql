@@ -59,9 +59,10 @@ create policy "turma_professores_write" on public.turma_professores
 -- ============================================================
 -- Depois de rodar: Project Settings > API > "Reload schema cache".
 --
--- "Encerrar semestre" NÃO limpa esta tabela, de propósito: ele existe
--- para tirar ALUNOS das turmas antes da matrícula nova, e quem dá aula
--- normalmente continua dando. Assim a aba do professor volta a
--- funcionar no semestre seguinte sem ninguém reconfigurar nada — e o
--- painel permite ajustar quando alguém deixa de dar aula.
+-- "Encerrar semestre" limpa esta tabela junto com as matrículas: a
+-- equipe do projeto tem rotatividade alta de um semestre para o outro, e
+-- um vínculo de ensino que sobrevivesse sozinho deixaria ex-professor
+-- vendo o feed da turma de quem assumiu. Quem continua dando aula é
+-- remarcado no painel depois da matrícula nova — isso não vem em
+-- planilha, é sempre na mão.
 -- ============================================================

@@ -358,7 +358,11 @@ export interface ForroApi {
    * fica sem turma, que é a situação de quem terminou o curso e
    * continua frequentando.
    *
-   * Devolve quantas pessoas tinham turma.
+   * Zera também quem DÁ AULA em cada turma (`addTurmaEnsino`), pelo
+   * mesmo motivo: a equipe muda bastante de um semestre para o outro.
+   * Isso é remarcado na mão no painel, não vem em planilha.
+   *
+   * Devolve quantas pessoas perderam algum vínculo de turma.
    */
   encerrarSemestre(): Promise<number>
   /**
@@ -393,8 +397,10 @@ export interface ForroApi {
    * de quem ensina, sem contar como aluno em ranking, distintivo de
    * turma ou lista de chamada.
    *
-   * `encerrarSemestre` não desfaz isso de propósito — quem dá aula
-   * normalmente continua dando. Ver migração 023.
+   * `encerrarSemestre` limpa estes vínculos junto com as matrículas: a
+   * equipe do projeto tem rotatividade alta entre semestres, e um
+   * vínculo que sobrevivesse sozinho deixaria ex-professor vendo o feed
+   * da turma de quem assumiu. Ver migração 023.
    */
   addTurmaEnsino(userId: string, turma: string): Promise<void>
   removeTurmaEnsino(userId: string, turma: string): Promise<void>
