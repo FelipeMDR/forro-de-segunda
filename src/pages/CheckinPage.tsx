@@ -193,6 +193,18 @@ export function CheckinPage() {
     [valendoAgora],
   )
 
+  /**
+   * Tem desafio com local rolando e o GPS ainda não disse nem sim nem
+   * não. Enquanto isso for verdade, publicar é uma corrida: a câmera é
+   * rápida (3 toques: tirar, revisar, publicar) e o GPS pode não ter
+   * respondido ainda, principalmente num salão fechado, onde o sinal de
+   * satélite demora ou nunca fecha. Sem travar o botão nesse meio-tempo,
+   * a foto sai sem coordenada nenhuma — e como ela nunca é reavaliada
+   * depois (a coordenada não fica guardada, só o veredito), o ponto se
+   * perde pra sempre, em silêncio, sem aviso nenhum na tela de revisão.
+   */
+  const aguardandoLocal = comLocal.length > 0 && !posicao && !erroLocal
+
   // Só pede GPS se algum desafio realmente precisar — pedir permissão
   // sem motivo é o tipo de coisa que faz o aluno negar pra sempre.
   const buscarLocal = async () => {
@@ -471,13 +483,51 @@ export function CheckinPage() {
           />
         </div>
 
+        {/* Só aparece quando tem desafio com local em jogo — é o que
+            explica por que o botão está preso, em vez de deixar
+            parecer travado à toa. */}
+        {aguardandoLocal && (
+          <div className="flex items-center gap-3 rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
+            <span aria-hidden className="animate-pulse text-lg">
+              📍
+            </span>
+            <p className="flex-1">
+              Confirmando sua localização antes de publicar — só um
+              instante.
+            </p>
+          </div>
+        )}
+        {erroLocal && comLocal.length > 0 && (
+          <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+            <p className="flex-1">
+              📍 {erroLocal} — sem isso a foto não marca ponto nos
+              desafios com local.
+            </p>
+            <button
+              className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
+              onClick={() => void buscarLocal()}
+            >
+              Tentar de novo
+            </button>
+          </div>
+        )}
+
         <div className="space-y-2 border-t border-preto/10 pt-4">
           <button
             className="btn-primary w-full py-3.5 text-base"
-            disabled={enviando || !limite.pode}
+            // Trava enquanto o GPS ainda não respondeu nem sim nem não:
+            // publicar agora sairia sem coordenada, e isso não tem
+            // conserto depois (ver `aguardandoLocal`). Já errado
+            // (`erroLocal`) não trava — aí é escolha da pessoa publicar
+            // mesmo sem valer o local, como sempre foi.
+            disabled={enviando || !limite.pode || aguardandoLocal}
             onClick={() => void publicar()}
           >
-            {enviando ? 'Publicando…' : 'Publicar check-in'}
+            {enviando
+              ? 'Publicando…'
+              : aguardandoLocal
+                ? 'Aguardando localização…'
+                : 'Publicar check-in'}
           </button>
           <button
             className="w-full py-2 text-center text-sm font-bold text-tinta-600 disabled:opacity-50"
