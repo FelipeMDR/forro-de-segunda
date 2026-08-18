@@ -1187,14 +1187,6 @@ export class SupabaseApi implements ForroApi {
       ok(
         await this.sb.from('challenges').update(valores).eq('id', challengeId),
       )
-      // Substitui as janelas por completo — mais simples e seguro que
-      // tentar casar quais dias mudaram, sumiram ou são novos.
-      ok(
-        await this.sb
-          .from('challenge_janelas')
-          .delete()
-          .eq('challenge_id', challengeId),
-      )
     } else {
       const uid = await this.requireUid()
       const criado = ok(
@@ -1206,18 +1198,41 @@ export class SupabaseApi implements ForroApi {
       ) as { id: string }
       challengeId = criado.id
     }
+
+    // GRAVA as janelas novas ANTES de apagar as velhas — nunca o
+    // contrário. Editar e apagar são duas idas à rede separadas, sem
+    // transação amarrando as duas: se a rede caísse entre elas, um
+    // "apaga tudo, insere depois" deixava o desafio SEM NENHUMA janela
+    // até a próxima edição — e sem janela, `getRanking` não reconhece
+    // check-in nenhum, de ninguém, mesmo os já feitos (os pontos não
+    // ficam gravados por check-in, são recalculados na hora a partir da
+    // janela do desafio). Foi exatamente isso que aconteceu em produção:
+    // editar o horário do Espaço Livre zerou os pontos do desafio
+    // inteiro. Nesta ordem, o pior cenário de uma falha no meio do
+    // caminho é sobrar um dia antigo pontuando a mais — nunca ninguém
+    // deixar de pontuar.
     if (data.janelas.length > 0) {
       ok(
-        await this.sb.from('challenge_janelas').insert(
+        await this.sb.from('challenge_janelas').upsert(
           data.janelas.map((j) => ({
             challenge_id: challengeId,
             dia_semana: j.dia_semana,
             hora_inicio: j.hora_inicio,
             hora_fim: j.hora_fim,
           })),
+          { onConflict: 'challenge_id,dia_semana' },
         ),
       )
     }
+    const diasNovos = data.janelas.map((j) => j.dia_semana)
+    let apagar = this.sb
+      .from('challenge_janelas')
+      .delete()
+      .eq('challenge_id', challengeId)
+    if (diasNovos.length > 0) {
+      apagar = apagar.not('dia_semana', 'in', `(${diasNovos.join(',')})`)
+    }
+    ok(await apagar)
   }
 
   async deleteChallenge(id: string) {
