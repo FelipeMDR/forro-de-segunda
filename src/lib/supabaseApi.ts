@@ -1882,12 +1882,36 @@ export class SupabaseApi implements ForroApi {
     const semConta = plano.filter((p) => !p.userId)
 
     // ---- Quem já tem conta: troca as turmas do perfil ----
-    // Apaga e reinsere em vez de comparar diferença: a planilha do
-    // semestre é a verdade, e "sumiu do arquivo" precisa mesmo sumir.
+    // A planilha do semestre é a verdade: turma que sumiu do arquivo
+    // precisa mesmo sumir. Mas GRAVA as turmas novas (upsert) ANTES de
+    // apagar as velhas — mesmo bug do saveChallenge: matrícula processa
+    // lotes de até 100 pessoas, cada upsert/delete é uma ida à rede
+    // separada sem transação amarrando as duas, e "apaga tudo, insere
+    // depois" deixava quem já tinha conta SEM TURMA NENHUMA se a rede
+    // caísse no meio — até alguém rodar a matrícula de nascença, sem
+    // aviso nenhum para o aluno. Nesta ordem, o pior cenário de uma
+    // falha no meio do caminho é sobrar uma turma antiga a mais, nunca
+    // faltar a nova.
+    //
+    // Diferente do desafio, aqui cada pessoa tem seu PRÓPRIO conjunto de
+    // turmas novas — não dá para apagar "o que sobrou" com uma condição
+    // só para o lote inteiro. Busca o que cada um tinha antes, upserta o
+    // conjunto novo (chave é user_id+turma) e só apaga, por pessoa, o
+    // que ficou de fora do novo conjunto dela.
     if (comConta.length > 0) {
-      for (const lote of emLotes(comConta.map((p) => p.userId!), 100)) {
-        ok(await this.sb.from('profile_turmas').delete().in('user_id', lote))
+      const idsComConta = comConta.map((p) => p.userId!)
+      const existentes: { user_id: string; turma: string }[] = []
+      for (const lote of emLotes(idsComConta, 100)) {
+        existentes.push(
+          ...(ok(
+            await this.sb
+              .from('profile_turmas')
+              .select('user_id, turma')
+              .in('user_id', lote),
+          ) as { user_id: string; turma: string }[]),
+        )
       }
+
       const vinculos = comConta.flatMap((p) =>
         p.turmasNovas
           .filter((t) => t.turma)
@@ -1898,15 +1922,42 @@ export class SupabaseApi implements ForroApi {
           })),
       )
       if (vinculos.length > 0) {
-        ok(await this.sb.from('profile_turmas').insert(vinculos))
+        ok(
+          await this.sb
+            .from('profile_turmas')
+            .upsert(vinculos, { onConflict: 'user_id,turma' }),
+        )
+      }
+
+      const novasPorUsuario = new Map<string, Set<string>>()
+      for (const v of vinculos) {
+        if (!novasPorUsuario.has(v.user_id)) {
+          novasPorUsuario.set(v.user_id, new Set())
+        }
+        novasPorUsuario.get(v.user_id)!.add(v.turma)
+      }
+      const sobrasPorUsuario = new Map<string, string[]>()
+      for (const e of existentes) {
+        if (novasPorUsuario.get(e.user_id)?.has(e.turma)) continue
+        if (!sobrasPorUsuario.has(e.user_id)) sobrasPorUsuario.set(e.user_id, [])
+        sobrasPorUsuario.get(e.user_id)!.push(e.turma)
+      }
+      for (const [userId, turmas] of sobrasPorUsuario) {
+        ok(
+          await this.sb
+            .from('profile_turmas')
+            .delete()
+            .eq('user_id', userId)
+            .in('turma', turmas),
+        )
       }
     }
 
     // ---- Quem ainda não tem conta: troca a linha da chamada ----
-    const idsVelhos = semConta.flatMap((p) => p.linhasChamada.map((l) => l.id))
-    for (const lote of emLotes(idsVelhos, 100)) {
-      ok(await this.sb.from('alunos_cadastrados').delete().in('id', lote))
-    }
+    // Mesma ordem invertida, mas mais simples: cada linha nova é um
+    // insert com id novo, sem relação nenhuma com os ids antigos — não
+    // precisa diferença nenhuma, só gravar as novas antes de apagar as
+    // velhas (que já são conhecidas por id).
     const linhas = semConta.flatMap((p) =>
       p.turmasNovas.map((t) => ({
         nome: p.nome,
@@ -1917,6 +1968,10 @@ export class SupabaseApi implements ForroApi {
     )
     if (linhas.length > 0) {
       ok(await this.sb.from('alunos_cadastrados').insert(linhas))
+    }
+    const idsVelhos = semConta.flatMap((p) => p.linhasChamada.map((l) => l.id))
+    for (const lote of emLotes(idsVelhos, 100)) {
+      ok(await this.sb.from('alunos_cadastrados').delete().in('id', lote))
     }
 
     return { perfis: comConta.length, chamada: semConta.length }
