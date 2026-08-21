@@ -231,6 +231,14 @@ export class SupabaseApi implements ForroApi {
         'Não encontramos essa conta pelo telefone. Se você já cadastrou um e-mail, entre com ele.',
       )
     }
+    // `traduz` fala em "telefone" porque é o caso mais comum do app —
+    // mas quem digitou um e-mail está olhando pro campo "E-mail" da
+    // tela, e ler "telefone" ali soa como resposta errada, não como erro
+    // de senha. Mesma causa (Supabase não reconheceu login+senha), texto
+    // que casa com o que a pessoa realmente digitou.
+    if (!porTelefone && /invalid login credentials/i.test(error.message)) {
+      throw new Error('E-mail ou senha incorretos')
+    }
     throw new Error(traduz(error.message))
   }
 
