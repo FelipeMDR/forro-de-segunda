@@ -192,8 +192,16 @@ export interface ForroApi {
   addComment(checkinId: string, texto: string): Promise<void>
   deleteComment(id: string): Promise<void>
   reportCheckin(checkinId: string, motivo: string): Promise<void>
-  /** Check-ins de qualquer aluno (usado no próprio perfil e no público). */
-  checkinsDe(userId: string): Promise<{ criado_em: string }[]>
+  /**
+   * Check-ins de qualquer aluno (usado no próprio perfil e no público).
+   *
+   * Vem com `locais` — em quais desafios a foto valeu no local — porque
+   * é o que decide se ela conta como presença (ver `lib/presenca.ts`).
+   * Quem só quer saber "já postei hoje" pode ignorar o campo.
+   */
+  checkinsDe(
+    userId: string,
+  ): Promise<{ criado_em: string; locais: string[] }[]>
   /**
    * Check-ins de um período com a contagem de reações — é o que a
    * retrospectiva usa para achar a foto mais curtida. Consulta à parte

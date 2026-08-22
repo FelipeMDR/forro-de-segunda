@@ -61,6 +61,11 @@ export function computeBadges(input: {
   cargos?: string[]
   /** Distintivos personalizados já concedidos a essa pessoa. */
   distintivosCustom?: Badge[]
+  /**
+   * As noites que CONTAM como presença — não os check-ins crus. Quem
+   * chama filtra antes com `datasDePresenca` (ver `lib/presenca.ts`);
+   * aqui só se conta quantas são.
+   */
   checkinDates: Date[]
   /**
    * Pares confirmados pelos dois lados. Só os confirmados entram: se

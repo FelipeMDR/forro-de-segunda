@@ -975,7 +975,7 @@ export class DemoApi implements ForroApi {
   async checkinsDe(userId: string) {
     return this.db.checkins
       .filter((c) => c.user_id === userId)
-      .map((c) => ({ criado_em: c.criado_em }))
+      .map((c) => ({ criado_em: c.criado_em, locais: c.locais ?? [] }))
   }
 
   async checkinsComReacoes(
@@ -990,6 +990,7 @@ export class DemoApi implements ForroApi {
         legenda: c.legenda,
         criado_em: c.criado_em,
         reacoes: this.db.reactions.filter((r) => r.checkin_id === c.id).length,
+        locais: c.locais ?? [],
       }))
       .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
   }
@@ -1582,6 +1583,7 @@ export class DemoApi implements ForroApi {
           data: c.criado_em,
           nome: p?.nome ?? 'Alguém',
           turma: p ? (turmaLabel(p.turmas) ?? '') : '',
+          locais: c.locais ?? [],
         }
       })
     return rows.sort((a, b) => b.data.localeCompare(a.data))

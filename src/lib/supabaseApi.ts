@@ -926,10 +926,16 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('checkins')
-        .select('criado_em')
+        .select('criado_em, locais:checkin_locais(challenge_id)')
         .eq('user_id', userId),
-    )
-    return data as { criado_em: string }[]
+    ) as unknown as Array<{
+      criado_em: string
+      locais: Array<{ challenge_id: string }> | null
+    }>
+    return data.map((c) => ({
+      criado_em: c.criado_em,
+      locais: (c.locais ?? []).map((l) => l.challenge_id),
+    }))
   }
 
   async checkinsComReacoes(
@@ -939,7 +945,9 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('checkins')
-        .select('id, foto_url, legenda, criado_em, reacoes:reactions(count)')
+        .select(
+          'id, foto_url, legenda, criado_em, reacoes:reactions(count), locais:checkin_locais(challenge_id)',
+        )
         .eq('user_id', userId)
         .gte('criado_em', desdeISO)
         .order('criado_em', { ascending: false }),
@@ -949,6 +957,7 @@ export class SupabaseApi implements ForroApi {
       legenda: string | null
       criado_em: string
       reacoes: { count: number }[]
+      locais: Array<{ challenge_id: string }> | null
     }>
     return data.map((c) => ({
       id: c.id,
@@ -956,6 +965,7 @@ export class SupabaseApi implements ForroApi {
       legenda: c.legenda,
       criado_em: c.criado_em,
       reacoes: c.reacoes?.[0]?.count ?? 0,
+      locais: (c.locais ?? []).map((l) => l.challenge_id),
     }))
   }
 
@@ -1799,19 +1809,21 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('checkins')
         .select(
-          'criado_em, autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
+          'criado_em, locais:checkin_locais(challenge_id), autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
         )
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
         .order('criado_em', { ascending: false }),
     ) as unknown as Array<{
       criado_em: string
+      locais: Array<{ challenge_id: string }> | null
       autor: { nome: string; turmas: TurmaMembro[] | null } | null
     }>
     return data.map((c) => ({
       data: c.criado_em,
       nome: c.autor?.nome ?? 'Alguém',
       turma: turmaLabel(c.autor?.turmas ?? []) ?? '',
+      locais: (c.locais ?? []).map((l) => l.challenge_id),
     }))
   }
 

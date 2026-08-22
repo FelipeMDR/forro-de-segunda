@@ -5,6 +5,7 @@ import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { diasSuspensos, mapaAberturas } from '../lib/dates'
 import {
   fraseDaRetrospectiva,
   montarRetrospectiva,
@@ -95,12 +96,22 @@ export function RetrospectivaPage() {
           .catch(() => null)
         const desde =
           ultimoEncerramento ?? profile?.criado_em ?? new Date(0).toISOString()
-        const [checkins, parceiros] = await Promise.all([
-          api.checkinsComReacoes(userId, desde),
-          api.parceirosDe(userId, desde).catch(() => []),
-        ])
+        const [checkins, parceiros, desafios, feriados, aberturas] =
+          await Promise.all([
+            api.checkinsComReacoes(userId, desde),
+            api.parceirosDe(userId, desde).catch(() => []),
+            api.listChallenges().catch(() => []),
+            api.listFeriados().catch(() => []),
+            api.listAberturas().catch(() => []),
+          ])
         if (cancelado) return
-        setR(montarRetrospectiva(checkins, parceiros, new Date(desde)))
+        setR(
+          montarRetrospectiva(checkins, parceiros, new Date(desde), {
+            desafios,
+            suspensos: diasSuspensos(feriados),
+            aberturas: mapaAberturas(aberturas),
+          }),
+        )
       } catch (e) {
         if (cancelado) return
         console.error('[retrospectiva] falha ao carregar', e)

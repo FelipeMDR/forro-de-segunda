@@ -281,6 +281,8 @@ export interface CheckinComReacoes {
   legenda: string | null
   criado_em: string
   reacoes: number
+  /** Desafios em que valeu no local — ver `lib/presenca.ts`. */
+  locais: string[]
 }
 
 export type TipoNotificacao = 'reacao' | 'comentario' | 'dupla'
@@ -439,6 +441,11 @@ export interface AttendanceRow {
   data: string
   nome: string
   turma: string
+  /**
+   * Desafios em que a foto valeu no local — é o que decide se a linha
+   * conta como presença de verdade (ver `lib/presenca.ts`).
+   */
+  locais: string[]
 }
 
 export interface Report {

@@ -40,7 +40,8 @@ diferente você dançou**. Não é fitness, não é rede social genérica.
 
 | Conceito | O que é |
 | --- | --- |
-| **Check-in** | Foto tirada na hora (sem galeria) que registra presença |
+| **Check-in** | Foto tirada na hora (sem galeria) — candidata a presença |
+| **Presença** | Check-in que marcou ponto em algum desafio rodando na hora. Foto fora de janela (ou fora do local, quando o desafio exige) entra no feed mas **não** vira presença — senão bastava postar de casa. Participar do desafio é opcional: quem não entrou não aparece no rank, mas ganha a presença. Regra única em `lib/presenca.ts` |
 | **Noite de forró** | Das 05:00 às 04:59 do dia seguinte — a madrugada pertence à noite que começou |
 | **Desafio** | Competição por período, com janelas de horário por dia da semana e opcionalmente trava por local (GPS) |
 | **Janela** | Faixa de horário em que o check-in conta ponto naquele desafio |

@@ -1,4 +1,5 @@
 import { computeStreak, diasDistintos } from './dates'
+import { datasDePresenca, type RegrasPresenca } from './presenca'
 import type { CheckinComReacoes, ParceiroDanca } from './types'
 
 /**
@@ -38,9 +39,13 @@ export function montarRetrospectiva(
   checkins: CheckinComReacoes[],
   parceiros: ParceiroDanca[],
   inicio: Date,
+  // Presença = check-in que marcou ponto em algum desafio. A foto que
+  // não marcou continua entrando em "reações recebidas" e pode até ser
+  // o destaque do semestre — ela existiu, só não foi uma noite de forró.
+  regras: RegrasPresenca,
   agora = new Date(),
 ): Retrospectiva {
-  const datas = checkins.map((c) => new Date(c.criado_em))
+  const datas = datasDePresenca(checkins, regras)
   // Mais reações vence; empate fica com a mais recente, que é a ordem
   // em que a consulta já devolve.
   const destaque = checkins.reduce<CheckinComReacoes | null>(

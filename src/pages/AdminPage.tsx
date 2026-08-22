@@ -25,10 +25,11 @@ import {
   diasSuspensos,
   formatDate,
   formatRelative,
-  janelaDoCheckin,
+  mapaAberturas,
   ocorrenciasEvento,
   toISODate,
 } from '../lib/dates'
+import { janelaDaPresenca } from '../lib/presenca'
 import {
   DIAS_SEMANA,
   PAPEIS_DANCA,
@@ -2356,25 +2357,34 @@ export function AdminPage() {
   // um check-in às 23h e outro à 01h contam como a MESMA janela.
   // `presencas` vem do mais novo para o mais antigo, então percorre ao
   // contrário para marcar o mais antigo de cada janela.
-  // Dia cancelado não tem janela: a foto entrou no feed, mas não vale
-  // presença — a planilha precisa dizer o mesmo que o ranking.
-  const suspensos = diasSuspensos(feriados)
-  const chavesVistas = new Set<string>()
+  //
+  // A regra de o que conta mora em `lib/presenca.ts`, a mesma que o
+  // perfil usa: janela do desafio + veredito de local quando o desafio
+  // exige estar lá. Aqui em cima disso vem só o "1 por janela", que é
+  // específico da planilha. Dia cancelado não tem janela; espaço que
+  // abriu mais cedo adianta a janela daquele dia (isso faltava aqui, e
+  // fazia a planilha discordar do ranking).
+  const regrasPresenca = {
+    desafios,
+    suspensos: diasSuspensos(feriados),
+    aberturas: mapaAberturas(aberturas),
+  }
+  const janelasVistas = new Set<string>()
   const pontuados = new Set<string>()
   for (const p of [...(presencas ?? [])].reverse()) {
-    const d = new Date(p.data)
-    const chaves = desafios
-      .map((c) => {
-        const janela = janelaDoCheckin(d, c, suspensos)
-        return janela ? `${p.nome}|${c.id}|${janela}` : null
-      })
-      .filter((k): k is string => k !== null)
-    if (chaves.length === 0) continue
-    if (!chaves.some((k) => !chavesVistas.has(k))) continue
-    chaves.forEach((k) => chavesVistas.add(k))
+    const janela = janelaDaPresenca(
+      { criado_em: p.data, locais: p.locais },
+      regrasPresenca,
+    )
+    if (!janela) continue
+    const chave = `${p.nome}|${janela}`
+    if (janelasVistas.has(chave)) continue
+    janelasVistas.add(chave)
     pontuados.add(p.data)
   }
   const contaPonto = (data: string) => pontuados.has(data)
+  /** Presenças de verdade — o que a planilha existe para contar. */
+  const totalPresencas = pontuados.size
 
   const exportarPresencas = () => {
     if (!presencas) return
@@ -2394,7 +2404,11 @@ export function AdminPage() {
     )
   }
 
-  const alunosUnicos = new Set((presencas ?? []).map((p) => p.nome)).size
+  // Quem de fato apareceu — não quem apenas postou. Contar todo autor
+  // de foto aqui inflaria o número que a diretoria usa para valer.
+  const alunosUnicos = new Set(
+    (presencas ?? []).filter((p) => contaPonto(p.data)).map((p) => p.nome),
+  ).size
 
   return (
     <div className="space-y-5">
@@ -2460,9 +2474,12 @@ export function AdminPage() {
           📋 Frequência
         </h2>
         <p className="text-xs text-tinta-500">
-          A coluna <strong>Ponto</strong> marca ✅ só no primeiro check-in
-          válido de cada janela — vale 1 ponto por janela, mesmo com várias
-          fotos ou se a janela virar a noite.
+          Só conta presença o check-in que marcou ponto em algum desafio
+          rodando na hora — dentro da janela e, quando o desafio exige,
+          no local. Foto fora disso entra no feed, mas não vira presença.
+          A coluna <strong>Ponto</strong> marca ✅ no primeiro check-in
+          válido de cada janela: vale 1 por janela, mesmo com várias fotos
+          ou se a janela virar a noite.
         </p>
         <div className="flex gap-2">
           <input
@@ -2487,7 +2504,19 @@ export function AdminPage() {
           <Spinner />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 text-center">
+            {/* Presenças primeiro: é o número que vale. "Check-ins" fica
+                ao lado para o contraste ficar visível — se ele for muito
+                maior, tem foto sendo postada fora de desafio (ou faltou
+                desafio rodando naquela noite). */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-verde-500/10 py-2.5">
+                <p className="text-lg font-extrabold text-verde-800">
+                  {totalPresencas}
+                </p>
+                <p className="text-[10px] font-bold uppercase text-tinta-500">
+                  presenças
+                </p>
+              </div>
               <div className="rounded-xl bg-fundo py-2.5">
                 <p className="text-lg font-extrabold">{presencas.length}</p>
                 <p className="text-[10px] font-bold uppercase text-tinta-500">
