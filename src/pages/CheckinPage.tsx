@@ -236,16 +236,19 @@ export function CheckinPage() {
     }
   }
 
-  // Em fila com a câmera, nunca junto: `cameraResolvida` só vira true
-  // quando o diálogo da câmera saiu da frente. Quando a câmera nem
-  // aparece (já postou hoje, bateu o limite), não há o que esperar.
-  //
-  // `etapa === null` é "ainda não sei qual passo mostrar", e não "não
-  // vai ter câmera": sem esta primeira condição o GPS disparava no
-  // primeiro render, antes de a tela decidir — voltando a empilhar os
-  // dois pedidos, que é justamente o que este código evita.
-  const podePedirLocal =
-    etapa !== null && (etapa !== 'camera' || cameraResolvida)
+  /**
+   * O GPS espera a câmera — e espera de propósito.
+   *
+   * `cameraResolvida` só vira true depois que a pessoa tocou em "Abrir a
+   * câmera" e o navegador respondeu. Amarrar o GPS a isso resolve duas
+   * coisas de uma vez: nunca há dois diálogos do sistema empilhados, e
+   * simplesmente ENTRAR na tela não dispara pedido nenhum — nem de
+   * câmera, nem de localização.
+   *
+   * Não perde nada: só dá para publicar depois de tirar a foto, então
+   * quando a localização vai fazer falta a câmera já passou por aqui.
+   */
+  const podePedirLocal = cameraResolvida
 
   useEffect(() => {
     if (

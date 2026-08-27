@@ -34,16 +34,30 @@ export function ehIOS(): boolean {
 }
 
 /**
+ * Navegador embutido dentro de outro app (Instagram, Facebook,
+ * WhatsApp…) — é por aí que muita gente chega, clicando no link da bio.
+ *
+ * Importa muito além da instalação: essas janelas costumam ser
+ * DESCARTADAS ao fechar, então permissão de câmera e localização não
+ * sobrevive — o app pede tudo de novo na visita seguinte, para sempre.
+ * Nenhum ajuste no site muda isso; a saída é abrir no navegador de
+ * verdade e instalar.
+ */
+export function ehNavegadorEmbutido(): boolean {
+  return /FBAN|FBAV|FB_IAB|Instagram|Line|Twitter|LinkedIn|WhatsApp|GSA/i.test(
+    navigator.userAgent,
+  )
+}
+
+/**
  * No iOS, só o Safari adiciona à tela inicial. Chrome, Firefox e os
- * navegadores embutidos (Instagram, WhatsApp…) não têm a opção — e é
- * por aí que muita gente chega, clicando no link da bio.
+ * navegadores embutidos (Instagram, WhatsApp…) não têm a opção.
  */
 export function ehSafariIOS(): boolean {
   if (!ehIOS()) return false
   const ua = navigator.userAgent
   const outroNavegador = /CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser/i.test(ua)
-  const navegadorEmbutido = /FBAN|FBAV|Instagram|Line|Twitter|LinkedIn/i.test(ua)
-  return !outroNavegador && !navegadorEmbutido
+  return !outroNavegador && !ehNavegadorEmbutido()
 }
 
 /**

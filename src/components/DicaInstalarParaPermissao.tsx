@@ -1,4 +1,4 @@
-import { useInstalacao } from '../lib/instalacao'
+import { ehNavegadorEmbutido, useInstalacao } from '../lib/instalacao'
 import { BotaoInstalar } from './BotaoInstalar'
 
 /**
@@ -19,6 +19,26 @@ export function DicaInstalarParaPermissao() {
   const { jaInstalado, temPromptNativo, ios } = useInstalacao()
 
   if (jaInstalado) return null
+
+  // Navegador embutido (link do Instagram, do WhatsApp…) é o pior caso:
+  // a janela é descartada ao fechar, então a permissão NUNCA sobrevive,
+  // e nem instalar dá para oferecer daqui. Merece recado próprio — sem
+  // ele a pessoa fica liberando a câmera todo santo dia sem entender.
+  if (ehNavegadorEmbutido()) {
+    return (
+      <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+        <p className="font-bold">Por isso ele pergunta toda vez</p>
+        <p className="mt-0.5 text-xs">
+          Você abriu o app pelo navegador de dentro de outro aplicativo
+          (Instagram, WhatsApp…), e ele esquece tudo ao fechar. Toque nos
+          <strong> ··· </strong> aqui em cima, escolha{' '}
+          <strong>Abrir no navegador</strong> e, de lá, adicione à tela
+          inicial — aí ele pergunta uma vez só.
+        </p>
+      </div>
+    )
+  }
+
   // Sem caminho de instalação nenhum, prometer que instalar resolve
   // seria enganação. `BotaoInstalar` usa exatamente a mesma condição —
   // e no iPhone fora do Safari ele abre o guia de "Abrir no Safari".

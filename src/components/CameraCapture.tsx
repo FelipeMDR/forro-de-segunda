@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { estadoDaPermissao } from '../lib/permissoes'
 import { DicaInstalarParaPermissao } from './DicaInstalarParaPermissao'
+
+/**
+ * A câmera já foi aberta com sucesso nesta sessão?
+ *
+ * Fica fora do componente porque a tela de check-in monta e desmonta o
+ * tempo todo (ir ao feed e voltar, tirar outra foto). Sem isto, cada
+ * volta cairia de novo no aviso de "abrir a câmera" mesmo já tendo
+ * liberado há dez segundos.
+ *
+ * Some quando a aba é fechada — de propósito: é exatamente o mesmo
+ * tempo de vida da permissão de sessão do Safari, que é quem manda aqui.
+ */
+let abriuNestaSessao = false
 
 /**
  * Câmera dentro do app — a foto do check-in só pode ser tirada na hora
@@ -141,6 +155,7 @@ export function CameraCapture({
         audio: false,
       })
       streamRef.current = stream
+      abriuNestaSessao = true
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
@@ -162,7 +177,24 @@ export function CameraCapture({
     }
   }, [])
 
+  /**
+   * Esperando um toque para só então pedir a câmera.
+   *
+   * `null` = ainda decidindo (não pisca nada na tela). Começa esperando
+   * quando a câmera nunca abriu nesta sessão, e o efeito abaixo libera
+   * na hora se descobrir que a permissão já está dada.
+   */
+  const [aguardandoToque, setAguardandoToque] = useState<boolean | null>(null)
+
+  // Decide UMA vez, na montagem: abrir sozinho ou esperar o toque.
+  //
+  // Esta é a diferença que faz o app parar de perguntar "toda vez que
+  // entro": antes bastava a tela de check-in aparecer para o navegador
+  // disparar o pedido de câmera, mesmo que a pessoa só estivesse
+  // passando por ali. Agora o pedido só sai quando ela toca — e quem já
+  // liberou não vê diferença nenhuma, porque aí abre direto.
   useEffect(() => {
+    let cancelado = false
     if (!window.isSecureContext) {
       // getUserMedia só funciona em HTTPS (ou localhost) — acontece se
       // alguém abrir o app por um IP da rede local em http://
@@ -175,11 +207,29 @@ export function CameraCapture({
       setErro('Este navegador não suporta câmera. Tente o Chrome ou o Safari.')
       return
     }
+    void (async () => {
+      // `liberada` = o navegador já guardou o sim, então abrir não faz
+      // aparecer diálogo nenhum. Safari não responde por 'camera' e cai
+      // em `desconhecido`: aí esperamos o toque, que é justamente onde
+      // o pedido repetido mais incomoda.
+      const jaPode =
+        abriuNestaSessao || (await estadoDaPermissao('camera')) === 'liberada'
+      if (cancelado) return
+      setAguardandoToque(!jaPode)
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [])
+
+  // Abre (e reabre ao virar a câmera) só depois de liberado o caminho.
+  useEffect(() => {
+    if (aguardandoToque !== false) return
     void abrirCamera(facing)
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [abrirCamera, facing])
+  }, [abrirCamera, facing, aguardandoToque])
 
   // Enquanto a câmera está aberta a página de trás não deve rolar: o
   // dedo encostando na tela para enquadrar arrastaria o conteúdo.
@@ -266,6 +316,39 @@ export function CameraCapture({
       )}
     </div>
   )
+
+  // Esperando o toque: nenhum pedido de permissão saiu ainda, e é esse
+  // o ponto — entrar na tela não pode disparar diálogo do sistema.
+  if (!erro && aguardandoToque) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex flex-col bg-fundo"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      >
+        {faixaDeCima}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
+          <span className="text-5xl">📸</span>
+          <p className="text-sm text-tinta-600">
+            Toque para abrir a câmera e registrar sua presença.
+          </p>
+          <button
+            className="btn-primary px-6 py-3 text-base"
+            onClick={() => setAguardandoToque(false)}
+          >
+            Abrir a câmera
+          </button>
+          <div className="w-full max-w-sm text-left">
+            <DicaInstalarParaPermissao />
+          </div>
+          {permitirFotoTeste && (
+            <button className="btn-ghost" onClick={() => void gerarFotoTeste()}>
+              Usar foto de teste (demo) 📸
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   if (erro) {
     return (
