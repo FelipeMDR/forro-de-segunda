@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { DicaInstalarParaPermissao } from './DicaInstalarParaPermissao'
 
 /**
  * Câmera dentro do app — a foto do check-in só pode ser tirada na hora
@@ -90,6 +91,7 @@ export function CameraCapture({
   onFechar,
   topo,
   permitirFotoTeste = false,
+  onResolvida,
 }: {
   onCapture: (foto: Blob) => void
   /** Sair da câmera sem tirar foto. */
@@ -98,6 +100,15 @@ export function CameraCapture({
   topo?: ReactNode
   /** Modo demo: oferece uma foto gerada quando a câmera não está disponível. */
   permitirFotoTeste?: boolean
+  /**
+   * Avisa quando o pedido de câmera terminou — liberado ou não.
+   *
+   * Quem chama usa isso para só então pedir OUTRA permissão (o GPS). Os
+   * dois pedidos disparando juntos empilhavam dois diálogos do sistema
+   * na cara de quem só queria tirar uma foto, e um deles costumava ser
+   * respondido no chute só para sumir da tela.
+   */
+  onResolvida?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -107,6 +118,13 @@ export function CameraCapture({
   // Dimensões do quadro que a câmera está entregando. Só dá para saber
   // depois que o vídeo carrega, e mudam ao virar a câmera.
   const [quadro, setQuadro] = useState<{ w: number; h: number } | null>(null)
+
+  // `useRef` e não dependência: o callback muda de identidade a cada
+  // render de quem chama, e como dependência ele reabriria a câmera —
+  // um novo `getUserMedia` a cada render, que é exatamente o tipo de
+  // coisa que faz o navegador perguntar de novo.
+  const aoResolver = useRef(onResolvida)
+  aoResolver.current = onResolvida
 
   const abrirCamera = useCallback(async (modo: 'environment' | 'user') => {
     setErro(null)
@@ -137,6 +155,10 @@ export function CameraCapture({
             ? 'Nenhuma câmera encontrada neste aparelho.'
             : 'Não foi possível abrir a câmera. Confira as permissões do navegador.',
       )
+    } finally {
+      // Liberado ou negado, o diálogo da câmera saiu da frente: agora dá
+      // para pedir o GPS sem empilhar dois avisos do sistema.
+      aoResolver.current?.()
     }
   }, [])
 
@@ -261,6 +283,12 @@ export function CameraCapture({
           >
             Tentar de novo
           </button>
+          {/* Quem chegou aqui é exatamente quem se cansou de liberar a
+              câmera toda vez — é o melhor momento para contar que
+              instalar resolve. Some sozinho para quem já instalou. */}
+          <div className="w-full max-w-sm text-left">
+            <DicaInstalarParaPermissao />
+          </div>
           {permitirFotoTeste && (
             <button className="btn-primary" onClick={() => void gerarFotoTeste()}>
               Usar foto de teste (demo) 📸

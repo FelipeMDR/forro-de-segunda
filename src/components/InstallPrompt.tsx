@@ -30,9 +30,13 @@ export function InstallPrompt() {
         <p className="text-sm font-bold text-brasa-700">
           Deixe o Forró de Segunda na tela inicial
         </p>
+        {/* A permissão vem primeiro: é a queixa real de quem usa pelo
+            navegador, onde o celular esquece o "permitir" a cada vez.
+            Ícone e lembretes são bônus — não é por eles que alguém
+            para o que está fazendo para instalar um app. */}
         <p className="text-xs text-tinta-600">
-          Abre direto, com ícone próprio — e é assim que os lembretes
-          funcionam.
+          Assim o celular para de pedir câmera e localização toda vez — e
+          o app abre direto, com ícone próprio.
         </p>
         <div className="mt-2 flex gap-2">
           <BotaoInstalar

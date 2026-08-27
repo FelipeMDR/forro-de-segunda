@@ -29,6 +29,8 @@ import {
   limiteCheckin,
   LIMITE_POR_JANELA,
 } from '../lib/limites'
+import { estadoDaPermissao } from '../lib/permissoes'
+import { DicaInstalarParaPermissao } from '../components/DicaInstalarParaPermissao'
 import type { AberturaAntecipada, Challenge, Feriado } from '../lib/types'
 
 /**
@@ -83,6 +85,14 @@ export function CheckinPage() {
   const [posicao, setPosicao] = useState<PosicaoObtida | null>(null)
   const [erroLocal, setErroLocal] = useState<string | null>(null)
   const [buscandoLocal, setBuscandoLocal] = useState(false)
+  /**
+   * O pedido de câmera já terminou (liberado ou não)?
+   *
+   * O GPS espera por isto. Antes os dois pedidos saíam juntos ao abrir a
+   * tela e o sistema empilhava dois diálogos — um deles quase sempre
+   * respondido no chute só para sair da frente.
+   */
+  const [cameraResolvida, setCameraResolvida] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setAgora(new Date()), 20_000)
@@ -211,6 +221,13 @@ export function CheckinPage() {
     setBuscandoLocal(true)
     setErroLocal(null)
     try {
+      // Se já está bloqueado, chamar o GPS não abre diálogo nenhum: o
+      // navegador recusa na hora. Perguntar antes troca um erro
+      // genérico por um recado que diz o que fazer.
+      if ((await estadoDaPermissao('geolocation')) === 'bloqueada') {
+        setErroLocal('Você bloqueou o acesso à localização')
+        return
+      }
       setPosicao(await obterPosicao())
     } catch (e) {
       setErroLocal((e as Error).message)
@@ -219,12 +236,29 @@ export function CheckinPage() {
     }
   }
 
+  // Em fila com a câmera, nunca junto: `cameraResolvida` só vira true
+  // quando o diálogo da câmera saiu da frente. Quando a câmera nem
+  // aparece (já postou hoje, bateu o limite), não há o que esperar.
+  //
+  // `etapa === null` é "ainda não sei qual passo mostrar", e não "não
+  // vai ter câmera": sem esta primeira condição o GPS disparava no
+  // primeiro render, antes de a tela decidir — voltando a empilhar os
+  // dois pedidos, que é justamente o que este código evita.
+  const podePedirLocal =
+    etapa !== null && (etapa !== 'camera' || cameraResolvida)
+
   useEffect(() => {
-    if (comLocal.length > 0 && !posicao && !erroLocal && !buscandoLocal) {
+    if (
+      podePedirLocal &&
+      comLocal.length > 0 &&
+      !posicao &&
+      !erroLocal &&
+      !buscandoLocal
+    ) {
       void buscarLocal()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comLocal.length])
+  }, [comLocal.length, podePedirLocal])
 
   /** Situação de cada desafio com local: dentro do raio ou não. */
   const situacaoLocal = useMemo(
@@ -324,6 +358,17 @@ export function CheckinPage() {
   const longe = situacaoLocal.filter((s) => s.distancia !== null && !s.dentro)
 
   /**
+   * Tem desafio meu exigindo local agora, e a localização não veio
+   * (bloqueada, sem sinal, ainda buscando).
+   *
+   * Sem isto, quem bloqueia o GPS caía no último caso da lista e lia
+   * "nenhum desafio com janela aberta agora" — uma mentira, e das que
+   * fazem a pessoa achar que o app está quebrado. O desafio ESTÁ
+   * aberto; o que falta é provar que ela está lá.
+   */
+  const semLocalizacao = meusComLocal.length > 0 && !posicao
+
+  /**
    * UM aviso, não cinco.
    *
    * Antes cada situação (valendo ponto, longe do local, já pontuou,
@@ -332,52 +377,79 @@ export function CheckinPage() {
    * que é o motivo da tela existir, para fora do celular. Aqui vence a
    * informação mais acionável, e o resto fica nos detalhes.
    */
-  const status: { tom: 'ok' | 'info' | 'aviso'; emoji: string; texto: string } =
-    aindaPontuamAqui.length > 0
-      ? {
-          tom: 'ok',
-          emoji: '✅',
-          texto:
-            aindaPontuamAqui.length === 1
-              ? `Valendo ponto em ${aindaPontuamAqui[0].titulo}`
-              : `Valendo ponto em ${aindaPontuamAqui.length} desafios`,
-        }
-      : longe.length > 0
-        ? {
-            tom: 'aviso',
-            emoji: '📍',
-            texto: `Você está a ${distanciaLegivel(longe[0].distancia ?? 0)} de ${
-              longe[0].desafio.local?.nome || 'onde o desafio conta'
-            } — de lá, a foto marca ponto.`,
-          }
-        : jaPontuaram.length > 0
-          ? {
-              tom: 'info',
-              emoji: '👍',
-              texto:
-                'Seu ponto desta noite já foi contado. A foto entra no feed do mesmo jeito.',
-            }
-          : suspensaoAgora
-            ? {
-                tom: 'aviso',
-                emoji: '🚫',
-                texto: `Hoje não tem forró${
-                  suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''
-                } — a foto não marca ponto.`,
-              }
-            : foraDeles.length > 0
-              ? {
-                  tom: 'info',
-                  emoji: '🏆',
-                  texto:
-                    'Tem desafio rolando agora que você não entrou. Pode postar — a foto já fica valendo se você entrar depois.',
-                }
-              : {
-                  tom: 'aviso',
-                  emoji: '⚠️',
-                  texto:
-                    'Nenhum desafio com janela aberta agora. A foto entra no feed, mas não marca ponto.',
-                }
+  interface Status {
+    tom: 'ok' | 'info' | 'aviso'
+    emoji: string
+    texto: string
+  }
+
+  // Retornos diretos, em ordem de prioridade — antes isto era uma
+  // escada de ternários aninhados, e cada caso novo empurrava a
+  // indentação de todos os outros.
+  const decidirStatus = (): Status => {
+    if (aindaPontuamAqui.length > 0) {
+      return {
+        tom: 'ok',
+        emoji: '✅',
+        texto:
+          aindaPontuamAqui.length === 1
+            ? `Valendo ponto em ${aindaPontuamAqui[0].titulo}`
+            : `Valendo ponto em ${aindaPontuamAqui.length} desafios`,
+      }
+    }
+    if (longe.length > 0) {
+      return {
+        tom: 'aviso',
+        emoji: '📍',
+        texto: `Você está a ${distanciaLegivel(longe[0].distancia ?? 0)} de ${
+          longe[0].desafio.local?.nome || 'onde o desafio conta'
+        } — de lá, a foto marca ponto.`,
+      }
+    }
+    // Antes do "nenhum desafio aberto": o desafio ESTÁ aberto, o que
+    // falta é a localização. Cair no caso final aqui era mentira.
+    if (semLocalizacao) {
+      return {
+        tom: 'aviso',
+        emoji: '📍',
+        texto: erroLocal
+          ? `Tem desafio rolando que só conta ponto no local, e não deu para confirmar onde você está (${erroLocal.toLowerCase()}).`
+          : 'Confirmando sua localização para saber se a foto marca ponto…',
+      }
+    }
+    if (jaPontuaram.length > 0) {
+      return {
+        tom: 'info',
+        emoji: '👍',
+        texto:
+          'Seu ponto desta noite já foi contado. A foto entra no feed do mesmo jeito.',
+      }
+    }
+    if (suspensaoAgora) {
+      return {
+        tom: 'aviso',
+        emoji: '🚫',
+        texto: `Hoje não tem forró${
+          suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''
+        } — a foto não marca ponto.`,
+      }
+    }
+    if (foraDeles.length > 0) {
+      return {
+        tom: 'info',
+        emoji: '🏆',
+        texto:
+          'Tem desafio rolando agora que você não entrou. Pode postar — a foto já fica valendo se você entrar depois.',
+      }
+    }
+    return {
+      tom: 'aviso',
+      emoji: '⚠️',
+      texto:
+        'Nenhum desafio com janela aberta agora. A foto entra no feed, mas não marca ponto.',
+    }
+  }
+  const status: Status = decidirStatus()
 
   // amber-800 e não 700: sobre o fundo em /10 o 700 dá 4,23:1, abaixo
   // do mínimo de 4,5:1 para texto pequeno.
@@ -413,6 +485,7 @@ export function CheckinPage() {
     return (
       <CameraCapture
         onCapture={(b) => void aoCapturar(b)}
+        onResolvida={() => setCameraResolvida(true)}
         // Fechar não é cancelar o check-in: cai no passo 3, que é o
         // estado de repouso da tela (duplas e saída para o feed).
         onFechar={() => setEtapa('pronto')}
@@ -609,18 +682,23 @@ export function CheckinPage() {
 
       {/* GPS falhou e ainda dá para tirar outra: aí sim é acionável. */}
       {erroLocal && comLocal.length > 0 && limite.pode && (
-        <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-          <p className="flex-1">
-            📍 {erroLocal} — sem isso a foto não marca ponto nos desafios com
-            local.
-          </p>
-          <button
-            className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
-            onClick={() => void buscarLocal()}
-          >
-            Tentar de novo
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+            <p className="flex-1">
+              📍 {erroLocal} — sem isso a foto não marca ponto nos desafios
+              com local.
+            </p>
+            <button
+              className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
+              onClick={() => void buscarLocal()}
+            >
+              Tentar de novo
+            </button>
+          </div>
+          {/* Aqui, e não só no feed: é neste momento que a pessoa está
+              incomodada com a permissão e disposta a resolver de vez. */}
+          <DicaInstalarParaPermissao />
+        </>
       )}
 
       {/* O detalhe desafio a desafio interessa a pouca gente e quase
