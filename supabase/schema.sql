@@ -57,9 +57,16 @@ create table if not exists public.challenges (
   descricao text,
   data_inicio date not null,
   data_fim date not null,
+  -- Disputas que rodam neste desafio ao mesmo tempo: presença e/ou
+  -- rodízio. As duas saem dos dados que já existem — ver migração 024.
+  modalidades text[] not null default array['checkin']::text[],
   criado_por uuid references public.profiles(id) on delete set null,
   criado_em timestamptz not null default now(),
-  check (data_fim >= data_inicio)
+  check (data_fim >= data_inicio),
+  constraint challenges_modalidades_validas check (
+    array_length(modalidades, 1) >= 1
+    and modalidades <@ array['checkin', 'duplas']::text[]
+  )
 );
 
 -- Janela de check-in por dia da semana: cada espaço tem seu próprio

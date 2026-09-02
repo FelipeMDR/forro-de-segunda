@@ -166,9 +166,59 @@ export interface ChallengeLocal {
 export const RAIO_LOCAL_PADRAO_M = 200
 
 /**
- * Desafio = competição de presença: quem somar mais check-ins válidos
- * dentro do período e da janela do dia (cada dia da semana pode ter
- * seu próprio horário) vence.
+ * Tipo de disputa dentro de um desafio.
+ *
+ * Um desafio pode rodar mais de uma ao mesmo tempo: o "Espaço Livre
+ * 2026.2" tem o rank de presença E o rank de rodízio, e a pessoa
+ * compete nos dois sem fazer nada a mais — os dois saem dos mesmos
+ * check-ins e das mesmas marcações de dupla que já existiam.
+ */
+export type Modalidade = 'checkin' | 'duplas'
+
+export interface DefinicaoModalidade {
+  id: Modalidade
+  emoji: string
+  /** Nome curto, para a aba do ranking. */
+  nome: string
+  /** Como o ponto se chama: [singular, plural]. */
+  unidade: [string, string]
+  /** Uma linha explicando a regra, mostrada abaixo do ranking. */
+  regra: string
+}
+
+export const MODALIDADES: DefinicaoModalidade[] = [
+  {
+    id: 'checkin',
+    emoji: '📸',
+    nome: 'Presença',
+    unidade: ['presença', 'presenças'],
+    regra:
+      'Cada janela com check-in válido vale 1 ponto — várias fotos na mesma janela contam uma vez.',
+  },
+  {
+    id: 'duplas',
+    emoji: '🤝',
+    nome: 'Rodízio',
+    unidade: ['parceiro', 'parceiros'],
+    regra:
+      'Conta PESSOAS DIFERENTES com quem você dançou (dupla confirmada dos dois lados), nas noites que valeram neste desafio. Dançar dez vezes com a mesma pessoa conta 1.',
+  },
+]
+
+export function defModalidade(m: Modalidade): DefinicaoModalidade {
+  return MODALIDADES.find((x) => x.id === m) ?? MODALIDADES[0]
+}
+
+/** "3 parceiros" / "1 presença" — rótulo do ponto naquela modalidade. */
+export function rotuloPontos(m: Modalidade, n: number): string {
+  const [um, varios] = defModalidade(m).unidade
+  return `${n} ${n === 1 ? um : varios}`
+}
+
+/**
+ * Desafio = competição dentro de um período. A disputa principal é de
+ * presença (check-in dentro da janela do dia), e o mesmo desafio pode
+ * abrir outras disputas em paralelo — ver `Modalidade`.
  */
 export interface Challenge {
   id: string
@@ -185,6 +235,12 @@ export interface Challenge {
    * adiciona (normalmente importando a lista de ingressos).
    */
   entrada_restrita: boolean
+  /**
+   * Disputas abertas neste desafio. Nunca vazio — sem modalidade
+   * nenhuma não há o que rankear. Desafio criado antes desta ideia
+   * existir vem só com `['checkin']`, que é como sempre funcionou.
+   */
+  modalidades: Modalidade[]
   criado_por: string | null
   participantes: number
   sou_membro: boolean
@@ -199,6 +255,7 @@ export interface ChallengeInput {
   janelas: ChallengeJanela[]
   local: ChallengeLocal | null
   entrada_restrita: boolean
+  modalidades: Modalidade[]
 }
 
 /**

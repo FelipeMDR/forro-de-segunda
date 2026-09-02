@@ -19,9 +19,12 @@ import { ParticipantesDesafio } from '../components/ParticipantesDesafio'
 import { colocacoes } from '../lib/ranking'
 import {
   DIAS_ABREV,
+  defModalidade,
+  rotuloPontos,
   type AberturaAntecipada,
   type Challenge,
   type Feriado,
+  type Modalidade,
   type RankingEntry,
 } from '../lib/types'
 
@@ -42,6 +45,12 @@ export function ChallengeDetailPage() {
   const [editando, setEditando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [ocupado, setOcupado] = useState(false)
+  /**
+   * Qual disputa está na tela. `null` = ainda não escolhida; assim que
+   * o desafio carrega, cai na primeira modalidade dele — que é a
+   * presença nos desafios que só têm uma.
+   */
+  const [modalidade, setModalidade] = useState<Modalidade | null>(null)
 
   const carregar = useCallback(async () => {
     if (!id) return
@@ -53,7 +62,13 @@ export function ChallengeDetailPage() {
       setAberturasAntecipadas(
         await api.listAberturas().catch(() => [] as AberturaAntecipada[]),
       )
-      if (c) setRanking(await api.getRanking(c))
+      // Se a modalidade aberta sumiu (a organização desligou aquela
+      // disputa enquanto a tela estava aberta), volta para a primeira.
+      setModalidade((atual) =>
+        c && atual && c.modalidades.includes(atual)
+          ? atual
+          : (c?.modalidades[0] ?? null),
+      )
     } catch (e) {
       console.error('[desafio] falha ao carregar', e)
       setErro((e as Error).message || 'Erro desconhecido')
@@ -63,6 +78,26 @@ export function ChallengeDetailPage() {
   useEffect(() => {
     void carregar()
   }, [carregar])
+
+  // O ranking recarrega sozinho ao trocar de aba. Consulta à parte da
+  // de cima porque trocar de disputa não precisa rebuscar o desafio,
+  // os feriados e as aberturas — que não mudam entre uma aba e outra.
+  useEffect(() => {
+    if (!desafio || !modalidade) return
+    let cancelado = false
+    void api
+      .getRanking(desafio, modalidade)
+      .then((r) => {
+        if (!cancelado) setRanking(r)
+      })
+      .catch((e) => {
+        console.error('[desafio] falha ao carregar ranking', e)
+        if (!cancelado) setRanking([])
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [api, desafio, modalidade])
 
   if (erro) {
     return (
@@ -83,6 +118,8 @@ export function ChallengeDetailPage() {
   const restantes = daysLeft(desafio.data_fim)
   const suspensoes = suspensoesDoDesafio(desafio, feriados)
   const aberturas = aberturasDoDesafio(desafio, aberturasAntecipadas)
+  const modalidadeAtual = modalidade ?? desafio.modalidades[0]
+  const def = defModalidade(modalidadeAtual)
   const classificacao = colocacoes(ranking)
   const lider = classificacao[0]?.entrada
   const minhaColocacao = classificacao.find(
@@ -118,10 +155,13 @@ export function ChallengeDetailPage() {
     }
   }
 
+  // Um CSV por disputa: o arquivo e a coluna dizem qual, senão dois
+  // downloads do mesmo desafio ficariam indistinguíveis na pasta.
   const exportarCSV = () => {
+    const base = desafio.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     downloadCSV(
-      `desafio-${desafio.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-      ['Posição', 'Nome', 'Turma', 'Presenças'],
+      `desafio-${base}-${modalidadeAtual}`,
+      ['Posição', 'Nome', 'Turma', def.nome],
       colocacoes(ranking).map(({ entrada, posicao }) => [
         String(posicao),
         entrada.nome,
@@ -219,12 +259,14 @@ export function ChallengeDetailPage() {
           </p>
         </div>
 
+        {/* Fala da disputa que está aberta na tela — com duas abas, um
+            "você tem 3 presenças" fixo contradiria o rodízio ao lado. */}
         {desafio.sou_membro && minhaEntrada && (
           <div className="rounded-xl bg-fundo px-4 py-3 text-sm">
+            {desafio.modalidades.length > 1 && `${def.emoji} ${def.nome}: `}
             Você tem{' '}
             <strong className="text-brasa-700">
-              {minhaEntrada.pontos}{' '}
-              {minhaEntrada.pontos === 1 ? 'presença' : 'presenças'}
+              {rotuloPontos(modalidadeAtual, minhaEntrada.pontos)}
             </strong>
             {lider && lider.pontos > minhaEntrada.pontos ? (
               <>
@@ -303,6 +345,39 @@ export function ChallengeDetailPage() {
             </button>
           )}
         </div>
+
+        {/* Só aparece quando há mais de uma disputa: num desafio comum
+            um seletor de uma opção só seria ruído. */}
+        {desafio.modalidades.length > 1 && (
+          <div
+            className="grid gap-1 rounded-xl bg-preto/5 p-1"
+            style={{
+              gridTemplateColumns: `repeat(${desafio.modalidades.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {desafio.modalidades.map((id) => {
+              const d = defModalidade(id)
+              return (
+                <button
+                  key={id}
+                  onClick={() => setModalidade(id)}
+                  aria-pressed={modalidadeAtual === id}
+                  className={`rounded-lg py-2 text-sm font-bold transition ${
+                    modalidadeAtual === id
+                      ? 'bg-papel text-tinta-900 shadow-sm'
+                      : 'text-tinta-500'
+                  }`}
+                >
+                  {d.emoji} {d.nome}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {desafio.modalidades.length > 1 && (
+          <p className="px-1 text-xs text-tinta-500">{def.regra}</p>
+        )}
+
         {ranking.length === 0 ? (
           <EmptyState
             emoji="🕺"
@@ -343,7 +418,7 @@ export function ChallengeDetailPage() {
                       </p>
                     )}
                   </div>
-                  <span className="text-sm font-extrabold text-brasa-700">
+                  <span className="shrink-0 text-sm font-extrabold text-brasa-700">
                     {r.pontos} {r.pontos === 1 ? 'pt' : 'pts'}
                   </span>
                 </Link>

@@ -6,7 +6,7 @@ import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft, formatDate } from '../lib/dates'
-import { DIAS_ABREV, type Challenge } from '../lib/types'
+import { DIAS_ABREV, defModalidade, type Challenge } from '../lib/types'
 
 /** Resumo compacto da janela pro cartão: junta os dias se o horário
  * for igual em todos; se variar por dia, só avisa que varia (o
@@ -47,6 +47,23 @@ function CartaoDesafio({ c }: { c: Challenge }) {
         {formatDate(c.data_inicio)} – {formatDate(c.data_fim)} ·{' '}
         {resumoJanelas(c)} · 👥 {c.participantes}
       </p>
+      {/* Só quando há mais de uma disputa: dizer "📸 Presença" num
+          desafio comum não informa nada que já não fosse o padrão. */}
+      {c.modalidades.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {c.modalidades.map((m) => {
+            const d = defModalidade(m)
+            return (
+              <span
+                key={m}
+                className="rounded-full bg-preto/5 px-2 py-0.5 text-[10px] font-bold text-tinta-600"
+              >
+                {d.emoji} {d.nome}
+              </span>
+            )
+          })}
+        </div>
+      )}
       {fase === 'ativo' && (
         <p className="mt-2 text-xs font-bold text-brasa-700">
           🔥 {restantes} {restantes === 1 ? 'dia restante' : 'dias restantes'}

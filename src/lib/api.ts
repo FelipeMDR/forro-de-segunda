@@ -21,6 +21,7 @@ import type {
   DistintivoRecebedor,
   FeedItem,
   Feriado,
+  Modalidade,
   Notificacao,
   ParceiroDanca,
   ParceiroPossivel,
@@ -228,7 +229,17 @@ export interface ForroApi {
   deleteChallenge(id: string): Promise<void>
   joinChallenge(id: string): Promise<void>
   leaveChallenge(id: string): Promise<void>
-  getRanking(challenge: Challenge): Promise<RankingEntry[]>
+  /**
+   * Ranking de UMA modalidade do desafio (ver `Modalidade`).
+   *
+   * Sempre devolve todos os membros, inclusive com 0 — quem entrou
+   * aparece na lista mesmo sem ter pontuado ainda. Sem `modalidade`,
+   * assume `checkin`, que é como o desafio sempre funcionou.
+   */
+  getRanking(
+    challenge: Challenge,
+    modalidade?: Modalidade,
+  ): Promise<RankingEntry[]>
   /** Adiciona alguém a um desafio (organizador) — usado nos restritos. */
   addMembroDesafio(challengeId: string, userId: string): Promise<void>
   removeMembroDesafio(challengeId: string, userId: string): Promise<void>

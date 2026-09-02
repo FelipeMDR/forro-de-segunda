@@ -226,6 +226,29 @@ export function desafiosQueContam(
 }
 
 /**
+ * As janelas do desafio em que esses check-ins caíram — ou seja, as
+ * NOITES que valeram para a pessoa ali dentro.
+ *
+ * É um Set porque duas fotos na mesma janela são a mesma noite, e
+ * porque o ranking de rodízio precisa perguntar "esta dupla foi numa
+ * noite que valeu neste desafio?" — sem isso, dava para somar parceiro
+ * marcando dupla numa noite fora do horário ou fora do local.
+ */
+export function janelasNoDesafio(
+  datas: Date[],
+  c: Challenge,
+  suspensos?: ReadonlySet<string>,
+  aberturas?: ReadonlyMap<string, number>,
+): Set<string> {
+  const janelas = new Set<string>()
+  for (const d of datas) {
+    const j = janelaDoCheckin(d, c, suspensos, aberturas)
+    if (j) janelas.add(j)
+  }
+  return janelas
+}
+
+/**
  * Pontos de um aluno num desafio: **no máximo 1 por janela**. Postar
  * várias fotos na mesma janela (mesmo se ela cruzar a meia-noite) rende
  * só um ponto — o feed aceita todas, o ranking conta a janela.
@@ -236,12 +259,7 @@ export function pontosNoDesafio(
   suspensos?: ReadonlySet<string>,
   aberturas?: ReadonlyMap<string, number>,
 ): number {
-  const janelas = new Set<string>()
-  for (const d of datas) {
-    const j = janelaDoCheckin(d, c, suspensos, aberturas)
-    if (j) janelas.add(j)
-  }
-  return janelas.size
+  return janelasNoDesafio(datas, c, suspensos, aberturas).size
 }
 
 /**

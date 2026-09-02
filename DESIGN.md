@@ -44,6 +44,7 @@ diferente você dançou**. Não é fitness, não é rede social genérica.
 | **Presença** | Check-in que marcou ponto em algum desafio rodando na hora. Foto fora de janela (ou fora do local, quando o desafio exige) entra no feed mas **não** vira presença — senão bastava postar de casa. Participar do desafio é opcional: quem não entrou não aparece no rank, mas ganha a presença. Regra única em `lib/presenca.ts` |
 | **Noite de forró** | Das 05:00 às 04:59 do dia seguinte — a madrugada pertence à noite que começou |
 | **Desafio** | Competição por período, com janelas de horário por dia da semana e opcionalmente trava por local (GPS) |
+| **Modalidade** | Disputa dentro de um desafio. O mesmo desafio pode rodar mais de uma em paralelo, com uma inscrição só: **Presença** (janelas com check-in válido) e **Rodízio** (pessoas diferentes com dupla confirmada). Cada uma vira uma aba de ranking. Definições em `lib/types.ts`, cálculo em `getRanking(desafio, modalidade)` |
 | **Janela** | Faixa de horário em que o check-in conta ponto naquele desafio |
 | **Dupla** | Duas pessoas que dançaram juntas; só conta quando as duas se marcam |
 | **Distintivo** | Conquista, automática (sequência, presenças) ou entregue à mão pela organização |

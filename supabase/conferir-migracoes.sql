@@ -98,6 +98,15 @@ from (values
   (
     '023 — turmas em que a pessoa dá aula',
     to_regclass('public.turma_professores') is not null
+  ),
+  (
+    '024 — mais de uma disputa no mesmo desafio',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'challenges'
+        and column_name = 'modalidades'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

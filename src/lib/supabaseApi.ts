@@ -2,16 +2,16 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { EmailNaoConfirmado, type ForroApi } from './api'
 import {
   diasSuspensos,
+  janelasNoDesafio,
   limitesDaNoite,
   mapaAberturas,
-  pontosNoDesafio,
 } from './dates'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
-import { PAGINA_FEED, turmaLabel } from './types'
+import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
 import type {
   AberturaAntecipada,
   AberturaAntecipadaInput,
@@ -33,6 +33,7 @@ import type {
   DistintivoRecebedor,
   FeedItem,
   Feriado,
+  Modalidade,
   Notificacao,
   ParceiroDanca,
   ParceiroPossivel,
@@ -138,6 +139,23 @@ function ok<T>(res: { data: T; error: { message: string } | null }): T {
 
 function horaCurta(v: unknown): string {
   return String(v ?? '00:00').slice(0, 5)
+}
+
+/**
+ * As modalidades que o app entende, vindas de uma coluna que pode nem
+ * existir (antes da migração 024) ou trazer um valor que esta versão do
+ * app ainda não conhece — o banco aceitaria um valor novo antes de o
+ * app aprender a desenhar a aba dele.
+ *
+ * Nunca devolve vazio: sem modalidade não há ranking nenhum na tela, e
+ * "só presença" é o comportamento de sempre.
+ */
+function modalidadesValidas(bruto: unknown): Modalidade[] {
+  const conhecidas = MODALIDADES.map((m) => m.id) as string[]
+  const lista = Array.isArray(bruto)
+    ? bruto.filter((m): m is Modalidade => conhecidas.includes(m as string))
+    : []
+  return lista.length > 0 ? lista : ['checkin']
 }
 
 /** Distintivo sem a contagem de recebedores (embed simples). */
@@ -1143,6 +1161,9 @@ export class SupabaseApi implements ForroApi {
         }))
         .sort((a, b) => a.dia_semana - b.dia_semana),
       entrada_restrita: Boolean(c.entrada_restrita),
+      // Sem a migração 024 a coluna não existe: cai em só presença, que
+      // é como o desafio funcionava antes de existir modalidade.
+      modalidades: modalidadesValidas(c.modalidades),
       // Ausente enquanto a migração 008 não roda — sem trava de local
       local:
         c.local_lat != null && c.local_lng != null
@@ -1199,6 +1220,9 @@ export class SupabaseApi implements ForroApi {
       local_lng: data.local?.lng ?? null,
       local_raio_m: data.local?.raio_m ?? null,
       entrada_restrita: data.entrada_restrita,
+      // Nunca vazio: o banco recusa (constraint da migração 024), e o
+      // formulário também não deixa desmarcar tudo.
+      modalidades: data.modalidades.length > 0 ? data.modalidades : ['checkin'],
     }
     let challengeId = data.id
     if (challengeId) {
@@ -1280,7 +1304,10 @@ export class SupabaseApi implements ForroApi {
     )
   }
 
-  async getRanking(challenge: Challenge): Promise<RankingEntry[]> {
+  async getRanking(
+    challenge: Challenge,
+    modalidade: Modalidade = 'checkin',
+  ): Promise<RankingEntry[]> {
     const membros = ok(
       await this.sb
         .from('challenge_members')
@@ -1298,6 +1325,36 @@ export class SupabaseApi implements ForroApi {
     }>
     if (membros.length === 0) return []
 
+    const ids = membros.map((m) => m.user_id)
+    const janelasPor = await this.janelasValidasPorMembro(challenge, ids)
+
+    const pontos =
+      modalidade === 'duplas'
+        ? await this.pontosDeRodizio(challenge, ids, janelasPor)
+        : new Map([...janelasPor].map(([uid, js]) => [uid, js.size]))
+
+    return membros
+      .map((m) => ({
+        user_id: m.user_id,
+        nome: m.perfil?.nome ?? 'Alguém',
+        avatar_url: m.perfil?.avatar_url ?? null,
+        turma: turmaLabel(m.perfil?.turmas ?? []),
+        pontos: pontos.get(m.user_id) ?? 0,
+      }))
+      .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome))
+  }
+
+  /**
+   * As noites que valeram para cada membro NESTE desafio.
+   *
+   * É a base das duas modalidades: presença conta quantas são; rodízio
+   * usa como filtro, para uma dupla marcada fora do horário (ou fora do
+   * local) não virar parceiro no ranking.
+   */
+  private async janelasValidasPorMembro(
+    challenge: Challenge,
+    ids: string[],
+  ): Promise<Map<string, Set<string>>> {
     const inicio = new Date(`${challenge.data_inicio}T00:00:00`).toISOString()
     const fim = new Date(`${challenge.data_fim}T23:59:59`).toISOString()
     const checkins = ok(
@@ -1306,10 +1363,7 @@ export class SupabaseApi implements ForroApi {
         .select('id, user_id, criado_em')
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
-        .in(
-          'user_id',
-          membros.map((m) => m.user_id),
-        ),
+        .in('user_id', ids),
     ) as Array<{ id: string; user_id: string; criado_em: string }>
 
     // Desafio com trava de local: valem só os check-ins com veredito
@@ -1354,20 +1408,55 @@ export class SupabaseApi implements ForroApi {
       this.listAberturas().then(mapaAberturas).catch(() => new Map()),
     ])
 
-    const pontos = new Map<string, number>()
+    const janelasPor = new Map<string, Set<string>>()
     for (const [uid, datas] of datasPor) {
-      pontos.set(uid, pontosNoDesafio(datas, challenge, suspensos, aberturas))
+      janelasPor.set(
+        uid,
+        janelasNoDesafio(datas, challenge, suspensos, aberturas),
+      )
     }
+    return janelasPor
+  }
 
-    return membros
-      .map((m) => ({
-        user_id: m.user_id,
-        nome: m.perfil?.nome ?? 'Alguém',
-        avatar_url: m.perfil?.avatar_url ?? null,
-        turma: turmaLabel(m.perfil?.turmas ?? []),
-        pontos: pontos.get(m.user_id) ?? 0,
-      }))
-      .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome))
+  /**
+   * Rodízio: quantas PESSOAS DIFERENTES cada membro tirou para dançar
+   * dentro do desafio.
+   *
+   * Pessoas diferentes, e não quantidade de duplas, pela mesma razão
+   * que o distintivo de rodízio já usava: contar volume premiaria
+   * dançar a noite toda com o mesmo par, e dois amigos se marcando
+   * todas as semanas subiriam sozinhos no ranking. Contar variedade
+   * empurra o rodízio, que é a cultura do forró.
+   *
+   * Só entram duplas CONFIRMADAS pelos dois lados, e só em noites que
+   * valeram para a pessoa neste desafio — senão daria para somar
+   * parceiro marcando dupla numa foto tirada em casa.
+   */
+  private async pontosDeRodizio(
+    challenge: Challenge,
+    ids: string[],
+    janelasPor: Map<string, Set<string>>,
+  ): Promise<Map<string, number>> {
+    // A dupla confirmada tem as duas linhas opostas, então olhar por
+    // `de_user` já cobre a todos sem contar ninguém duas vezes.
+    const rows = ok(
+      await this.sb
+        .from('duplas')
+        .select('data, de_user, para_user')
+        .eq('confirmada', true)
+        .gte('data', challenge.data_inicio)
+        .lte('data', challenge.data_fim)
+        .in('de_user', ids),
+    ) as Array<{ data: string; de_user: string; para_user: string }>
+
+    const parceirosPor = new Map<string, Set<string>>()
+    for (const r of rows) {
+      if (!janelasPor.get(r.de_user)?.has(r.data)) continue
+      const set = parceirosPor.get(r.de_user) ?? new Set<string>()
+      set.add(r.para_user)
+      parceirosPor.set(r.de_user, set)
+    }
+    return new Map([...parceirosPor].map(([uid, set]) => [uid, set.size]))
   }
 
   // ---- Agenda ----

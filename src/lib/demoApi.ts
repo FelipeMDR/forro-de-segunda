@@ -3,8 +3,8 @@ import {
   addDays,
   diaDaNoite,
   diasSuspensos,
+  janelasNoDesafio,
   mapaAberturas,
-  pontosNoDesafio,
   proximaOcorrencia,
   toISODate,
 } from './dates'
@@ -37,6 +37,7 @@ import type {
   Comment,
   ConfirmacaoPresenca,
   DistintivoDef,
+  Modalidade,
   Notificacao,
   ParceiroDanca,
   ParceiroPossivel,
@@ -81,6 +82,8 @@ interface ChallengeRow {
   janelas: ChallengeJanela[]
   local: ChallengeLocal | null
   entrada_restrita?: boolean
+  /** Opcional: banco demo anterior às modalidades não tem o campo. */
+  modalidades?: Modalidade[]
   criado_por: string | null
 }
 
@@ -290,7 +293,7 @@ function seed(): DB {
     id: uuid(),
     titulo: 'Copa do mês — quem dança mais?',
     descricao:
-      'Competição de presença: cada check-in na janela das aulas vale 1 ponto. Quem somar mais pontos até o fim do mês leva o destaque no Instagram! 🏆',
+      'Duas disputas ao mesmo tempo: presença (cada check-in na janela vale 1 ponto) e rodízio (quantas pessoas diferentes você tirou para dançar). Quem lidera cada uma leva o destaque no Instagram! 🏆',
     data_inicio: inicio,
     data_fim: fim,
     // Janela ampla em todos os dias no demo, pra facilitar o teste em
@@ -301,6 +304,9 @@ function seed(): DB {
       hora_fim: '23:59',
     })),
     local: null,
+    // Duas disputas no mesmo desafio, para o seletor de ranking já
+    // nascer visível no demo (migração 024)
+    modalidades: ['checkin', 'duplas'],
     criado_por: ana.id,
   }
 
@@ -1037,6 +1043,9 @@ export class DemoApi implements ForroApi {
     return {
       ...c,
       entrada_restrita: Boolean(c.entrada_restrita),
+      // Banco demo gravado antes das modalidades existirem: só presença,
+      // que é como o desafio funcionava.
+      modalidades: c.modalidades?.length ? c.modalidades : ['checkin'],
       participantes: this.db.members.filter((m) => m.challenge_id === c.id)
         .length,
       sou_membro: this.db.members.some(
@@ -1067,6 +1076,7 @@ export class DemoApi implements ForroApi {
         data_fim: data.data_fim,
         janelas: data.janelas,
         entrada_restrita: data.entrada_restrita,
+        modalidades: data.modalidades,
         // Espelha o trigger marca_local_desde (migração 009): o marco
         // nasce quando a trava é ligada e é preservado depois.
         local: data.local && {
@@ -1083,6 +1093,7 @@ export class DemoApi implements ForroApi {
         data_fim: data.data_fim,
         janelas: data.janelas,
         entrada_restrita: data.entrada_restrita,
+        modalidades: data.modalidades,
         local: data.local && {
           ...data.local,
           desde: new Date().toISOString(),
@@ -1217,7 +1228,10 @@ export class DemoApi implements ForroApi {
     return { adicionados, pendentes, jaEstavam }
   }
 
-  async getRanking(challenge: Challenge): Promise<RankingEntry[]> {
+  async getRanking(
+    challenge: Challenge,
+    modalidade: Modalidade = 'checkin',
+  ): Promise<RankingEntry[]> {
     const memberIds = this.db.members
       .filter((m) => m.challenge_id === challenge.id)
       .map((m) => m.user_id)
@@ -1228,8 +1242,9 @@ export class DemoApi implements ForroApi {
     return memberIds
       .map((uid) => {
         const p = this.db.profiles.find((x) => x.id === uid)
-        // Máximo de 1 ponto por dia, mesmo com várias fotos
-        const pontos = pontosNoDesafio(
+        // As noites que valeram para esta pessoa neste desafio — base
+        // das duas modalidades (espelha `janelasValidasPorMembro`).
+        const janelas = janelasNoDesafio(
           this.db.checkins
             .filter(
               (c) =>
@@ -1246,6 +1261,23 @@ export class DemoApi implements ForroApi {
           suspensos,
           aberturas,
         )
+        // Rodízio conta PESSOAS DIFERENTES, e só em noite que valeu —
+        // mesma regra da produção (ver `pontosDeRodizio`).
+        const pontos =
+          modalidade === 'duplas'
+            ? new Set(
+                (this.db.duplas ?? [])
+                  .filter(
+                    (d) =>
+                      d.confirmada &&
+                      d.de_user === uid &&
+                      d.data >= challenge.data_inicio &&
+                      d.data <= challenge.data_fim &&
+                      janelas.has(d.data),
+                  )
+                  .map((d) => d.para_user),
+              ).size
+            : janelas.size
         return {
           user_id: uid,
           nome: p?.nome ?? 'Alguém',

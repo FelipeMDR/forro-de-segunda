@@ -5,9 +5,11 @@ import { toISODate } from '../lib/dates'
 import { obterPosicao } from '../lib/geo'
 import {
   DIAS_ABREV,
+  MODALIDADES,
   RAIO_LOCAL_PADRAO_M,
   type Challenge,
   type ChallengeInput,
+  type Modalidade,
 } from '../lib/types'
 
 export function ChallengeForm({
@@ -31,6 +33,7 @@ export function ChallengeForm({
     janelas: desafio?.janelas ?? [],
     local: desafio?.local ?? null,
     entrada_restrita: desafio?.entrada_restrita ?? false,
+    modalidades: desafio?.modalidades ?? ['checkin'],
   })
   const [salvando, setSalvando] = useState(false)
   const [buscandoLocal, setBuscandoLocal] = useState(false)
@@ -95,6 +98,25 @@ export function ChallengeForm({
       ].sort((a, b) => a.dia_semana - b.dia_semana),
     }))
     setDiasEscolhidos([])
+  }
+
+  /**
+   * Liga/desliga uma disputa. Nunca deixa zerar: sem modalidade o
+   * desafio não teria ranking nenhum, e o banco recusaria de qualquer
+   * forma (constraint da migração 024) — melhor a última não desmarcar
+   * do que salvar e receber um erro de banco.
+   */
+  const alternarModalidade = (id: Modalidade) => {
+    setForm((f) => {
+      const tem = f.modalidades.includes(id)
+      if (tem && f.modalidades.length === 1) return f
+      return {
+        ...f,
+        modalidades: tem
+          ? f.modalidades.filter((m) => m !== id)
+          : [...f.modalidades, id],
+      }
+    })
   }
 
   const removerJanela = (dia_semana: number) => {
@@ -211,6 +233,46 @@ export function ChallengeForm({
               required
             />
           </div>
+        </div>
+
+        {/* Quais disputas rodam neste desafio. Duas ou mais convivem no
+            mesmo período, com a mesma inscrição — o aluno compete em
+            todas sem fazer nada a mais. */}
+        <div className="space-y-2 rounded-2xl bg-fundo p-3">
+          <span className="label">Disputas deste desafio</span>
+          {MODALIDADES.map((m) => {
+            const marcada = form.modalidades.includes(m.id)
+            const ultima = marcada && form.modalidades.length === 1
+            return (
+              <label
+                key={m.id}
+                className={`flex items-start gap-3 rounded-xl px-2 py-2 ${
+                  ultima ? '' : 'cursor-pointer'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-brasa-500"
+                  checked={marcada}
+                  disabled={ultima}
+                  onChange={() => alternarModalidade(m.id)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">
+                    {m.emoji} {m.nome}
+                  </span>
+                  <span className="block text-[11px] text-tinta-500">
+                    {m.regra}
+                  </span>
+                </span>
+              </label>
+            )
+          })}
+          <p className="text-[11px] text-tinta-500">
+            Cada disputa vira uma aba de ranking na página do desafio.
+            Ligar o rodízio num desafio que já começou não zera nada — as
+            duplas já marcadas no período entram junto.
+          </p>
         </div>
 
         {/* Horário configurado por dia */}

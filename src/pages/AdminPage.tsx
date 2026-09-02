@@ -33,6 +33,7 @@ import { janelaDaPresenca } from '../lib/presenca'
 import {
   DIAS_SEMANA,
   PAPEIS_DANCA,
+  defModalidade,
   ehEquipeDoProjeto,
   emojiCargo,
   type AgendaEvent,
@@ -48,6 +49,7 @@ import {
   type DistintivoRecebedor,
   type Feriado,
   type FeriadoInput,
+  type Modalidade,
   type PapelDanca,
   type Profile,
   type Report,
@@ -994,6 +996,9 @@ function PainelEntrega({
   const [busca, setBusca] = useState('')
   const [desafioId, setDesafioId] = useState('')
   const [topN, setTopN] = useState<number>(3)
+  /** Qual disputa premiar, quando o desafio tem mais de uma. */
+  const [modalidadePremio, setModalidadePremio] =
+    useState<Modalidade>('checkin')
   const [turmaEscolhida, setTurmaEscolhida] = useState('')
   const [entregando, setEntregando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -1035,6 +1040,8 @@ function PainelEntrega({
     }
   }
 
+  const desafioEscolhido = desafios.find((c) => c.id === desafioId)
+
   // Alunos de uma turma — pra premiar quem se formou naquela turma
   // no semestre de uma vez só
   const alunosDaTurma = turmaEscolhida
@@ -1054,14 +1061,18 @@ function PainelEntrega({
   }
 
   const entregarTopN = async () => {
-    const desafio = desafios.find((c) => c.id === desafioId)
+    const desafio = desafioEscolhido
     if (!desafio) {
       toast('Escolha um desafio', 'erro')
       return
     }
+    // Desafio de uma disputa só ignora o seletor (que nem aparece).
+    const mod = desafio.modalidades.includes(modalidadePremio)
+      ? modalidadePremio
+      : desafio.modalidades[0]
     setEntregando(true)
     try {
-      const ranking = await api.getRanking(desafio)
+      const ranking = await api.getRanking(desafio, mod)
       // Respeita empate: cortar no índice escolheria um dos empatados
       // por ordem alfabética, o que seria arbitrário e injusto.
       const premiados = ateAPosicao(ranking, topN)
@@ -1075,10 +1086,16 @@ function PainelEntrega({
       )
       await carregarRecebedores()
       onConcedido()
+      // O nome da disputa entra no recado: com duas abas, "top 3 do
+      // Espaço Livre" não diria qual ranking foi premiado.
+      const onde =
+        desafio.modalidades.length > 1
+          ? `${desafio.titulo} · ${defModalidade(mod).nome}`
+          : desafio.titulo
       toast(
         premiados.length > topN
-          ? `Entregue para ${premiados.length} pessoas — o top ${topN} de "${desafio.titulo}" tem empate 🤝`
-          : `Entregue para o top ${premiados.length} de "${desafio.titulo}"! 🏆`,
+          ? `Entregue para ${premiados.length} pessoas — o top ${topN} de "${onde}" tem empate 🤝`
+          : `Entregue para o top ${premiados.length} de "${onde}"! 🏆`,
       )
     } catch (err) {
       toast((err as Error).message, 'erro')
@@ -1177,6 +1194,24 @@ function PainelEntrega({
               </option>
             ))}
           </select>
+          {/* Desafio com mais de uma disputa tem mais de um topo: sem
+              escolher, "top 3" seria ambíguo e premiaria o rank errado. */}
+          {desafioEscolhido && desafioEscolhido.modalidades.length > 1 && (
+            <select
+              className="input w-40"
+              aria-label="Disputa do desafio"
+              value={modalidadePremio}
+              onChange={(e) =>
+                setModalidadePremio(e.target.value as Modalidade)
+              }
+            >
+              {desafioEscolhido.modalidades.map((m) => (
+                <option key={m} value={m}>
+                  {defModalidade(m).nome}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="number"
             min={1}
