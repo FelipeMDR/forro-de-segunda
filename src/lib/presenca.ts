@@ -31,6 +31,14 @@ export interface CheckinComVeredito {
    * raio — e aí só contam desafios sem trava de local.
    */
   locais?: string[]
+  /**
+   * A organização revisou a foto e decidiu que ela não vale presença
+   * (migração 026). Vence tudo: nem janela, nem local, nem nada.
+   *
+   * É o que substituiu a trava por sensor — ver o comentário no topo
+   * da migração 026 para o porquê.
+   */
+  presencaAnulada?: boolean
 }
 
 /** O contexto que decide o que conta: desafios + exceções do calendário. */
@@ -78,6 +86,9 @@ export function janelaDaPresenca(
   c: CheckinComVeredito,
   { desafios, suspensos, aberturas }: RegrasPresenca,
 ): string | null {
+  // Revisão da organização vem antes de qualquer regra automática: é
+  // gente olhando a foto, e isso vale mais que sensor ou horário.
+  if (c.presencaAnulada) return null
   const d = new Date(c.criado_em)
   for (const desafio of desafios) {
     const janela = janelaDoCheckin(d, desafio, suspensos, aberturas)

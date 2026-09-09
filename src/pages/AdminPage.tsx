@@ -22,6 +22,7 @@ import {
 import { planejarMatricula, turmasDaLinha } from '../lib/matricula'
 import { ateAPosicao } from '../lib/ranking'
 import {
+  diaDaNoite,
   diasSuspensos,
   formatDate,
   formatRelative,
@@ -2319,6 +2320,147 @@ function LinhaAlunoApp({
   )
 }
 
+/**
+ * Revisão das fotos da noite — o que substituiu a trava de GPS.
+ *
+ * A trava por sensor foi desligada porque punia quem apareceu: sinal
+ * que não fecha, permissão negada e leitura imprecisa viravam acusação
+ * contra o aluno. Wi-fi também não resolve aqui (a rede é da
+ * universidade e muita gente está no 4G).
+ *
+ * O que sobrou é o que o app sempre teve de mais forte: a foto, tirada
+ * na hora, sem galeria. Trinta miniaturas de uma mesma noite lado a
+ * lado, e a que foi tirada num quarto salta aos olhos — humano faz
+ * isso em dois segundos, sem sensor e sem modelo.
+ *
+ * Agrupa por NOITE, e não por dia do calendário, porque é assim que o
+ * resto do app conta presença (a madrugada pertence à noite anterior).
+ * É a comparação lado a lado que faz o olho funcionar: fotos do mesmo
+ * salão se parecem, e a de fora destoa.
+ */
+function RevisaoDeFotos({
+  presencas,
+  contaPonto,
+  onMudou,
+}: {
+  presencas: AttendanceRow[]
+  contaPonto: (data: string) => boolean
+  onMudou: () => void
+}) {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [aberto, setAberto] = useState(false)
+  const [ocupado, setOcupado] = useState<string | null>(null)
+
+  const porNoite = new Map<string, AttendanceRow[]>()
+  for (const p of presencas) {
+    const noite = diaDaNoite(new Date(p.data))
+    porNoite.set(noite, [...(porNoite.get(noite) ?? []), p])
+  }
+  const noites = [...porNoite.entries()].sort((a, b) =>
+    b[0].localeCompare(a[0]),
+  )
+  const anuladas = presencas.filter((p) => p.presencaAnulada).length
+
+  const alternar = async (p: AttendanceRow) => {
+    setOcupado(p.id)
+    try {
+      await api.anularPresenca(p.id, !p.presencaAnulada)
+      onMudou()
+      toast(
+        p.presencaAnulada
+          ? `Presença de ${p.nome} vale de novo`
+          : `Presença de ${p.nome} anulada — a foto continua no feed`,
+      )
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  if (presencas.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-preto/10">
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="text-xs font-bold text-tinta-700">
+          🔍 Revisar as fotos ({presencas.length})
+          {anuladas > 0 && (
+            <span className="ml-1 font-normal text-tinta-500">
+              · {anuladas} anulada{anuladas > 1 ? 's' : ''}
+            </span>
+          )}
+        </span>
+        <span className="text-tinta-500">{aberto ? '▾' : '▸'}</span>
+      </button>
+
+      {aberto && (
+        <div className="space-y-4 border-t border-preto/10 px-4 py-3">
+          <p className="text-xs text-tinta-500">
+            Uma noite por bloco. Toque numa foto que não foi no espaço para
+            anular a presença — a foto <strong>continua no feed</strong>, só
+            o ponto sai. Dá para desfazer a qualquer momento.
+          </p>
+
+          {noites.map(([noite, fotos]) => (
+            <div key={noite} className="space-y-1.5">
+              <p className="text-[11px] font-bold uppercase text-tinta-500">
+                {formatDate(noite)} · {fotos.length}{' '}
+                {fotos.length === 1 ? 'foto' : 'fotos'}
+              </p>
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {fotos.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={ocupado === p.id}
+                    onClick={() => void alternar(p)}
+                    aria-pressed={p.presencaAnulada}
+                    className={`relative overflow-hidden rounded-lg border-2 text-left transition ${
+                      p.presencaAnulada
+                        ? 'border-red-500 opacity-50'
+                        : 'border-transparent'
+                    }`}
+                  >
+                    {/* Foto arquivada pela retenção (4 meses) fica sem
+                        URL — o bloco vira só o nome, e ainda dá para
+                        anular pelo que a planilha mostra. */}
+                    {p.foto_url ? (
+                      <img
+                        src={p.foto_url}
+                        alt={`Check-in de ${p.nome}`}
+                        loading="lazy"
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex aspect-square w-full items-center justify-center bg-preto/5 text-2xl">
+                        📷
+                      </div>
+                    )}
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[10px] font-bold text-white">
+                      {p.nome.split(/\s+/)[0]}
+                      {p.presencaAnulada
+                        ? ' · anulada'
+                        : contaPonto(p.data)
+                          ? ' ✅'
+                          : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AdminPage() {
   const { api, papel, carregando } = useAuth()
   const toast = useToast()
@@ -2408,7 +2550,11 @@ export function AdminPage() {
   const pontuados = new Set<string>()
   for (const p of [...(presencas ?? [])].reverse()) {
     const janela = janelaDaPresenca(
-      { criado_em: p.data, locais: p.locais },
+      {
+        criado_em: p.data,
+        locais: p.locais,
+        presencaAnulada: p.presencaAnulada,
+      },
       regrasPresenca,
     )
     if (!janela) continue
@@ -2601,6 +2747,12 @@ export function AdminPage() {
                 </table>
               </div>
             )}
+
+            <RevisaoDeFotos
+              presencas={presencas}
+              contaPonto={contaPonto}
+              onMudou={() => void carregarPresencas(mes)}
+            />
           </>
         )}
       </section>

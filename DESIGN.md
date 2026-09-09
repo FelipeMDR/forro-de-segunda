@@ -41,6 +41,7 @@ diferente você dançou**. Não é fitness, não é rede social genérica.
 | Conceito | O que é |
 | --- | --- |
 | **Check-in** | Foto tirada na hora (sem galeria) — candidata a presença |
+| **Revisão de presença** | Quem confere se a foto foi mesmo no espaço é **a organização olhando as fotos da noite lado a lado** (painel → Frequência → Revisar as fotos), não um sensor. Anular tira só o ponto: a foto continua no feed, e dá para desfazer. Sensor foi tentado e descartado — GPS não fecha sinal dentro do prédio, o wi-fi é da universidade e não identifica o espaço, e boa parte da galera está no 4G (migração 026) |
 | **Presença** | Check-in que marcou ponto em algum desafio rodando na hora. Foto fora de janela (ou fora do local, quando o desafio exige) entra no feed mas **não** vira presença — senão bastava postar de casa. Participar do desafio é opcional: quem não entrou não aparece no rank, mas ganha a presença. Regra única em `lib/presenca.ts` |
 | **Noite de forró** | Das 05:00 às 04:59 do dia seguinte — a madrugada pertence à noite que começou |
 | **Desafio** | Competição por período, com janelas de horário por dia da semana e opcionalmente trava por local (GPS) |

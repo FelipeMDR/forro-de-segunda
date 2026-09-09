@@ -71,6 +71,8 @@ interface CheckinRow {
   favorito?: boolean
   /** Desafios em que a foto valeu no local (espelha checkin_locais). */
   locais?: string[]
+  /** A organização revisou e anulou a presença desta foto (mig. 026). */
+  presenca_anulada?: boolean
 }
 
 interface ChallengeRow {
@@ -981,7 +983,11 @@ export class DemoApi implements ForroApi {
   async checkinsDe(userId: string) {
     return this.db.checkins
       .filter((c) => c.user_id === userId)
-      .map((c) => ({ criado_em: c.criado_em, locais: c.locais ?? [] }))
+      .map((c) => ({
+        criado_em: c.criado_em,
+        locais: c.locais ?? [],
+        presencaAnulada: c.presenca_anulada === true,
+      }))
   }
 
   async checkinsComReacoes(
@@ -997,6 +1003,7 @@ export class DemoApi implements ForroApi {
         criado_em: c.criado_em,
         reacoes: this.db.reactions.filter((r) => r.checkin_id === c.id).length,
         locais: c.locais ?? [],
+        presencaAnulada: c.presenca_anulada === true,
       }))
       .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
   }
@@ -1249,6 +1256,8 @@ export class DemoApi implements ForroApi {
             .filter(
               (c) =>
                 c.user_id === uid &&
+                // Revisão da organização vence tudo (mig. 026)
+                c.presenca_anulada !== true &&
                 // Com trava de local, valem só os que têm veredito —
                 // menos os anteriores à trava, que continuam valendo
                 (!challenge.local ||
@@ -1612,13 +1621,27 @@ export class DemoApi implements ForroApi {
       .map((c) => {
         const p = this.db.profiles.find((x) => x.id === c.user_id)
         return {
+          id: c.id,
           data: c.criado_em,
           nome: p?.nome ?? 'Alguém',
           turma: p ? (turmaLabel(p.turmas) ?? '') : '',
+          foto_url: c.foto_url,
           locais: c.locais ?? [],
+          presencaAnulada: c.presenca_anulada === true,
         }
       })
     return rows.sort((a, b) => b.data.localeCompare(a.data))
+  }
+
+  async anularPresenca(checkinId: string, anulada: boolean) {
+    if (this.db.roles[this.uid()] !== 'organizador') {
+      throw new Error('Só a organização pode revisar presenças')
+    }
+    const c = this.db.checkins.find((x) => x.id === checkinId)
+    if (!c) throw new Error('Check-in não encontrado')
+    c.presenca_anulada = anulada
+    this.persist()
+    this.notifyFeed()
   }
 
   async listReports(): Promise<Report[]> {

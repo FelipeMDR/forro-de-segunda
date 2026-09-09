@@ -202,7 +202,9 @@ export interface ForroApi {
    */
   checkinsDe(
     userId: string,
-  ): Promise<{ criado_em: string; locais: string[] }[]>
+  ): Promise<
+    { criado_em: string; locais: string[]; presencaAnulada: boolean }[]
+  >
   /**
    * Check-ins de um período com a contagem de reações — é o que a
    * retrospectiva usa para achar a foto mais curtida. Consulta à parte
@@ -338,6 +340,15 @@ export interface ForroApi {
 
   // ---- Organizador ----
   getAttendance(inicioISO: string, fimISO: string): Promise<AttendanceRow[]>
+  /**
+   * Liga/desliga a presença de um check-in (organizador).
+   *
+   * É a revisão humana das fotos, que faz o papel que a trava de GPS
+   * não conseguiu: a foto continua no feed e só o ponto sai.
+   * Reversível de propósito — a decisão é sobre uma pessoa, não sobre
+   * um dado. Ver migração 026.
+   */
+  anularPresenca(checkinId: string, anulada: boolean): Promise<void>
   listReports(): Promise<Report[]>
   resolveReport(id: string, removerPost: boolean): Promise<void>
   listAlunosCadastrados(): Promise<AlunoCadastrado[]>

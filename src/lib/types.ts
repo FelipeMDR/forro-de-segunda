@@ -340,6 +340,8 @@ export interface CheckinComReacoes {
   reacoes: number
   /** Desafios em que valeu no local — ver `lib/presenca.ts`. */
   locais: string[]
+  /** A organização anulou a presença desta foto (migração 026). */
+  presencaAnulada: boolean
 }
 
 export type TipoNotificacao = 'reacao' | 'comentario' | 'dupla'
@@ -495,14 +497,20 @@ export interface DistintivoRecebedor {
 }
 
 export interface AttendanceRow {
+  /** Do check-in em si — é por ele que a revisão anula a presença. */
+  id: string
   data: string
   nome: string
   turma: string
+  /** Para a organização olhar a foto e decidir (migração 026). */
+  foto_url: string
   /**
    * Desafios em que a foto valeu no local — é o que decide se a linha
    * conta como presença de verdade (ver `lib/presenca.ts`).
    */
   locais: string[]
+  /** Já revisada e anulada pela organização. */
+  presencaAnulada: boolean
 }
 
 export interface Report {

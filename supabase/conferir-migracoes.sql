@@ -107,6 +107,15 @@ from (values
         and table_name = 'challenges'
         and column_name = 'modalidades'
     )
+  ),
+  (
+    '026 — organização revisa as fotos e anula presença',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'checkins'
+        and column_name = 'presenca_anulada'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

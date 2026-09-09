@@ -944,15 +944,17 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('checkins')
-        .select('criado_em, locais:checkin_locais(challenge_id)')
+        .select('criado_em, presenca_anulada, locais:checkin_locais(challenge_id)')
         .eq('user_id', userId),
     ) as unknown as Array<{
       criado_em: string
+      presenca_anulada: boolean | null
       locais: Array<{ challenge_id: string }> | null
     }>
     return data.map((c) => ({
       criado_em: c.criado_em,
       locais: (c.locais ?? []).map((l) => l.challenge_id),
+      presencaAnulada: c.presenca_anulada === true,
     }))
   }
 
@@ -964,7 +966,7 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('checkins')
         .select(
-          'id, foto_url, legenda, criado_em, reacoes:reactions(count), locais:checkin_locais(challenge_id)',
+          'id, foto_url, legenda, criado_em, presenca_anulada, reacoes:reactions(count), locais:checkin_locais(challenge_id)',
         )
         .eq('user_id', userId)
         .gte('criado_em', desdeISO)
@@ -975,6 +977,7 @@ export class SupabaseApi implements ForroApi {
       legenda: string | null
       criado_em: string
       reacoes: { count: number }[]
+      presenca_anulada: boolean | null
       locais: Array<{ challenge_id: string }> | null
     }>
     return data.map((c) => ({
@@ -984,6 +987,7 @@ export class SupabaseApi implements ForroApi {
       criado_em: c.criado_em,
       reacoes: c.reacoes?.[0]?.count ?? 0,
       locais: (c.locais ?? []).map((l) => l.challenge_id),
+      presencaAnulada: c.presenca_anulada === true,
     }))
   }
 
@@ -1357,12 +1361,15 @@ export class SupabaseApi implements ForroApi {
   ): Promise<Map<string, Set<string>>> {
     const inicio = new Date(`${challenge.data_inicio}T00:00:00`).toISOString()
     const fim = new Date(`${challenge.data_fim}T23:59:59`).toISOString()
+    // `presenca_anulada` fica de fora já na consulta: a revisão da
+    // organização vence qualquer regra automática (migração 026).
     const checkins = ok(
       await this.sb
         .from('checkins')
         .select('id, user_id, criado_em')
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
+        .not('presenca_anulada', 'is', true)
         .in('user_id', ids),
     ) as Array<{ id: string; user_id: string; criado_em: string }>
 
@@ -1898,22 +1905,36 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('checkins')
         .select(
-          'criado_em, locais:checkin_locais(challenge_id), autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
+          'id, criado_em, foto_url, presenca_anulada, locais:checkin_locais(challenge_id), autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
         )
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
         .order('criado_em', { ascending: false }),
     ) as unknown as Array<{
+      id: string
       criado_em: string
+      foto_url: string
+      presenca_anulada: boolean | null
       locais: Array<{ challenge_id: string }> | null
       autor: { nome: string; turmas: TurmaMembro[] | null } | null
     }>
     return data.map((c) => ({
+      id: c.id,
       data: c.criado_em,
       nome: c.autor?.nome ?? 'Alguém',
       turma: turmaLabel(c.autor?.turmas ?? []) ?? '',
+      foto_url: c.foto_url,
       locais: (c.locais ?? []).map((l) => l.challenge_id),
+      presencaAnulada: c.presenca_anulada === true,
     }))
+  }
+
+  async anularPresenca(checkinId: string, anulada: boolean) {
+    const { error } = await this.sb.rpc('anular_presenca', {
+      p_checkin: checkinId,
+      p_valor: anulada,
+    })
+    if (error) throw new Error(traduz(error.message))
   }
 
   async listReports(): Promise<Report[]> {
