@@ -201,7 +201,7 @@ export const MODALIDADES: DefinicaoModalidade[] = [
     nome: 'Rodízio',
     unidade: ['parceiro', 'parceiros'],
     regra:
-      'Conta PESSOAS DIFERENTES com quem você dançou (dupla confirmada dos dois lados), nas noites que valeram neste desafio. Dançar dez vezes com a mesma pessoa conta 1.',
+      'Conta pessoas diferentes com quem você dançou (dupla confirmada dos dois lados) durante TODO o desafio — dançar com a mesma pessoa em várias noites conta 1.',
   },
 ]
 
