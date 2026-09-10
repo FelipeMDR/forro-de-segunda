@@ -8,7 +8,6 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import {
-  diaDaNoite,
   formatDateLong,
   proximasOcorrenciasAgenda,
   toISODate,
@@ -21,7 +20,6 @@ import type {
   ConfirmacaoPresenca,
   Feriado,
   FeedItem,
-  ParceiroPossivel,
 } from '../lib/types'
 
 /**
@@ -357,34 +355,6 @@ export function FeedPage() {
     }
   }
 
-  // Uma consulta só, para hoje: o caminho passivo de marcar dupla é
-  // sobre a noite que acabou ("rolando o feed no ônibus de volta"), e
-  // buscar por data de cada post viraria N consultas.
-  const noiteAtual = diaDaNoite(new Date())
-  const [duplasHoje, setDuplasHoje] = useState<Map<string, ParceiroPossivel>>(
-    new Map(),
-  )
-
-  const carregarDuplas = useCallback(async () => {
-    try {
-      const lista = await api.parceirosPossiveis(noiteAtual)
-      setDuplasHoje(new Map(lista.map((p) => [p.user_id, p])))
-    } catch (e) {
-      // Sem a migração 016 o botão simplesmente não aparece
-      console.error('[feed] falha ao carregar duplas', e)
-    }
-  }, [api, noiteAtual])
-
-  useEffect(() => {
-    void carregarDuplas()
-  }, [carregarDuplas])
-
-  const marcarDupla = async (parceiroId: string, marcar: boolean) => {
-    if (marcar) await api.marcarDupla(parceiroId, noiteAtual)
-    else await api.desmarcarDupla(parceiroId, noiteAtual)
-    await carregarDuplas()
-  }
-
   // Filtra por turma em comum, não por turma exata: quem faz duas turmas
   // vê as duas, e continua vendo quem divide qualquer uma delas.
   const feedVisivel = useMemo(() => {
@@ -486,12 +456,6 @@ export function FeedPage() {
               key={item.id}
               item={item}
               onChanged={() => void carregar()}
-              dupla={
-                diaDaNoite(new Date(item.criado_em)) === noiteAtual
-                  ? duplasHoje.get(item.user_id)
-                  : null
-              }
-              onDupla={(marcar) => marcarDupla(item.user_id, marcar)}
             />
           ))}
 
