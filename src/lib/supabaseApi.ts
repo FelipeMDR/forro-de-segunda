@@ -9,6 +9,7 @@ import {
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
+import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
@@ -1718,9 +1719,11 @@ export class SupabaseApi implements ForroApi {
     // Cada fonte já veio limitada a `limite`; cortar de novo aqui é o
     // que descarta o excedente do merge e mantém a página no tamanho
     // certo — ver o comentário da função sobre por que isso é seguro.
-    return itens
-      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
-      .slice(0, limite)
+    // Compacta ANTES de cortar: senão a repetição ocuparia vaga na
+    // página e empurraria aviso de verdade para a página seguinte.
+    return compactarNotificacoes(
+      itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
+    ).slice(0, limite)
   }
 
   async contarNaoLidas(): Promise<number> {

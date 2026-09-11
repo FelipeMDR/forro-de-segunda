@@ -12,6 +12,7 @@ import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
+import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
   CARGOS_PADRAO,
@@ -1558,8 +1559,8 @@ export class DemoApi implements ForroApi {
           pendente: !d.confirmada,
         })),
     ]
-    const ordenados = itens.sort((a, b) =>
-      b.criado_em.localeCompare(a.criado_em),
+    const ordenados = compactarNotificacoes(
+      itens.sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
     )
     // O demo monta a lista inteira de uma vez (é só filtrar arrays em
     // memória) — a paginação aqui é só recortar o resultado já pronto,
