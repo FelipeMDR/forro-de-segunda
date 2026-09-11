@@ -168,6 +168,8 @@ export function FeedPage() {
   const [temMais, setTemMais] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const ultimaCarga = useRef(0)
+  /** Número da última recarga disparada — ver `carregar`. */
+  const sequencia = useRef(0)
   /** Evento de tempo real que chegou com o app em segundo plano. */
   const pendente = useRef(false)
   /** Marcador invisível no fim da lista — carrega mais ao entrar na tela. */
@@ -182,12 +184,19 @@ export function FeedPage() {
    * contador desatualizado, que a próxima rolagem corrige.
    */
   const carregar = useCallback(async () => {
+    // Cada chamada leva um número, e só a MAIS RECENTE tem o direito de
+    // mexer na tela. Sem isso, duas recargas em voo (tempo real + foco
+    // + o que mais disparar) chegavam fora de ordem, e a resposta velha
+    // — que chegava por último — apagava o que a nova tinha acabado de
+    // mostrar. Era assim que uma reação recém-feita "sumia".
+    const minha = ++sequencia.current
     try {
       // Carregados em separado: se a agenda falhar, o feed ainda
       // aparece (antes um erro derrubava a tela inteira).
       setErro(null)
       ultimaCarga.current = Date.now()
       const novos = await api.getFeed({ limite: PAGINA_FEED })
+      if (minha !== sequencia.current) return
       setFeed((atual) => {
         if (!atual) {
           setTemMais(novos.length === PAGINA_FEED)
@@ -206,9 +215,11 @@ export function FeedPage() {
         api.listEvents().catch(() => [] as AgendaEvent[]),
         api.listFeriados().catch(() => [] as Feriado[]),
       ])
+      if (minha !== sequencia.current) return
       setEventos(e)
       setFeriados(fer)
     } catch (e) {
+      if (minha !== sequencia.current) return
       console.error('[feed] falha ao carregar', e)
       setErro((e as Error).message || 'Erro desconhecido')
     }

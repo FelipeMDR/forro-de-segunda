@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -27,16 +27,54 @@ export function CheckinCard({
 
   // Só o cargo mais alto vai para o feed — a lista completa fica no perfil
   const cargo = cargoPrincipal(item.autor.cargos)
-  const minhaReacao = item.reacoes.find((r) => r.user_id === userId)?.tipo
+
+  /**
+   * As reações vivem em estado local, e não direto na prop.
+   *
+   * Reagir era: mandar para o servidor, ESPERAR, recarregar o feed
+   * inteiro, e só então o coração acendia. No 4G isso levava segundos
+   * sem nenhum sinal na tela — a pessoa tocava de novo achando que não
+   * pegou, e o segundo toque DESFAZIA o primeiro. Somado à corrida de
+   * recargas do feed (ver `FeedPage.carregar`), a reação "parava de
+   * funcionar" justamente para quem mais reagia.
+   *
+   * Agora o toque muda a tela na hora e o servidor confirma depois. Se
+   * falhar, volta ao que era e avisa. O feed sincroniza a cópia local
+   * quando a prop muda (tempo real, recarga), então quem reagiu de outro
+   * aparelho também aparece — só não é ele que faz o coração acender.
+   */
+  const [reacoes, setReacoes] = useState(item.reacoes)
+  useEffect(() => {
+    setReacoes(item.reacoes)
+  }, [item.reacoes])
+  // Um toque por vez por cartão: dois pedidos em voo podem chegar ao
+  // servidor fora de ordem e deixar o oposto do que a pessoa queria.
+  const [reagindo, setReagindo] = useState(false)
+
+  const minhaReacao = reacoes.find((r) => r.user_id === userId)?.tipo
   const contagem = (tipo: string) =>
-    item.reacoes.filter((r) => r.tipo === tipo).length
+    reacoes.filter((r) => r.tipo === tipo).length
 
   const reagir = async (tipo: string) => {
+    if (reagindo || !userId) return
+    const antes = reacoes
+    // Mesma regra do servidor (`toggleReaction`): tocar no que já está
+    // marcado tira; tocar noutro troca; tocar em nada põe.
+    const semAMinha = reacoes.filter((r) => r.user_id !== userId)
+    setReacoes(
+      minhaReacao === tipo ? semAMinha : [...semAMinha, { tipo, user_id: userId }],
+    )
+    setReagindo(true)
     try {
       await api.toggleReaction(item.id, tipo)
-      onChanged()
+      // Sem `onChanged()` de propósito: a tela já está certa, e uma
+      // recarga inteira do feed aqui era a principal fonte da corrida.
+      // O tempo real cuida de trazer as reações dos outros.
     } catch (e) {
+      setReacoes(antes)
       toast((e as Error).message, 'erro')
+    } finally {
+      setReagindo(false)
     }
   }
 
@@ -178,6 +216,9 @@ export function CheckinCard({
               key={tipo}
               onClick={() => void reagir(tipo)}
               aria-pressed={minha}
+              // Sem `disabled`: o botão fica clicável e a cor muda na
+              // hora; é o `reagindo` lá em cima que descarta o toque
+              // extra, invisível para quem toca uma vez só.
               className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm transition active:scale-90 ${
                 minha
                   ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
