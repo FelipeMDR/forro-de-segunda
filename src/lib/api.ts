@@ -97,11 +97,16 @@ export interface ForroApi {
    *
    * Devolve 'confirmar' quando o Supabase está exigindo o clique no
    * e-mail: a conta existe, mas a sessão só nasce depois disso.
+   *
+   * `nome` é o que a pessoa digitou quando a lista de chamada não
+   * trouxe nome nenhum para o telefone dela. Quando a lista tem o nome,
+   * a tela nem pergunta e ele vai vazio.
    */
   signUpTelefone(
     telefone: string,
     email: string,
     senha: string,
+    nome?: string,
   ): Promise<ResultadoCadastro>
   /**
    * Manda de novo o e-mail de confirmação de cadastro. Serve para quem

@@ -28,6 +28,9 @@ export function LoginPage() {
   const [verificado, setVerificado] = useState<{
     nome: string | null
   } | null>(null)
+  // Só entra em jogo quando a lista de chamada não trouxe nome para o
+  // telefone: aí quem se apresenta é a própria pessoa.
+  const [nome, setNome] = useState('')
   // Demo: formulário de organizador
   const [orgAberto, setOrgAberto] = useState(false)
   const [orgNome, setOrgNome] = useState('')
@@ -37,6 +40,7 @@ export function LoginPage() {
   const trocarAba = (t: 'entrar' | 'primeira') => {
     setAba(t)
     setVerificado(null)
+    setNome('')
     setSenha('')
     setConfirmar('')
     setEmail('')
@@ -125,11 +129,20 @@ export function LoginPage() {
       toast('Você precisa aceitar o aviso de privacidade para criar a conta', 'erro')
       return
     }
+    // A lista não trouxe nome e a pessoa não digitou: sem isso a conta
+    // nasceria "Dançarino(a)", e ninguém no painel saberia quem é.
+    if (!verificado?.nome && nome.trim().length < 2) {
+      toast('Conta pra gente como você se chama', 'erro')
+      return
+    }
     setOcupado(true)
     try {
       // 'entrou' não precisa de tela: a sessão já existe e o app troca
       // sozinho para o feed
-      if ((await api.signUpTelefone(telefone, email, senha)) === 'confirmar') {
+      if (
+        (await api.signUpTelefone(telefone, email, senha, nome)) ===
+        'confirmar'
+      ) {
         setConfirmando(email.trim())
       }
     } catch (err) {
@@ -378,6 +391,33 @@ export function LoginPage() {
                 : 'Telefone encontrado na lista! 🎉'}{' '}
               Agora é só criar seu acesso.
             </p>
+            {/* A lista de chamada normalmente já traz o nome; quando não
+                traz (planilha sem a coluna, linha em branco), é aqui que
+                a pessoa se apresenta. Não mostra o campo quando a lista
+                tem nome: o gatilho do banco dá preferência à lista, e um
+                campo editável que fosse ignorado seria pior que nenhum. */}
+            {!verificado.nome && (
+              <div>
+                <label className="label" htmlFor="cad-nome">
+                  Seu nome
+                </label>
+                <input
+                  id="cad-nome"
+                  type="text"
+                  className="input"
+                  placeholder="Como a galera te chama"
+                  autoComplete="name"
+                  value={nome}
+                  minLength={2}
+                  onChange={(e) => setNome(e.target.value)}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-tinta-500">
+                  A lista da organização não veio com seu nome — é assim
+                  que você vai aparecer no feed e no ranking.
+                </p>
+              </div>
+            )}
             <div>
               <label className="label" htmlFor="cad-email">
                 E-mail

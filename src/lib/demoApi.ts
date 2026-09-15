@@ -12,6 +12,7 @@ import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
+import { NOME_PADRAO } from './nome'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
@@ -604,7 +605,9 @@ export class DemoApi implements ForroApi {
     )
     return {
       existe: matches.length > 0 || Boolean(convite),
-      nome: matches[0]?.nome ?? convite?.nome ?? null,
+      // Qualquer linha com nome serve: o telefone pode estar em duas
+      // turmas e só uma delas ter vindo com o nome preenchido.
+      nome: matches.find((m) => m.nome)?.nome ?? convite?.nome ?? null,
       jaTemConta,
     }
   }
@@ -678,7 +681,12 @@ export class DemoApi implements ForroApi {
     return 'trocado' as const
   }
 
-  async signUpTelefone(telefone: string, email: string, senha: string) {
+  async signUpTelefone(
+    telefone: string,
+    email: string,
+    senha: string,
+    nome?: string,
+  ) {
     const { existe, jaTemConta } = await this.telefoneNaLista(telefone)
     if (jaTemConta) {
       throw new Error('Este telefone já tem conta — use a aba Entrar')
@@ -694,9 +702,15 @@ export class DemoApi implements ForroApi {
     )
     const profile: Profile = {
       id: uuid(),
-      // Convidado da festa não está na lista de chamada, mas o nome
-      // veio na planilha de ingressos
-      nome: matches[0]?.nome ?? convite?.nome ?? 'Dançarino(a)',
+      // Mesma ordem de handle_new_user (migração 027): a lista de
+      // chamada manda; se ela não tem nome, vale o que a pessoa
+      // digitou; convidado da festa não está na lista de chamada, mas o
+      // nome veio na planilha de ingressos.
+      nome:
+        matches.find((m) => m.nome)?.nome ??
+        (nome?.trim() || undefined) ??
+        convite?.nome ??
+        NOME_PADRAO,
       avatar_url: null,
       // Veterano sem turma entra sem vínculo (espelha handle_new_user,
       // que filtra `a.turma is not null`)

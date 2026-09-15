@@ -12,6 +12,7 @@ import type { Coordenada } from './geo'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
+import { NOME_PADRAO } from './nome'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
 import type {
   AberturaAntecipada,
@@ -261,7 +262,12 @@ export class SupabaseApi implements ForroApi {
     throw new Error(traduz(error.message))
   }
 
-  async signUpTelefone(telefone: string, email: string, senha: string) {
+  async signUpTelefone(
+    telefone: string,
+    email: string,
+    senha: string,
+    nome?: string,
+  ) {
     const { existe, jaTemConta } = await this.telefoneNaLista(telefone)
     if (jaTemConta) {
       throw new Error('Este telefone já tem conta — use a aba Entrar')
@@ -282,11 +288,20 @@ export class SupabaseApi implements ForroApi {
     // O aceite viaja como metadado e o gatilho da migração 019 o grava
     // no perfil junto com o resto: assim não existe instante em que a
     // conta exista sem o registro do consentimento.
+    //
+    // O nome também vai por metadado. O gatilho (migração 027) só usa
+    // ele quando a lista de chamada não tem nome para o telefone — que
+    // é exatamente quando a tela pediu. Sem isso a conta nascia
+    // "Dançarino(a)", e ninguém reparava até aparecer no painel.
     const { data, error } = await this.sb.auth.signUp({
       email: email.trim(),
       password: senha,
       options: {
-        data: { telefone, termos_versao: VERSAO_TERMOS },
+        data: {
+          telefone,
+          nome: nome?.trim() || undefined,
+          termos_versao: VERSAO_TERMOS,
+        },
         emailRedirectTo: URL_CONFIRMADO(),
       },
     })
@@ -539,8 +554,7 @@ export class SupabaseApi implements ForroApi {
     const { data: s } = await this.sb.auth.getSession()
     const user = s.session?.user
     if (!user || user.id !== id) return null
-    const nome =
-      (user.user_metadata?.nome as string) || 'Dançarino(a)'
+    const nome = (user.user_metadata?.nome as string) || NOME_PADRAO
     const novo = {
       id,
       nome,

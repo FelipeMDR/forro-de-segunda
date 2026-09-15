@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AceiteTermos } from '../components/AceiteTermos'
+import { PedirNome } from '../components/PedirNome'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -380,6 +381,9 @@ export function FeedPage() {
       {/* Antes de tudo: quem ainda não consentiu precisa ser perguntado
           na primeira tela que abre, não escondido no perfil. */}
       <AceiteTermos />
+      {/* Quem ficou com o nome de preenchimento também é perguntado
+          aqui: é a única tela que todo mundo abre. */}
+      <PedirNome />
       <InstallPrompt />
       <AgendaCard
         ocorrencias={agenda}

@@ -116,6 +116,15 @@ from (values
         and table_name = 'checkins'
         and column_name = 'presenca_anulada'
     )
+  ),
+  (
+    '027 — nome no cadastro (gatilho prefere o que a pessoa digitou)',
+    exists (
+      select 1 from pg_proc
+      where proname = 'handle_new_user'
+        and pronamespace = 'public'::regnamespace
+        and prosrc like '%nullif(trim(new.raw_user_meta_data ->> ''nome''), '''')%'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;
