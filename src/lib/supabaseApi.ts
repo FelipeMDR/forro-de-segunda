@@ -121,6 +121,50 @@ function emLotes<T>(itens: T[], tamanho: number): T[][] {
 }
 
 /**
+ * Teto de linhas que o PostgREST devolve numa resposta quando ninguém
+ * pede página nenhuma (Project Settings → API → "Max rows", 1000 por
+ * padrão). O corte é SILENCIOSO: nada de erro, nada de aviso — a lista
+ * chega mais curta e o app segue contando como se fosse inteira.
+ */
+const PAGINA_POSTGREST = 1000
+
+/**
+ * Traz TODAS as linhas de uma consulta, página por página.
+ *
+ * Foi o corte silencioso acima que fez o rodízio "perder ponto com o
+ * passar dos dias": o ranking buscava as duplas confirmadas do desafio
+ * inteiro numa consulta só, e uma dupla confirmada são duas linhas —
+ * com 40 pessoas marcando 4 parceiros por noite, a milésima linha chega
+ * na segunda semana. Dali em diante cada noite nova empurrava linhas
+ * antigas para fora da resposta (sem `order`, o banco escolhe quais), e
+ * parceiros que já tinham contado sumiam da soma. Presença demorava
+ * mais a sentir (é uma linha por foto), mas ia pelo mesmo caminho.
+ *
+ * `monta(de, ate)` recebe o intervalo (inclusivo, base 0) e devolve a
+ * consulta já com `.range(de, ate)`. A consulta PRECISA ter uma ordem
+ * total (`.order('id')` basta): sem isso, o banco pode repetir uma
+ * linha numa página e omitir outra na seguinte.
+ *
+ * `data: unknown` de propósito: o tipo que o supabase-js infere para um
+ * select com relações vem cheio de `any`/erro de parse, e é o chamador
+ * quem sabe o formato — como já faz com `as` nas outras consultas.
+ */
+export async function todasAsLinhas<T>(
+  monta: (
+    de: number,
+    ate: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<T[]> {
+  const linhas: T[] = []
+  for (let de = 0; ; de += PAGINA_POSTGREST) {
+    const pagina = (ok(await monta(de, de + PAGINA_POSTGREST - 1)) ??
+      []) as T[]
+    linhas.push(...pagina)
+    if (pagina.length < PAGINA_POSTGREST) return linhas
+  }
+}
+
+/**
  * Caminho do arquivo dentro do bucket a partir da URL pública
  * (…/object/public/fotos/<uid>/<arquivo>). Devolve null para URL vazia,
  * de outro domínio ou de foto já arquivada pela retenção.
@@ -1084,9 +1128,10 @@ export class SupabaseApi implements ForroApi {
   ) {
     // Casa a lista de ingressos com quem já tem conta. O telefone é o
     // elo: é o login do app e o que a bilheteria costuma anotar.
-    const perfis = ok(
-      await this.sb.from('profiles').select('id, telefone'),
-    ) as Array<{ id: string; telefone: string | null }>
+    const perfis = await todasAsLinhas<{ id: string; telefone: string | null }>(
+      (de, ate) =>
+        this.sb.from('profiles').select('id, telefone').order('id').range(de, ate),
+    )
 
     const jaMembros = ok(
       await this.sb
@@ -1378,15 +1423,30 @@ export class SupabaseApi implements ForroApi {
     const fim = new Date(`${challenge.data_fim}T23:59:59`).toISOString()
     // `presenca_anulada` fica de fora já na consulta: a revisão da
     // organização vence qualquer regra automática (migração 026).
-    const checkins = ok(
-      await this.sb
-        .from('checkins')
-        .select('id, user_id, criado_em')
-        .gte('criado_em', inicio)
-        .lte('criado_em', fim)
-        .not('presenca_anulada', 'is', true)
-        .in('user_id', ids),
-    ) as Array<{ id: string; user_id: string; criado_em: string }>
+    // Em lotes de ids (a lista viaja na URL) e página a página dentro
+    // de cada lote (ver `todasAsLinhas`): um desafio de semestre inteiro
+    // passa fácil das mil linhas.
+    const checkins: Array<{ id: string; user_id: string; criado_em: string }> =
+      []
+    for (const lote of emLotes(ids, 100)) {
+      checkins.push(
+        ...(await todasAsLinhas<{
+          id: string
+          user_id: string
+          criado_em: string
+        }>((de, ate) =>
+          this.sb
+            .from('checkins')
+            .select('id, user_id, criado_em')
+            .gte('criado_em', inicio)
+            .lte('criado_em', fim)
+            .not('presenca_anulada', 'is', true)
+            .in('user_id', lote)
+            .order('id')
+            .range(de, ate),
+        )),
+      )
+    }
 
     // Desafio com trava de local: valem só os check-ins com veredito
     // registrado. Vem a lista de ids aprovados — nenhuma coordenada
@@ -1398,12 +1458,14 @@ export class SupabaseApi implements ForroApi {
       : null
     let aprovados: Set<string> | null = null
     if (challenge.local) {
-      const rows = ok(
-        await this.sb
+      const rows = await todasAsLinhas<{ checkin_id: string }>((de, ate) =>
+        this.sb
           .from('checkin_locais')
           .select('checkin_id')
-          .eq('challenge_id', challenge.id),
-      ) as Array<{ checkin_id: string }>
+          .eq('challenge_id', challenge.id)
+          .order('checkin_id')
+          .range(de, ate),
+      )
       aprovados = new Set(rows.map((r) => r.checkin_id))
     }
 
@@ -1461,15 +1523,32 @@ export class SupabaseApi implements ForroApi {
   ): Promise<Map<string, number>> {
     // A dupla confirmada tem as duas linhas opostas, então olhar por
     // `de_user` já cobre a todos sem contar ninguém duas vezes.
-    const rows = ok(
-      await this.sb
-        .from('duplas')
-        .select('data, de_user, para_user')
-        .eq('confirmada', true)
-        .gte('data', challenge.data_inicio)
-        .lte('data', challenge.data_fim)
-        .in('de_user', ids),
-    ) as Array<{ data: string; de_user: string; para_user: string }>
+    //
+    // Página a página, obrigatoriamente: esta é a consulta que mais
+    // cresce no app (duas linhas por dupla, várias duplas por pessoa
+    // por noite), e foi ela que estourou o teto do PostgREST primeiro —
+    // ver `todasAsLinhas`.
+    const rows: Array<{ data: string; de_user: string; para_user: string }> =
+      []
+    for (const lote of emLotes(ids, 100)) {
+      rows.push(
+        ...(await todasAsLinhas<{
+          data: string
+          de_user: string
+          para_user: string
+        }>((de, ate) =>
+          this.sb
+            .from('duplas')
+            .select('data, de_user, para_user')
+            .eq('confirmada', true)
+            .gte('data', challenge.data_inicio)
+            .lte('data', challenge.data_fim)
+            .in('de_user', lote)
+            .order('id')
+            .range(de, ate),
+        )),
+      )
+    }
 
     const parceirosPor = new Map<string, Set<string>>()
     for (const r of rows) {
@@ -1918,16 +1997,21 @@ export class SupabaseApi implements ForroApi {
   ): Promise<AttendanceRow[]> {
     const inicio = new Date(`${inicioISO}T00:00:00`).toISOString()
     const fim = new Date(`${fimISO}T23:59:59`).toISOString()
-    const data = ok(
-      await this.sb
+    // Um semestre de check-ins passa das mil linhas com folga; sem
+    // paginar, a frequência do painel só mostraria as semanas mais
+    // recentes (ver `todasAsLinhas`). `id` desempata a ordem por data.
+    const data = (await todasAsLinhas<Record<string, unknown>>((de, ate) =>
+      this.sb
         .from('checkins')
         .select(
           'id, criado_em, foto_url, presenca_anulada, locais:checkin_locais(challenge_id), autor:profiles!user_id(nome, turmas:profile_turmas(turma, papel_danca))',
         )
         .gte('criado_em', inicio)
         .lte('criado_em', fim)
-        .order('criado_em', { ascending: false }),
-    ) as unknown as Array<{
+        .order('criado_em', { ascending: false })
+        .order('id')
+        .range(de, ate),
+    )) as unknown as Array<{
       id: string
       criado_em: string
       foto_url: string
@@ -1998,10 +2082,18 @@ export class SupabaseApi implements ForroApi {
   }
 
   async listAlunosCadastrados(): Promise<AlunoCadastrado[]> {
-    const data = ok(
-      await this.sb.from('alunos_cadastrados').select('*').order('nome'),
-    )
-    return data as AlunoCadastrado[]
+    // Lista de chamada grande (várias turmas, semestres acumulados)
+    // passa das mil linhas — e uma chamada cortada matricularia só
+    // parte da turma (ver `todasAsLinhas`).
+    const data = (await todasAsLinhas<Record<string, unknown>>((de, ate) =>
+      this.sb
+        .from('alunos_cadastrados')
+        .select('*')
+        .order('nome')
+        .order('id')
+        .range(de, ate),
+    )) as unknown as AlunoCadastrado[]
+    return data
   }
 
   async saveAlunoCadastrado(a: {
@@ -2196,14 +2288,16 @@ export class SupabaseApi implements ForroApi {
   async listPerfisPublicos(): Promise<PerfilPublico[]> {
     // Colunas nomeadas de propósito: `*` traria o telefone junto, e a
     // busca é usada por qualquer aluno.
-    const data = ok(
-      await this.sb
+    const data = (await todasAsLinhas<Record<string, unknown>>((de, ate) =>
+      this.sb
         .from('profiles')
         .select(
           'id, nome, avatar_url, criado_em, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)',
         )
-        .order('nome'),
-    ) as unknown as Array<Record<string, unknown>>
+        .order('nome')
+        .order('id')
+        .range(de, ate),
+    )) as unknown as Array<Record<string, unknown>>
     const ensino = await this.ensinoPorUsuario()
     return data.map((p) => {
       const {
@@ -2216,12 +2310,14 @@ export class SupabaseApi implements ForroApi {
   }
 
   async listProfiles(): Promise<Profile[]> {
-    const data = ok(
-      await this.sb
+    const data = (await todasAsLinhas<Record<string, unknown>>((de, ate) =>
+      this.sb
         .from('profiles')
         .select(SupabaseApi.PROFILE_SELECT)
-        .order('nome'),
-    ) as unknown as Array<Record<string, unknown>>
+        .order('nome')
+        .order('id')
+        .range(de, ate),
+    )) as unknown as Array<Record<string, unknown>>
     const ensino = await this.ensinoPorUsuario()
     return data.map((p) => ({
       ...this.mapProfile(p),
