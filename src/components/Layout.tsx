@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { aoPublicarCheckin } from '../lib/eventos'
@@ -158,15 +158,37 @@ const BOTAO_CHECKIN: Record<
   },
 }
 
+/** Intervalo mínimo entre duas recontagens da bolinha de avisos. */
+const ESPERA_CONTAGEM_MS = 60_000
+
 export function Layout() {
   const { api, profile, papel } = useAuth()
   const { pathname } = useLocation()
   const [naoLidas, setNaoLidas] = useState(0)
   const estadoCheckin = useEstadoCheckin()
+  /** Quando a bolinha foi recontada pela última vez — ver o efeito abaixo. */
+  const ultimaContagem = useRef(0)
+  const telaAnterior = useRef(pathname)
 
-  // Recontagem ao trocar de tela: barato o bastante e evita um item
-  // ficar marcado como novo depois de a pessoa já ter aberto o painel.
+  // Recontagem ao trocar de tela, com freio.
+  //
+  // Contar não-lidas não é barato como parecia: são cinco consultas
+  // (perfil + as quatro origens de aviso), e trocar de aba é o gesto
+  // mais comum do app — de uma noite de forró saíam milhares de
+  // consultas só para redesenhar uma bolinha. Uma vez por minuto
+  // chega: aviso é coisa que pode esperar um minuto.
+  //
+  // A exceção é sair do painel de avisos: ali eles acabaram de ser
+  // marcados como vistos, e a bolinha PRECISA zerar na hora, senão
+  // continuaria anunciando o que a pessoa acabou de ler.
   useEffect(() => {
+    const saindoDosAvisos = telaAnterior.current === '/notificacoes'
+    telaAnterior.current = pathname
+    const agora = Date.now()
+    if (!saindoDosAvisos && agora - ultimaContagem.current < ESPERA_CONTAGEM_MS) {
+      return
+    }
+    ultimaContagem.current = agora
     let cancelado = false
     void api
       .contarNaoLidas()

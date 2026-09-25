@@ -8,6 +8,7 @@ import { ErrorState } from '../components/ErrorState'
 import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
+import { aoPublicarCheckin } from '../lib/eventos'
 import {
   formatDateLong,
   proximasOcorrenciasAgenda,
@@ -156,6 +157,16 @@ function AgendaCard({
   )
 }
 
+/**
+ * Quanto o feed espera, depois de uma foto nova, antes de recarregar.
+ *
+ * Generoso porque o custo não é o meu aparelho: o evento chega a TODO
+ * mundo que está com o app aberto, e cada um responde com uma consulta.
+ * Meio minuto de atraso ninguém percebe numa noite de forró; trinta
+ * recargas simultâneas a cada foto, o Supabase percebe.
+ */
+const ESPERA_TEMPO_REAL_MS = 25_000
+
 export function FeedPage() {
   const { api, profile, userId } = useAuth()
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
@@ -192,8 +203,6 @@ export function FeedPage() {
     // mostrar. Era assim que uma reação recém-feita "sumia".
     const minha = ++sequencia.current
     try {
-      // Carregados em separado: se a agenda falhar, o feed ainda
-      // aparece (antes um erro derrubava a tela inteira).
       setErro(null)
       ultimaCarga.current = Date.now()
       const novos = await api.getFeed({ limite: PAGINA_FEED })
@@ -212,13 +221,6 @@ export function FeedPage() {
         )
         return [...novos, ...cauda]
       })
-      const [e, fer] = await Promise.all([
-        api.listEvents().catch(() => [] as AgendaEvent[]),
-        api.listFeriados().catch(() => [] as Feriado[]),
-      ])
-      if (minha !== sequencia.current) return
-      setEventos(e)
-      setFeriados(fer)
     } catch (e) {
       if (minha !== sequencia.current) return
       console.error('[feed] falha ao carregar', e)
@@ -241,20 +243,51 @@ export function FeedPage() {
     }
   }, [api, feed, carregandoMais])
 
+  // Agenda e cancelamentos mudam raramente — uma busca por sessão
+  // basta, e não a cada recarga do feed. Recarregar os três juntos
+  // triplicava o custo de cada evento de tempo real, que é o que
+  // acontece com mais frequência no app inteiro.
+  //
+  // Carregados em separado do feed de propósito: se a agenda falhar, o
+  // feed ainda aparece (antes um erro derrubava a tela inteira).
+  useEffect(() => {
+    let cancelado = false
+    void Promise.all([
+      api.listEvents().catch(() => [] as AgendaEvent[]),
+      api.listFeriados().catch(() => [] as Feriado[]),
+    ]).then(([e, fer]) => {
+      if (cancelado) return
+      setEventos(e)
+      setFeriados(fer)
+    })
+    return () => {
+      cancelado = true
+    }
+  }, [api])
+
   useEffect(() => {
     void carregar()
 
-    // Tempo real: qualquer curtida de qualquer pessoa chega aqui. Numa
-    // segunda movimentada são centenas de eventos, então o intervalo é
-    // generoso e nada é buscado com o app em segundo plano — ninguém
-    // está olhando, e gastaria dados à toa.
+    // Tempo real: só foto nova (ver `subscribeFeed`). A espera é longa
+    // de propósito — uma foto que aparece meio minuto depois não muda
+    // nada para quem está no salão, e a recarga imediata, multiplicada
+    // por todo mundo que está com o app aberto, era o maior gasto de
+    // requisições do app. Com o app em segundo plano não busca nada:
+    // ninguém está olhando, e gastaria dados à toa.
     const unsub = api.subscribeFeed(() => {
       if (document.hidden) {
         pendente.current = true
         return
       }
       clearTimeout(timer.current)
-      timer.current = setTimeout(() => void carregar(), 3000)
+      timer.current = setTimeout(() => void carregar(), ESPERA_TEMPO_REAL_MS)
+    })
+
+    // A minha própria foto não espera: quem acabou de publicar volta
+    // para o feed querendo vê-la ali.
+    const unsubMinha = aoPublicarCheckin(() => {
+      clearTimeout(timer.current)
+      void carregar()
     })
 
     // Voltar para o app não precisa refazer a consulta se acabou de
@@ -271,6 +304,7 @@ export function FeedPage() {
     document.addEventListener('visibilitychange', aoVoltar)
     return () => {
       unsub()
+      unsubMinha()
       clearTimeout(timer.current)
       window.removeEventListener('focus', aoVoltar)
       document.removeEventListener('visibilitychange', aoVoltar)

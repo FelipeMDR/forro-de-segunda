@@ -125,6 +125,15 @@ from (values
         and pronamespace = 'public'::regnamespace
         and prosrc like '%nullif(trim(new.raw_user_meta_data ->> ''nome''), '''')%'
     )
+  ),
+  (
+    '028 — tempo real so nas fotos (reactions/comments fora)',
+    not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename in ('reactions', 'comments')
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

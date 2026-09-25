@@ -872,22 +872,34 @@ export class SupabaseApi implements ForroApi {
     })
   }
 
+  /**
+   * Avisa quando uma FOTO NOVA entra (ou sai) do feed.
+   *
+   * Só `checkins`, e só insert/delete. Antes eram as três tabelas com
+   * `event: '*'`, reações incluídas — e reação é, de longe, a tabela
+   * que mais muda: numa segunda movimentada são centenas de linhas, e
+   * CADA uma virava um evento para CADA aparelho conectado, que em
+   * resposta recarregava o feed. Cinquenta pessoas no salão viravam
+   * dezenas de milhares de requisições por noite, e foi isso que
+   * estourou a cota de logs do Supabase.
+   *
+   * A reação dos outros continua chegando — na próxima carga natural
+   * (abrir o app, voltar para ele depois de dois minutos, rolar a
+   * lista). A minha aparece na hora, porque a tela já a desenha sem
+   * esperar o servidor. O que não dá para adiar é a foto nova: é ela
+   * que faz o feed parecer vivo, e é a linha mais rara das três.
+   */
   subscribeFeed(cb: () => void) {
     const channel = this.sb
       .channel('feed-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'checkins' },
+        { event: 'INSERT', schema: 'public', table: 'checkins' },
         cb,
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments' },
-        cb,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reactions' },
+        { event: 'DELETE', schema: 'public', table: 'checkins' },
         cb,
       )
       .subscribe()
