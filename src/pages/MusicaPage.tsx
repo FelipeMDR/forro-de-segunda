@@ -72,6 +72,10 @@ export function MusicaPage() {
     setPedindo(f.uri)
     try {
       await api.pedirMusica(f)
+      // Pedido feito, a busca já cumpriu o papel: some da tela para a
+      // fila (e "Meus pedidos") voltarem a ser o que se vê
+      setResultados(null)
+      setTermo('')
       toast('Pedido feito! 🎶')
       await carregar()
     } catch (err) {
