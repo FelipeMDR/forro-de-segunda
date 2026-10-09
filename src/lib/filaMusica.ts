@@ -1,4 +1,5 @@
-import type { StatusPedido } from './types'
+import { PRAZO_PENDENTE_MS } from '../../supabase/functions/_shared/djPuro'
+import type { PedidoMusica, PedidoNaFila, StatusPedido } from './types'
 
 /**
  * A ordem do rodízio, em TS, para o modo demonstração.
@@ -46,4 +47,48 @@ export function ordenarFila<
       a.pedido.id.localeCompare(b.pedido.id),
   )
   return comRodada.map(({ pedido, rodada }, i) => ({ ...pedido, rodada, posicao: i + 1 }))
+}
+
+/** Uma linha da lista "Próximas" como a pessoa vê. */
+export interface ItemProximas {
+  pedido: PedidoMusica
+  /** 1 = a próxima a tocar. */
+  posicao: number
+  /** Já foi mandada para a fila do Spotify (não dá mais para cancelar). */
+  naFilaDoSpotify: boolean
+}
+
+/**
+ * O que vai tocar, na ordem, do jeito que a pessoa espera ver.
+ *
+ * O rodízio (`fila_da_noite`) só conta quem ainda ESPERA a vez. Mas o
+ * pedido que o loop já mandou para a fila do Spotify também não tocou:
+ * para quem olha o app, ele é o próximo — e sumir da lista antes de
+ * tocar parecia que tinha sido pulado. Ele entra na frente, como no
+ * Spotify.
+ *
+ * Só o envio mais recente conta, e só por PRAZO_PENDENTE_MS: um pedido
+ * pulado no Spotify fica `enviado` para sempre, e não pode passar a
+ * noite anunciado como "o próximo". O que está tocando agora também sai.
+ */
+export function proximasNaTela(
+  pedidos: PedidoMusica[],
+  fila: PedidoNaFila[],
+  tocandoPedidoId: string | null,
+  agora: Date,
+): ItemProximas[] {
+  const noSpotify =
+    pedidos
+      .filter((p) => p.status === 'enviado' && p.id !== tocandoPedidoId && p.enviado_em)
+      .sort((a, b) => (b.enviado_em ?? '').localeCompare(a.enviado_em ?? ''))[0] ?? null
+  const valeAinda =
+    noSpotify !== null &&
+    agora.getTime() - new Date(noSpotify.enviado_em!).getTime() <= PRAZO_PENDENTE_MS
+
+  const itens: ItemProximas[] = []
+  if (valeAinda) itens.push({ pedido: noSpotify, posicao: 1, naFilaDoSpotify: true })
+  for (const p of fila) {
+    itens.push({ pedido: p, posicao: itens.length + 1, naFilaDoSpotify: false })
+  }
+  return itens
 }

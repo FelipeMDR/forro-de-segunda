@@ -2675,12 +2675,14 @@ export class SupabaseApi implements ForroApi {
     const noite = await this.noiteDaSessao()
     if (!noite) return []
     const rows = ok(await this.sb.rpc('fila_da_noite', { p_noite: noite })) as Array<
-      Omit<PedidoNaFila, 'uri' | 'status'> & { track_uri: string; status: string }
+      Omit<PedidoNaFila, 'uri' | 'status' | 'enviado_em'> & { track_uri: string; status: string }
     >
     return rows.map(({ track_uri, ...r }) => ({
       ...r,
       uri: track_uri,
       status: r.status as PedidoNaFila['status'],
+      // A fila do rodízio só tem quem ainda espera a vez
+      enviado_em: null,
     }))
   }
 
@@ -2692,7 +2694,7 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('pedidos_musica')
         .select(
-          'id, noite, user_id, track_uri, titulo, artista, capa_url, duracao_ms, pedido_em, status, perfil:profiles!user_id(nome, avatar_url)',
+          'id, noite, user_id, track_uri, titulo, artista, capa_url, duracao_ms, pedido_em, status, enviado_em, perfil:profiles!user_id(nome, avatar_url)',
         )
         .eq('noite', noite)
         .neq('status', 'cancelado')
@@ -2708,6 +2710,7 @@ export class SupabaseApi implements ForroApi {
       duracao_ms: number
       pedido_em: string
       status: PedidoMusica['status']
+      enviado_em: string | null
       perfil: { nome: string; avatar_url: string | null } | null
     }>
     return rows.map((r) => ({
@@ -2723,6 +2726,7 @@ export class SupabaseApi implements ForroApi {
       duracao_ms: r.duracao_ms,
       pedido_em: r.pedido_em,
       status: r.status,
+      enviado_em: r.enviado_em,
     }))
   }
 

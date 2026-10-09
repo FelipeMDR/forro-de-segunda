@@ -5,7 +5,8 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { podeSerDJ } from '../lib/dj'
-import type { ConexaoDJ, PedidoNaFila, SessaoDJ } from '../lib/types'
+import { proximasNaTela } from '../lib/filaMusica'
+import type { ConexaoDJ, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
 
 const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
@@ -26,19 +27,22 @@ export function DJPage() {
   const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
   const [sessao, setSessao] = useState<SessaoDJ | null>(null)
   const [fila, setFila] = useState<PedidoNaFila[]>([])
+  const [pedidos, setPedidos] = useState<PedidoMusica[]>([])
   const [ocupado, setOcupado] = useState(false)
   const pode = profile ? podeSerDJ(profile.cargos, papel) : false
 
   const carregar = useCallback(async () => {
     if (!pode) return
-    const [c, s, f] = await Promise.all([
+    const [c, s, f, p] = await Promise.all([
       api.minhaConexaoDJ(),
       api.sessaoDJAberta(),
       api.filaDaNoite(),
+      api.pedidosDaNoite(),
     ])
     setConexao(c)
     setSessao(s)
     setFila(f)
+    setPedidos(p)
   }, [api, pode])
   useAtualizacaoPeriodica(carregar, 30_000)
 
@@ -77,7 +81,7 @@ export function DJPage() {
     }
   }
 
-  const cancelar = async (p: PedidoNaFila) => {
+  const cancelar = async (p: PedidoMusica) => {
     try {
       await api.cancelarPedido(p.id)
       await carregar()
@@ -139,7 +143,9 @@ export function DJPage() {
     )
   }
 
-  const proxima = fila[0]
+  // Inclui o pedido que já está na fila do Spotify e ainda não tocou
+  const proximas = proximasNaTela(pedidos, fila, sessao?.tocando?.pedido_id ?? null, new Date())
+  const proxima = proximas[0]?.pedido
 
   return (
     <div className="space-y-4">
@@ -191,23 +197,26 @@ export function DJPage() {
 
       <div className="card divide-y divide-preto/10">
         <p className="p-4 text-xs font-bold uppercase text-tinta-500">
-          Fila ({fila.length})
+          Fila ({proximas.length})
         </p>
-        {fila.map((p) => (
+        {proximas.map(({ pedido: p, posicao, naFilaDoSpotify }) => (
           <LinhaPedido
             key={p.id}
-            posicao={p.posicao}
+            posicao={posicao}
             titulo={p.titulo}
             artista={p.artista}
             capaUrl={p.capa_url}
             pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
+            detalhe={naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
             acao={
-              <button
-                className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
-                onClick={() => void cancelar(p)}
-              >
-                Cancelar
-              </button>
+              naFilaDoSpotify ? undefined : (
+                <button
+                  className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
+                  onClick={() => void cancelar(p)}
+                >
+                  Cancelar
+                </button>
+              )
             }
           />
         ))}

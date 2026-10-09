@@ -629,6 +629,8 @@ export interface PedidoMusica extends FaixaSpotify {
   avatar_url: string | null
   pedido_em: string
   status: StatusPedido
+  /** Quando o loop mandou para a fila do Spotify (null = ainda esperando). */
+  enviado_em: string | null
 }
 
 /** Pedido esperando, com o lugar dele no rodízio (1 = o próximo). */

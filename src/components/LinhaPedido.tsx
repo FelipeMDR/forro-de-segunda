@@ -25,9 +25,35 @@ export function CapaAlbum({ url, tamanho = 48 }: { url: string | null; tamanho?:
 }
 
 /**
+ * Capa com a foto de quem pediu sobreposta no canto. Na linha de texto
+ * a foto ficava com 18 px e não dava para reconhecer ninguém; aqui ela
+ * ganha metade da capa, com borda branca para destacar do álbum.
+ */
+function CapaComPessoa({
+  capaUrl,
+  pessoa,
+  tamanho,
+}: {
+  capaUrl: string | null
+  pessoa: { nome: string; avatarUrl: string | null }
+  tamanho: number
+}) {
+  const foto = Math.round(tamanho * 0.5)
+  return (
+    <span className="relative shrink-0" style={{ width: tamanho + 6, height: tamanho + 6 }}>
+      <CapaAlbum url={capaUrl} tamanho={tamanho} />
+      <span className="absolute bottom-0 right-0 rounded-full ring-2 ring-white">
+        <Avatar nome={pessoa.nome} url={pessoa.avatarUrl} tamanho={foto} />
+      </span>
+    </span>
+  )
+}
+
+/**
  * Uma música pedida: capa, título e artista, e — quando importa quem
- * pediu — a foto e o nome da pessoa. É a mesma linha na fila do aluno,
- * na do DJ e no "Tocando agora", para as três telas falarem igual.
+ * pediu — a foto da pessoa no canto da capa e o nome dela. É a mesma
+ * linha na fila do aluno, na do DJ e no "Tocando agora", para as três
+ * telas falarem igual.
  */
 export function LinhaPedido({
   titulo,
@@ -36,7 +62,7 @@ export function LinhaPedido({
   pessoa,
   posicao,
   detalhe,
-  tamanhoCapa = 48,
+  tamanhoCapa = 52,
   acao,
 }: {
   titulo: string
@@ -57,15 +83,16 @@ export function LinhaPedido({
           {posicao}
         </span>
       )}
-      <CapaAlbum url={capaUrl} tamanho={tamanhoCapa} />
+      {pessoa ? (
+        <CapaComPessoa capaUrl={capaUrl} pessoa={pessoa} tamanho={tamanhoCapa} />
+      ) : (
+        <CapaAlbum url={capaUrl} tamanho={tamanhoCapa} />
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{titulo}</p>
         <p className="truncate text-xs text-tinta-500">{artista}</p>
         {pessoa && (
-          <div className="mt-1 flex min-w-0 items-center gap-1.5">
-            <Avatar nome={pessoa.nome} url={pessoa.avatarUrl} tamanho={18} />
-            <span className="truncate text-xs text-tinta-600">pedida por {pessoa.nome}</span>
-          </div>
+          <p className="mt-0.5 truncate text-xs text-tinta-600">pedida por {pessoa.nome}</p>
         )}
         {detalhe && <p className="mt-0.5 text-xs font-semibold text-brasa-700">{detalhe}</p>}
       </div>

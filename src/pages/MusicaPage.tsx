@@ -5,11 +5,13 @@ import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { diaDaNoite } from '../lib/dates'
+import { proximasNaTela } from '../lib/filaMusica'
 import type { FaixaSpotify, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
 
-/** "toca daqui a ~N músicas" a partir da posição no rodízio. */
-function quando(posicao: number): string {
+/** "toca daqui a ~N músicas" a partir da posição na lista de próximas. */
+function quando(posicao: number, naFilaDoSpotify: boolean): string {
+  if (naFilaDoSpotify) return 'é a próxima! já está na fila do Spotify'
   if (posicao === 1) return 'é a próxima!'
   const antes = posicao - 1
   return `toca daqui a ~${antes} ${antes === 1 ? 'pedido' : 'pedidos'}`
@@ -79,7 +81,7 @@ export function MusicaPage() {
     }
   }
 
-  const cancelar = async (p: PedidoNaFila) => {
+  const cancelar = async (p: PedidoMusica) => {
     try {
       await api.cancelarPedido(p.id)
       await carregar()
@@ -101,7 +103,10 @@ export function MusicaPage() {
   }
 
   const jaPedidas = new Set(pedidos.map((p) => p.uri))
-  const meus = fila.filter((p) => p.user_id === userId)
+  // A lista que a pessoa vê inclui o pedido que já foi para a fila do
+  // Spotify e ainda não tocou — ele é o próximo (ver proximasNaTela)
+  const proximas = proximasNaTela(pedidos, fila, sessao.tocando?.pedido_id ?? null, new Date())
+  const meus = proximas.filter((i) => i.pedido.user_id === userId)
 
   return (
     <div className="space-y-4">
@@ -175,20 +180,23 @@ export function MusicaPage() {
       {meus.length > 0 && (
         <div className="card divide-y divide-preto/10">
           <p className="p-4 text-xs font-bold uppercase text-tinta-500">Meus pedidos</p>
-          {meus.map((p) => (
+          {meus.map(({ pedido: p, posicao, naFilaDoSpotify }) => (
             <LinhaPedido
               key={p.id}
               titulo={p.titulo}
               artista={p.artista}
               capaUrl={p.capa_url}
-              detalhe={quando(p.posicao)}
+              detalhe={quando(posicao, naFilaDoSpotify)}
               acao={
-                <button
-                  className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
-                  onClick={() => void cancelar(p)}
-                >
-                  Cancelar
-                </button>
+                // Já foi para o Spotify: não dá mais para tirar de lá
+                naFilaDoSpotify ? undefined : (
+                  <button
+                    className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
+                    onClick={() => void cancelar(p)}
+                  >
+                    Cancelar
+                  </button>
+                )
               }
             />
           ))}
@@ -197,17 +205,18 @@ export function MusicaPage() {
 
       <div className="card divide-y divide-preto/10">
         <p className="p-4 text-xs font-bold uppercase text-tinta-500">Próximas</p>
-        {fila.length === 0 && (
+        {proximas.length === 0 && (
           <p className="p-4 text-sm text-tinta-600">Nenhum pedido esperando — peça o seu!</p>
         )}
-        {fila.slice(0, 5).map((p) => (
+        {proximas.slice(0, 5).map(({ pedido: p, posicao, naFilaDoSpotify }) => (
           <LinhaPedido
             key={p.id}
-            posicao={p.posicao}
+            posicao={posicao}
             titulo={p.titulo}
             artista={p.artista}
             capaUrl={p.capa_url}
             pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
+            detalhe={naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
           />
         ))}
       </div>
