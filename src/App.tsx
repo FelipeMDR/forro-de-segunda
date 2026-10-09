@@ -8,6 +8,7 @@ import { AdminPage } from './pages/AdminPage'
 import { BuscarPage } from './pages/BuscarPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
+import { DJPage } from './pages/DJPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
@@ -15,10 +16,12 @@ import { FeedPage } from './pages/FeedPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
 import { NovaSenhaPage } from './pages/NovaSenhaPage'
+import { MusicaPage } from './pages/MusicaPage'
 import { PrivacidadePage } from './pages/PrivacidadePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { PublicacaoPage } from './pages/PublicacaoPage'
 import { RetrospectivaPage } from './pages/RetrospectivaPage'
+import { SpotifyConectadoPage } from './pages/SpotifyConectadoPage'
 import { UserProfilePage } from './pages/UserProfilePage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -69,6 +72,9 @@ export default function App() {
               <Route path="/perfil/conta" element={<ContaPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />
+              <Route path="/dj" element={<DJPage />} />
+              <Route path="/musica" element={<MusicaPage />} />
+              <Route path="/spotify/conectado" element={<SpotifyConectadoPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

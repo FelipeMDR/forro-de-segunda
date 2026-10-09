@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartaoInstalar } from '../components/BotaoInstalar'
+import { ConexaoSpotify } from '../components/ConexaoSpotify'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -315,6 +316,8 @@ export function ContaPage() {
           </button>
         </LinhaConta>
       </div>
+
+      <ConexaoSpotify />
 
       {pushSupported() && (
         <div className="card flex items-center gap-3 p-4">
