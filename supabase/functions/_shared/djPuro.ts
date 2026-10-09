@@ -46,6 +46,13 @@ export function faixaDaApi(t: unknown): FaixaApi | null {
   }
 }
 
+/**
+ * Quantas músicas a busca mostra. Poucas de propósito: no celular, no
+ * meio do salão, dez resultados viram uma rolagem — e a música certa
+ * quase sempre está entre as primeiras.
+ */
+export const LIMITE_BUSCA = 5
+
 /** O que o loop precisa saber do player do professor. */
 export interface EstadoPlayer {
   tocando: FaixaApi

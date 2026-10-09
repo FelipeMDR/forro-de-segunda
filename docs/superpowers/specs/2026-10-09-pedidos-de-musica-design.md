@@ -306,7 +306,7 @@ já existe em `FeedPage`). **Não usa tempo real**: o corte da cota de logs
   Buscar ou dar Enter, nunca a cada tecla. A função usa a chave do
   próprio app (client credentials, guardada em memória enquanto vale),
   então **não depende das 5 contas** e o aluno não loga no Spotify.
-  Devolve até 10 faixas (`market=BR`) com uri, título, artistas, capa e
+  Devolve até 5 faixas (`market=BR`) com uri, título, artistas, capa e
   duração.
 - Faixa já pedida na noite aparece como "Já pedida hoje", sem botão.
 - **Tocando agora** (da sessão, nunca do Spotify direto) e **Próximas**

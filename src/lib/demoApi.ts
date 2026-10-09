@@ -1,4 +1,4 @@
-import { decidirPassada } from '../../supabase/functions/_shared/djPuro'
+import { decidirPassada, LIMITE_BUSCA } from '../../supabase/functions/_shared/djPuro'
 import type { ForroApi } from './api'
 import {
   addDays,
@@ -2247,7 +2247,9 @@ export class DemoApi implements ForroApi {
       t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     const termo = normal(q.trim())
     if (termo.length < 2) return []
-    return CATALOGO_DEMO.filter((f) => normal(`${f.titulo} ${f.artista}`).includes(termo))
+    return CATALOGO_DEMO.filter((f) =>
+      normal(`${f.titulo} ${f.artista}`).includes(termo),
+    ).slice(0, LIMITE_BUSCA)
   }
 
   async pedirMusica(f: FaixaSpotify) {

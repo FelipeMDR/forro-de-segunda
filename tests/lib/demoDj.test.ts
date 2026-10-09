@@ -118,4 +118,11 @@ describe('DemoApi — pedidos de música', () => {
     expect((await api.buscarMusicas('xodo')).map((f) => f.titulo)).toContain('Eu Só Quero um Xodó')
     expect(await api.buscarMusicas('x')).toEqual([])
   })
+
+  it('a busca devolve no máximo 5 músicas', async () => {
+    const { DemoApi } = await import('../../src/lib/demoApi')
+    const api = new DemoApi()
+    // "Luiz Gonzaga" tem mais de 5 músicas no catálogo do demo
+    expect((await api.buscarMusicas('gonzaga')).length).toBe(5)
+  })
 })

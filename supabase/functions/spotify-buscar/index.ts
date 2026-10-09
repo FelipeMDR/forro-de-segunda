@@ -7,7 +7,7 @@
 // Publicar: npx supabase functions deploy spotify-buscar
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { faixaDaApi, type FaixaApi } from '../_shared/djPuro.ts'
+import { faixaDaApi, LIMITE_BUSCA, type FaixaApi } from '../_shared/djPuro.ts'
 import { cors, json } from '../_shared/http.ts'
 import { chamarSpotify, pedirToken } from '../_shared/spotify.ts'
 
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
   try {
     const r = (await chamarSpotify(
       await tokenDoApp(),
-      '/search?' + new URLSearchParams({ q: termo, type: 'track', market: 'BR', limit: '10' }),
+      '/search?' + new URLSearchParams({ q: termo, type: 'track', market: 'BR', limit: String(LIMITE_BUSCA) }),
     )) as { tracks?: { items?: unknown[] } } | null
     const faixas = (r?.tracks?.items ?? [])
       .map(faixaDaApi)
