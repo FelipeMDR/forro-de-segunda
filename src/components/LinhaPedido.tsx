@@ -27,7 +27,8 @@ export function CapaAlbum({ url, tamanho = 48 }: { url: string | null; tamanho?:
 /**
  * Capa com a foto de quem pediu sobreposta no canto. Na linha de texto
  * a foto ficava com 18 px e não dava para reconhecer ninguém; aqui ela
- * ganha metade da capa, com borda branca para destacar do álbum.
+ * cobre o quarto de baixo à direita da capa (60% do lado, passando um
+ * pouco da borda), com borda branca para destacar do álbum.
  */
 function CapaComPessoa({
   capaUrl,
@@ -38,9 +39,13 @@ function CapaComPessoa({
   pessoa: { nome: string; avatarUrl: string | null }
   tamanho: number
 }) {
-  const foto = Math.round(tamanho * 0.5)
+  const foto = Math.round(tamanho * 0.6)
+  const sobra = Math.round(tamanho * 0.12)
   return (
-    <span className="relative shrink-0" style={{ width: tamanho + 6, height: tamanho + 6 }}>
+    <span
+      className="relative shrink-0"
+      style={{ width: tamanho + sobra, height: tamanho + sobra }}
+    >
       <CapaAlbum url={capaUrl} tamanho={tamanho} />
       <span className="absolute bottom-0 right-0 rounded-full ring-2 ring-white">
         <Avatar nome={pessoa.nome} url={pessoa.avatarUrl} tamanho={foto} />
