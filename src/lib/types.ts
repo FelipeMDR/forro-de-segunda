@@ -606,3 +606,65 @@ export const DIAS_SEMANA = [
 ] as const
 
 export const DIAS_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as const
+
+// ---- Pedidos de música (Modo DJ, migração 029) ----
+
+/** Uma música como o app guarda e mostra (vem da busca do Spotify). */
+export interface FaixaSpotify {
+  uri: string
+  titulo: string
+  artista: string
+  capa_url: string | null
+  duracao_ms: number
+}
+
+export type StatusPedido = 'esperando' | 'enviado' | 'tocou' | 'cancelado'
+
+/** Um pedido da noite, com quem pediu. */
+export interface PedidoMusica extends FaixaSpotify {
+  id: string
+  noite: string
+  user_id: string
+  nome: string
+  avatar_url: string | null
+  pedido_em: string
+  status: StatusPedido
+}
+
+/** Pedido esperando, com o lugar dele no rodízio (1 = o próximo). */
+export interface PedidoNaFila extends PedidoMusica {
+  rodada: number
+  posicao: number
+}
+
+/** A sessão de DJ aberta (no máximo uma no projeto). */
+export interface SessaoDJ {
+  id: string
+  dj_user_id: string
+  dj_nome: string
+  noite: string
+  aberta_em: string
+  aviso: 'sem_aparelho' | 'sem_premium' | null
+  /** O que o loop viu tocando na última passada. */
+  tocando: {
+    titulo: string
+    artista: string
+    capa_url: string | null
+    pedido_id: string | null
+    pedido_por: string | null
+  } | null
+  atualizado_em: string | null
+}
+
+/** A conexão Spotify de quem está logado, sem as chaves. */
+export interface ConexaoDJ {
+  conectado: boolean
+  spotify_nome: string | null
+  plano: string | null
+}
+
+export type ResultadoConexao = 'ok' | 'sem_premium' | 'nao_liberado'
+
+export type ResultadoLigarDJ =
+  | { tipo: 'ligado' }
+  | { tipo: 'ocupado'; dj_nome: string }
