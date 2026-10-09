@@ -28,6 +28,18 @@ interface Conexao {
   expira_em: string
 }
 
+/**
+ * Erro do banco vira exceção, com o lugar onde aconteceu. Antes as
+ * chamadas ignoravam o `error`: uma reserva recusada passava em
+ * silêncio como "nada a enviar", e o pedido ficava esperando para
+ * sempre sem nenhuma pista. Agora a mensagem chega na resposta (500),
+ * que dá para ler em net._http_response.
+ */
+function doBanco<T>(r: { data: T; error: { message: string } | null }, onde: string): T {
+  if (r.error) throw new Error(`[${onde}] ${r.error.message}`)
+  return r.data
+}
+
 /** Renova a chave e grava. null = o professor revogou o acesso. */
 async function renovar(admin: SupabaseClient, c: Conexao): Promise<string | null> {
   try {
@@ -36,7 +48,10 @@ async function renovar(admin: SupabaseClient, c: Conexao): Promise<string | null
       await pedirToken({ grant_type: 'refresh_token', refresh_token: c.refresh_token }),
       new Date(),
     )
-    await admin.from('dj_conexoes').update(novo).eq('user_id', c.user_id)
+    doBanco(
+      await admin.from('dj_conexoes').update(novo).eq('user_id', c.user_id),
+      'gravar chave renovada',
+    )
     Object.assign(c, novo)
     return novo.access_token
   } catch (e) {
@@ -89,11 +104,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { data: conexao } = await admin
-      .from('dj_conexoes')
-      .select('user_id, access_token, refresh_token, expira_em')
-      .eq('user_id', sessao.dj_user_id)
-      .maybeSingle<Conexao>()
+    const conexao = doBanco(
+      await admin
+        .from('dj_conexoes')
+        .select('user_id, access_token, refresh_token, expira_em')
+        .eq('user_id', sessao.dj_user_id)
+        .maybeSingle<Conexao>(),
+      'ler conexao',
+    )
 
     let token: string | null = null
     if (conexao) {
@@ -118,18 +136,22 @@ Deno.serve(async (req) => {
     // `enviado`, é o pedido nosso pendente na fila do Spotify; e o id
     // dele vai para a reserva, que desiste se outra passada mandou algo
     // nesse meio-tempo (ver reservar_proximo_pedido na migração 029).
-    const { data: ultimoEnvio } = await admin
-      .from('pedidos_musica')
-      .select('id, track_uri, status, enviado_em')
-      .eq('noite', sessao.noite)
-      .in('status', ['enviado', 'tocou'])
-      .order('enviado_em', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle()
+    const ultimoEnvio = doBanco(
+      await admin
+        .from('pedidos_musica')
+        .select('id, track_uri, status, enviado_em')
+        .eq('noite', sessao.noite)
+        .in('status', ['enviado', 'tocou'])
+        .order('enviado_em', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle(),
+      'ler ultimo envio',
+    )
     const pendente = ultimoEnvio?.status === 'enviado' ? ultimoEnvio : null
-    const { data: proximos } = await admin
-      .rpc('fila_da_noite', { p_noite: sessao.noite })
-      .limit(1)
+    const proximos = doBanco(
+      await admin.rpc('fila_da_noite', { p_noite: sessao.noite }).limit(1),
+      'ler fila',
+    )
 
     const acao = decidirPassada({
       agora: new Date(),
@@ -177,11 +199,17 @@ Deno.serve(async (req) => {
       atualizado_em: agoraIso(),
     })
 
+    // Vai na resposta: "enviar: true" sem música enviada é a pista de que
+    // a reserva desistiu (outra passada mandou antes) ou a fila esvaziou
+    let enviou: string | null = null
     if (acao.enviar) {
-      const { data: reservados } = await admin.rpc('reservar_proximo_pedido', {
-        p_noite: sessao.noite,
-        p_ultimo_envio_visto: ultimoEnvio?.id ?? null,
-      })
+      const reservados = doBanco(
+        await admin.rpc('reservar_proximo_pedido', {
+          p_noite: sessao.noite,
+          p_ultimo_envio_visto: ultimoEnvio?.id ?? null,
+        }),
+        'reservar pedido',
+      )
       const pedido = (reservados ?? [])[0] as { id: string; track_uri: string } | undefined
       if (pedido) {
         try {
@@ -190,21 +218,22 @@ Deno.serve(async (req) => {
             '/me/player/queue?' + new URLSearchParams({ uri: pedido.track_uri }),
             { method: 'POST' },
           )
+          enviou = pedido.track_uri
         } catch (e) {
           // Recusa do player (chave, Premium, limite): o pedido volta
           // para o lugar dele. Recusa da música em si: ele sai, senão
           // falharia todo minuto na cabeça da fila e travaria a noite.
           if (e instanceof ErroSpotify && destinoDoPedidoRecusado(e.status) === 'descartar') {
-            await admin.rpc('descartar_pedido', { p_id: pedido.id })
+            doBanco(await admin.rpc('descartar_pedido', { p_id: pedido.id }), 'descartar pedido')
             console.warn('[dj-loop] o Spotify recusou a música', pedido.track_uri, e.message)
             return json({ feito: 'descartado', acao })
           }
-          await admin.rpc('devolver_pedido', { p_id: pedido.id })
+          doBanco(await admin.rpc('devolver_pedido', { p_id: pedido.id }), 'devolver pedido')
           throw e
         }
       }
     }
-    return json({ feito: 'passada', acao })
+    return json({ feito: 'passada', acao, enviou })
   } catch (e) {
     if (e instanceof ErroSpotify && e.status === 403) {
       await atualizarSessao({ aviso: 'sem_premium', atualizado_em: agoraIso() })
