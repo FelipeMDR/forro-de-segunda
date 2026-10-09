@@ -18,6 +18,13 @@ function quando(posicao: number, naFilaDoSpotify: boolean): string {
   return `toca daqui a ~${antes} ${antes === 1 ? 'pedido' : 'pedidos'}`
 }
 
+/**
+ * Quantas músicas da fila aparecem antes de "Ver a fila inteira". A
+ * fila cheia de uma noite movimentada viraria uma rolagem longa; as
+ * próximas cinco respondem quase sempre o que a pessoa quer saber.
+ */
+const PREVIA_DA_FILA = 5
+
 export function MusicaPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
@@ -29,6 +36,7 @@ export function MusicaPage() {
   const [resultados, setResultados] = useState<FaixaSpotify[] | null>(null)
   const [buscando, setBuscando] = useState(false)
   const [pedindo, setPedindo] = useState<string | null>(null)
+  const [filaInteira, setFilaInteira] = useState(false)
   // Check-in não "desaparece": confirmado uma vez na noite, não consulta mais
   const checkinConfirmadoNa = useRef<string | null>(null)
 
@@ -212,11 +220,14 @@ export function MusicaPage() {
       )}
 
       <div className="card divide-y divide-preto/10">
-        <p className="p-4 text-xs font-bold uppercase text-tinta-500">Próximas</p>
+        <p className="p-4 text-xs font-bold uppercase text-tinta-500">
+          Próximas{proximas.length > 0 && ` (${proximas.length})`}
+        </p>
         {proximas.length === 0 && (
           <p className="p-4 text-sm text-tinta-600">Nenhum pedido esperando — peça o seu!</p>
         )}
-        {proximas.slice(0, 5).map(({ pedido: p, posicao, naFilaDoSpotify }) => (
+        {(filaInteira ? proximas : proximas.slice(0, PREVIA_DA_FILA)).map(
+          ({ pedido: p, posicao, naFilaDoSpotify }) => (
           <LinhaPedido
             key={p.id}
             posicao={posicao}
@@ -226,7 +237,18 @@ export function MusicaPage() {
             pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
             detalhe={naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
           />
-        ))}
+          ),
+        )}
+        {proximas.length > PREVIA_DA_FILA && (
+          <button
+            className="w-full p-3 text-center text-sm font-bold text-brasa-700 hover:bg-preto/5"
+            onClick={() => setFilaInteira((v) => !v)}
+          >
+            {filaInteira
+              ? 'Mostrar só as próximas'
+              : `Ver a fila inteira (${proximas.length} músicas)`}
+          </button>
+        )}
       </div>
     </div>
   )
