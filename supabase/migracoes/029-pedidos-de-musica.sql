@@ -9,7 +9,41 @@
 -- `dj-loop`) entrega um pedido por vez ao Spotify do professor que
 -- está de DJ.
 --
--- Rode no SQL Editor. Pode rodar mais de uma vez.
+-- IMPLANTAÇÃO (nesta ordem)
+--
+-- 1. Rode este arquivo no SQL Editor. Pode rodar mais de uma vez.
+--    Confira com supabase/conferir-migracoes.sql (linha 029).
+--
+-- 2. Segredos das Edge Functions (Dashboard → Edge Functions → Secrets,
+--    ou no terminal). O Client Secret vai SÓ para lá — nunca para o
+--    repositório, nem para o chat:
+--      npx supabase secrets set SPOTIFY_CLIENT_ID=b50dd222d8e9498faf4744ed49a799dd
+--      npx supabase secrets set SPOTIFY_CLIENT_SECRET=<cole aqui o Client Secret>
+--
+-- 3. Publique as três funções:
+--      npx supabase functions deploy spotify-buscar
+--      npx supabase functions deploy spotify-conectar
+--      npx supabase functions deploy dj-loop
+--
+-- 4. Agende o loop (troque SEU-PROJETO e SUA_SERVICE_ROLE_KEY, como na
+--    limpeza de fotos da migração 006). Sem sessão de DJ aberta o banco
+--    só avalia o `where exists` — nenhuma chamada, nenhum log de API:
+--
+--      create extension if not exists pg_cron;
+--      create extension if not exists pg_net;
+--      select cron.unschedule('dj-loop')
+--      where exists (select 1 from cron.job where jobname = 'dj-loop');
+--      select cron.schedule('dj-loop', '* * * * *', $cron$
+--        select net.http_post(
+--          url := 'https://SEU-PROJETO.supabase.co/functions/v1/dj-loop',
+--          headers := '{"Authorization": "Bearer SUA_SERVICE_ROLE_KEY", "Content-Type": "application/json"}'::jsonb
+--        )
+--        where exists (select 1 from public.dj_sessoes where fechada_em is null);
+--      $cron$);
+--
+-- 5. No painel do Spotify (developer.spotify.com → app → User
+--    Management), cadastre o e-mail Spotify de cada professor que vai
+--    ser DJ. Máximo de 5 no modo de desenvolvimento.
 -- ============================================================
 
 -- ---------- Conexão Spotify de cada professor ----------

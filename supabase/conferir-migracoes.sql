@@ -134,6 +134,11 @@ from (values
         and schemaname = 'public'
         and tablename in ('reactions', 'comments')
     )
+  ),
+  (
+    '029 — pedidos de musica no Espaco Livre (Modo DJ)',
+    to_regclass('public.pedidos_musica') is not null
+      and exists (select 1 from pg_proc where proname = 'reservar_proximo_pedido')
   )
 ) as t(migracao, aplicada)
 order by migracao;
