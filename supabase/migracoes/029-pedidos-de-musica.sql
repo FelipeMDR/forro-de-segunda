@@ -190,7 +190,9 @@ begin
   if v_uid is null then
     raise exception 'Você precisa entrar primeiro';
   end if;
-  if p_uri is null or p_uri !~ '^spotify:track:[A-Za-z0-9]+$' then
+  -- Id de faixa do Spotify tem exatamente 22 caracteres. Um id
+  -- inventado seria recusado pelo Spotify na hora de enfileirar.
+  if p_uri is null or p_uri !~ '^spotify:track:[A-Za-z0-9]{22}$' then
     raise exception 'Música inválida';
   end if;
   -- A noite é a da sessão aberta, nunca a do relógio: um pedido às
@@ -268,6 +270,12 @@ begin
   if not exists (select 1 from dj_conexoes where user_id = v_uid) then
     raise exception 'Conecte seu Spotify antes de ligar o Modo DJ';
   end if;
+  -- Sessão esquecida aberta de uma noite que já acabou: fecha por
+  -- virada. Sem isso ela bloquearia a noite seguinte (com a `noite`
+  -- velha, ninguém teria check-in "nela" para pedir).
+  update dj_sessoes
+  set fechada_em = now(), motivo_fechamento = 'virada'
+  where fechada_em is null and noite <> noite_do_checkin(now());
   select s.id, s.dj_user_id into v_aberta_id, v_aberta_dj
   from dj_sessoes s where s.fechada_em is null
   for update;
@@ -334,14 +342,32 @@ $$;
 -- Reserva o próximo do rodízio marcando como `enviado` ANTES de mandar
 -- ao Spotify: duas passadas ao mesmo tempo (cron + app cutucando)
 -- nunca mandam o mesmo pedido duas vezes — só uma ganha o update.
-create or replace function public.reservar_proximo_pedido(p_noite date)
+--
+-- `p_ultimo_envio_visto` é o pedido enviado mais recente (enviado ou
+-- já tocado) que a passada viu ao começar. Se outra passada mandou
+-- algo nesse meio-tempo, ele mudou, e esta passada desiste: senão o
+-- Spotify ficaria com dois pedidos nossos e o primeiro nunca seria
+-- visto tocando. O lock serializa as duas passadas.
+drop function if exists public.reservar_proximo_pedido(date);
+create or replace function public.reservar_proximo_pedido(
+  p_noite date, p_ultimo_envio_visto uuid
+)
 returns setof public.pedidos_musica
 language plpgsql security definer
 set search_path = public
 as $$
 declare
   v_id uuid;
+  v_ultimo uuid;
 begin
+  perform pg_advisory_xact_lock(hashtext('dj-loop'));
+  select p.id into v_ultimo from pedidos_musica p
+  where p.noite = p_noite and p.status in ('enviado', 'tocou')
+  order by p.enviado_em desc nulls last
+  limit 1;
+  if v_ultimo is distinct from p_ultimo_envio_visto then
+    return;
+  end if;
   select f.id into v_id from fila_da_noite(p_noite) f limit 1;
   if v_id is null then
     return;
@@ -352,6 +378,19 @@ begin
     where pedidos_musica.id = v_id and pedidos_musica.status = 'esperando'
     returning pedidos_musica.*;
 end;
+$$;
+
+-- O Spotify recusou a música em si (id que não existe mais, faixa
+-- indisponível): ela sai da fila. Devolver faria a mesma música falhar
+-- todo minuto na cabeça da fila e travar a noite inteira.
+create or replace function public.descartar_pedido(p_id uuid)
+returns void
+language sql security definer
+set search_path = public
+as $$
+  update pedidos_musica
+  set status = 'cancelado'
+  where id = p_id and status = 'enviado';
 $$;
 
 -- Desfaz a reserva quando o Spotify recusou o envio
@@ -383,5 +422,6 @@ grant execute on function public.desligar_modo_dj() to authenticated;
 grant execute on function public.minha_conexao_dj() to authenticated;
 grant execute on function public.desconectar_spotify() to authenticated;
 -- O loop roda com a service role; aluno nenhum reserva nem devolve pedido
-revoke all on function public.reservar_proximo_pedido(date) from public, anon, authenticated;
+revoke all on function public.reservar_proximo_pedido(date, uuid) from public, anon, authenticated;
+revoke all on function public.descartar_pedido(uuid) from public, anon, authenticated;
 revoke all on function public.devolver_pedido(uuid) from public, anon, authenticated;

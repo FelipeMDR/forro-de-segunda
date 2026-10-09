@@ -11,6 +11,10 @@ import {
 } from './banco'
 
 const NOITE = '2026-10-12'
+/** URI no formato real do Spotify: id com exatamente 22 caracteres. */
+const faixa = (id: string) => `spotify:track:${id.padEnd(22, '0')}`
+const UMA = faixa('abc123')
+const MADRUGADA = faixa('madrugada')
 /** Hora `hh:mm` da noite de 12/10, em São Paulo. */
 const as = (hhmm: string) => `2026-10-12T${hhmm}:00-03:00`
 
@@ -123,14 +127,14 @@ describe('pedir_musica', () => {
 
   it('aceita quem tem check-in na noite da sessão', async () => {
     const db = await preparado()
-    await pedir(db, 'spotify:track:abc123')
-    expect((await fila(db, NOITE)).map((p) => p.track_uri)).toEqual(['spotify:track:abc123'])
+    await pedir(db, UMA)
+    expect((await fila(db, NOITE)).map((p) => p.track_uri)).toEqual([UMA])
   })
 
   it('recusa sem sessão aberta', async () => {
     const db = await preparado()
     await db.query(`update dj_sessoes set fechada_em = now()`)
-    await expect(pedir(db, 'spotify:track:abc123')).rejects.toThrow('O Modo DJ não está ligado agora')
+    await expect(pedir(db, UMA)).rejects.toThrow('O Modo DJ não está ligado agora')
   })
 
   it('recusa sem check-in na noite', async () => {
@@ -138,7 +142,7 @@ describe('pedir_musica', () => {
     await pessoa(db, IDS.b, 'Beto')
     await checkinNaNoite(db, IDS.b, '2026-10-11T22:00:00-03:00') // noite anterior
     await comoUsuario(db, IDS.b)
-    await expect(pedir(db, 'spotify:track:abc123')).rejects.toThrow('Faça seu check-in para pedir música')
+    await expect(pedir(db, UMA)).rejects.toThrow('Faça seu check-in para pedir música')
   })
 
   it('recusa quem só tem check-in com presença anulada', async () => {
@@ -146,7 +150,7 @@ describe('pedir_musica', () => {
     await pessoa(db, IDS.b, 'Beto')
     await checkinNaNoite(db, IDS.b, as('22:00'), true)
     await comoUsuario(db, IDS.b)
-    await expect(pedir(db, 'spotify:track:abc123')).rejects.toThrow('Faça seu check-in para pedir música')
+    await expect(pedir(db, UMA)).rejects.toThrow('Faça seu check-in para pedir música')
   })
 
   it('a madrugada (antes das 5h) ainda é a noite da sessão', async () => {
@@ -154,30 +158,39 @@ describe('pedir_musica', () => {
     await pessoa(db, IDS.b, 'Beto')
     await checkinNaNoite(db, IDS.b, '2026-10-13T01:30:00-03:00')
     await comoUsuario(db, IDS.b)
-    await pedir(db, 'spotify:track:madrugada')
-    expect((await fila(db, NOITE)).map((p) => p.track_uri)).toContain('spotify:track:madrugada')
+    await pedir(db, MADRUGADA)
+    expect((await fila(db, NOITE)).map((p) => p.track_uri)).toContain(MADRUGADA)
   })
 
   it('recusa música já pedida na noite, por qualquer pessoa', async () => {
     const db = await preparado()
-    await pedir(db, 'spotify:track:abc123')
+    await pedir(db, UMA)
     await pessoa(db, IDS.b, 'Beto')
     await checkinNaNoite(db, IDS.b, as('22:00'))
     await comoUsuario(db, IDS.b)
-    await expect(pedir(db, 'spotify:track:abc123')).rejects.toThrow('Essa música já foi pedida hoje')
+    await expect(pedir(db, UMA)).rejects.toThrow('Essa música já foi pedida hoje')
   })
 
   it('aceita de novo uma música cujo pedido foi cancelado', async () => {
     const db = await preparado()
-    await pedir(db, 'spotify:track:abc123')
+    await pedir(db, UMA)
     await db.query(`update pedidos_musica set status = 'cancelado'`)
-    await pedir(db, 'spotify:track:abc123')
+    await pedir(db, UMA)
     expect((await fila(db, NOITE)).length).toBe(1)
   })
 
   it('recusa URI que não é de faixa do Spotify', async () => {
     const db = await preparado()
-    for (const ruim of ['spotify:episode:abc', 'spotify:track:abc 1', "spotify:track:x'; drop table x;--", '']) {
+    for (const ruim of [
+      'spotify:episode:abc',
+      'spotify:track:abc 1',
+      "spotify:track:x'; drop table x;--",
+      '',
+      // Id curto ou longo demais: o Spotify recusaria ao enfileirar, e o
+      // pedido travaria a fila da noite inteira (revisão final, item 1)
+      'spotify:track:x',
+      `spotify:track:${'a'.repeat(23)}`,
+    ]) {
       await expect(pedir(db, ruim)).rejects.toThrow('Música inválida')
     }
   })
@@ -185,7 +198,7 @@ describe('pedir_musica', () => {
   it('recusa deslogado', async () => {
     const db = await preparado()
     await comoUsuario(db, null)
-    await expect(pedir(db, 'spotify:track:abc123')).rejects.toThrow('Você precisa entrar primeiro')
+    await expect(pedir(db, UMA)).rejects.toThrow('Você precisa entrar primeiro')
   })
 })
 
@@ -348,11 +361,16 @@ describe('reservar_proximo_pedido / devolver_pedido (loop)', () => {
     await pedido(db, IDS.b, NOITE, 'spotify:track:b1', as('21:02'))
     return db
   }
-  const reservar = async (db: Awaited<ReturnType<typeof bancoComMigracao>>) =>
-    (await db.query<{ track_uri: string; status: string }>(
-      `select track_uri, status from reservar_proximo_pedido($1)`,
-      [NOITE],
-    )).rows
+  const reservar = async (
+    db: Awaited<ReturnType<typeof bancoComMigracao>>,
+    pendenteVisto: string | null = null,
+  ) =>
+    (await db.query<{ id: string; track_uri: string; status: string }>(
+      `select id, track_uri, status from reservar_proximo_pedido($1, $2)`,
+      [NOITE, pendenteVisto],
+    )).rows.map(({ track_uri, status }) => ({ track_uri, status }))
+  const idDe = async (db: Awaited<ReturnType<typeof bancoComMigracao>>, uri: string) =>
+    (await db.query<{ id: string }>(`select id from pedidos_musica where track_uri = $1`, [uri])).rows[0].id
 
   it('reserva o primeiro do rodízio e marca como enviado', async () => {
     const db = await comFila()
@@ -365,8 +383,26 @@ describe('reservar_proximo_pedido / devolver_pedido (loop)', () => {
 
   it('duas reservas seguidas nunca devolvem o mesmo pedido', async () => {
     const db = await comFila()
-    const [r1, r2] = [await reservar(db), await reservar(db)]
+    const r1 = await reservar(db)
+    const r2 = await reservar(db, await idDe(db, r1[0].track_uri))
     expect(r1[0].track_uri).not.toBe(r2[0].track_uri)
+  })
+
+  it('passada que viu um estado velho não reserva (duas passadas ao mesmo tempo)', async () => {
+    // A passada A reservou a1; a passada B tinha visto "nenhum pendente"
+    // antes disso. B não pode mandar outro: o Spotify ficaria com dois
+    // pedidos nossos e a1 nunca seria marcado como tocado.
+    const db = await comFila()
+    await reservar(db, null)
+    expect(await reservar(db, null)).toEqual([])
+  })
+
+  it('na mesma passada, marcar o anterior como tocado não impede reservar o próximo', async () => {
+    const db = await comFila()
+    await reservar(db, null)
+    const a1 = await idDe(db, 'spotify:track:a1')
+    await db.query(`update pedidos_musica set status = 'tocou' where id = $1`, [a1])
+    expect(await reservar(db, a1)).toEqual([{ track_uri: 'spotify:track:b1', status: 'enviado' }])
   })
 
   it('fila vazia não reserva nada', async () => {
@@ -382,6 +418,54 @@ describe('reservar_proximo_pedido / devolver_pedido (loop)', () => {
     expect((await fila(db, NOITE))[0].track_uri).toBe('spotify:track:a1')
   })
 })
+describe('descartar_pedido (loop)', () => {
+  it('pedido que o Spotify recusou sai da fila e libera a música', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    const id = await pedido(db, IDS.a, NOITE, 'spotify:track:a1', as('21:00'), 'enviado')
+    await pedido(db, IDS.a, NOITE, 'spotify:track:a2', as('21:01'))
+    await db.query(`select descartar_pedido($1)`, [id])
+    const status = (await db.query<{ status: string }>(`select status from pedidos_musica where id = $1`, [id])).rows[0].status
+    expect(status).toBe('cancelado')
+    expect((await fila(db, NOITE)).map((p) => p.track_uri)).toEqual(['spotify:track:a2'])
+  })
+})
+
+describe('ligar_modo_dj com sessão de outra noite', () => {
+  it('sessão esquecida aberta de noite passada fecha por virada e não bloqueia', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.prof, 'Prof Um', { cargo: 'Professor(a)', conectado: true })
+    await pessoa(db, IDS.prof2, 'Prof Dois', { cargo: 'Professor(a)', conectado: true })
+    await sessaoAberta(db, IDS.prof, '2000-01-01')
+    await comoUsuario(db, IDS.prof2)
+    const r = (await db.query<{ r: unknown }>(`select ligar_modo_dj(false) as r`)).rows[0].r
+    expect(r).toEqual({ tipo: 'ligado' })
+    const sessoes = (
+      await db.query<{ dj_user_id: string; noite: string; fechada: boolean; motivo: string | null }>(
+        `select dj_user_id, noite::text as noite, fechada_em is not null as fechada,
+                motivo_fechamento as motivo
+         from dj_sessoes order by aberta_em`,
+      )
+    ).rows
+    expect(sessoes[0]).toMatchObject({ dj_user_id: IDS.prof, fechada: true, motivo: 'virada' })
+    expect(sessoes[1]).toMatchObject({ dj_user_id: IDS.prof2, fechada: false })
+    expect(sessoes[1].noite).not.toBe('2000-01-01')
+  })
+
+  it('o mesmo professor religando no dia seguinte ganha uma sessão nova, da noite certa', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.prof, 'Prof Um', { cargo: 'Professor(a)', conectado: true })
+    await sessaoAberta(db, IDS.prof, '2000-01-01')
+    await comoUsuario(db, IDS.prof)
+    await db.query(`select ligar_modo_dj(false)`)
+    const abertas = (
+      await db.query<{ noite: string }>(`select noite::text as noite from dj_sessoes where fechada_em is null`)
+    ).rows
+    expect(abertas.length).toBe(1)
+    expect(abertas[0].noite).not.toBe('2000-01-01')
+  })
+})
+
 describe('migração', () => {
   it('pode rodar mais de uma vez', async () => {
     const db = await bancoComMigracao()

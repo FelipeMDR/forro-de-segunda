@@ -2100,7 +2100,9 @@ export class DemoApi implements ForroApi {
       noite: s.noite,
       temConexao: Boolean(this.db.djConexoes?.[s.dj_user_id]),
       player: { tocando, filaUris: sim.filaSpotify },
-      enviadoPendente: pendente ? { id: pendente.id, trackUri: pendente.uri } : null,
+      enviadoPendente: pendente
+        ? { id: pendente.id, trackUri: pendente.uri, enviadoEm: pendente.enviado_em ?? agora.toISOString() }
+        : null,
       temProximo: fila.length > 0,
     })
     if (acao.tipo === 'fechar') {

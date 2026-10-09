@@ -11,7 +11,9 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import {
   decidirPassada,
+  destinoDoPedidoRecusado,
   estadoDoPlayer,
+  fimDaNoite,
   mesclarToken,
   precisaRenovar,
   type EstadoPlayer,
@@ -70,6 +72,14 @@ Deno.serve(async (req) => {
   const atualizarSessao = (campos: Record<string, unknown>) =>
     admin.from('dj_sessoes').update(campos).eq('id', sessao.id)
 
+  // A virada das 5h vem ANTES de qualquer chamada ao Spotify: se o
+  // Spotify falhasse depois das 5h, a sessão nunca fecharia, o cron
+  // seguiria chamando a noite toda e a sessão velha travaria a seguinte.
+  if (Date.now() >= fimDaNoite(sessao.noite).getTime()) {
+    await atualizarSessao({ fechada_em: agoraIso(), motivo_fechamento: 'virada' })
+    return json({ feito: 'virada' })
+  }
+
   try {
     const { data: conexao } = await admin
       .from('dj_conexoes')
@@ -96,14 +106,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: pendente } = await admin
+    // O último envio da noite (enviado ou já tocado). Se ainda está
+    // `enviado`, é o pedido nosso pendente na fila do Spotify; e o id
+    // dele vai para a reserva, que desiste se outra passada mandou algo
+    // nesse meio-tempo (ver reservar_proximo_pedido na migração 029).
+    const { data: ultimoEnvio } = await admin
       .from('pedidos_musica')
-      .select('id, track_uri')
+      .select('id, track_uri, status, enviado_em')
       .eq('noite', sessao.noite)
-      .eq('status', 'enviado')
-      .order('enviado_em', { ascending: false })
+      .in('status', ['enviado', 'tocou'])
+      .order('enviado_em', { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle()
+    const pendente = ultimoEnvio?.status === 'enviado' ? ultimoEnvio : null
     const { data: proximos } = await admin
       .rpc('fila_da_noite', { p_noite: sessao.noite })
       .limit(1)
@@ -113,7 +128,9 @@ Deno.serve(async (req) => {
       noite: sessao.noite,
       temConexao: token !== null,
       player,
-      enviadoPendente: pendente ? { id: pendente.id, trackUri: pendente.track_uri } : null,
+      enviadoPendente: pendente
+        ? { id: pendente.id, trackUri: pendente.track_uri, enviadoEm: pendente.enviado_em }
+        : null,
       temProximo: (proximos ?? []).length > 0,
     })
 
@@ -155,6 +172,7 @@ Deno.serve(async (req) => {
     if (acao.enviar) {
       const { data: reservados } = await admin.rpc('reservar_proximo_pedido', {
         p_noite: sessao.noite,
+        p_ultimo_envio_visto: ultimoEnvio?.id ?? null,
       })
       const pedido = (reservados ?? [])[0] as { id: string; track_uri: string } | undefined
       if (pedido) {
@@ -165,7 +183,14 @@ Deno.serve(async (req) => {
             { method: 'POST' },
           )
         } catch (e) {
-          // O Spotify recusou: o pedido volta para o lugar dele na fila
+          // Recusa do player (chave, Premium, limite): o pedido volta
+          // para o lugar dele. Recusa da música em si: ele sai, senão
+          // falharia todo minuto na cabeça da fila e travaria a noite.
+          if (e instanceof ErroSpotify && destinoDoPedidoRecusado(e.status) === 'descartar') {
+            await admin.rpc('descartar_pedido', { p_id: pedido.id })
+            console.warn('[dj-loop] o Spotify recusou a música', pedido.track_uri, e.message)
+            return json({ feito: 'descartado', acao })
+          }
           await admin.rpc('devolver_pedido', { p_id: pedido.id })
           throw e
         }

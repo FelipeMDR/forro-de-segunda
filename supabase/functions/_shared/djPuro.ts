@@ -106,6 +106,25 @@ export function fimDaNoite(noite: string): Date {
   return new Date(Date.UTC(a, m - 1, d + 1, 5 + 3))
 }
 
+/** Quanto um pedido nosso pode ficar "na fila" antes de ser dado como perdido. */
+export const PRAZO_PENDENTE_MS = 15 * 60 * 1000
+
+/**
+ * O Spotify recusou enfileirar um pedido: ele volta para a fila ou sai?
+ *
+ * Volta quando o problema é do player ou do Spotify (chave, Premium,
+ * limite, instabilidade): na próxima passada pode dar certo. Sai quando
+ * a recusa é da música em si (400/404/410 — id que não existe mais,
+ * faixa indisponível): devolver faria a mesma música falhar todo minuto
+ * na cabeça da fila e travar a noite inteira.
+ */
+export function destinoDoPedidoRecusado(status: number): 'devolver' | 'descartar' {
+  if (status === 401 || status === 403 || status === 429 || status >= 500) {
+    return 'devolver'
+  }
+  return 'descartar'
+}
+
 export type AcaoLoop =
   | { tipo: 'fechar'; motivo: 'virada' | 'conexao_perdida' }
   | { tipo: 'sem_aparelho' }
@@ -120,13 +139,18 @@ export type AcaoLoop =
  * a API do Spotify só deixa acrescentar, nunca reordenar.
  *
  * `enviadoPendente` é o pedido `enviado` mais recente da noite.
+ *
+ * A fila do Spotify mistura o que foi enfileirado com as próximas da
+ * playlist, sem dizer qual é qual. Um pedido pulado cuja música também
+ * está na playlist pareceria "ainda na fila" até a playlist chegar
+ * nele — por isso, passado PRAZO_PENDENTE_MS, ele é dado como perdido.
  */
 export function decidirPassada(e: {
   agora: Date
   noite: string
   temConexao: boolean
   player: EstadoPlayer | null
-  enviadoPendente: { id: string; trackUri: string } | null
+  enviadoPendente: { id: string; trackUri: string; enviadoEm: string } | null
   temProximo: boolean
 }): AcaoLoop {
   if (e.agora.getTime() >= fimDaNoite(e.noite).getTime()) {
@@ -137,8 +161,11 @@ export function decidirPassada(e: {
 
   const p = e.enviadoPendente
   const tocando = p !== null && e.player.tocando.uri === p.trackUri
+  const venceu =
+    p !== null &&
+    e.agora.getTime() - new Date(p.enviadoEm).getTime() > PRAZO_PENDENTE_MS
   const aindaNaFila =
-    p !== null && !tocando && e.player.filaUris.includes(p.trackUri)
+    p !== null && !tocando && !venceu && e.player.filaUris.includes(p.trackUri)
   return {
     tipo: 'passada',
     marcarTocou: tocando && p ? p.id : null,

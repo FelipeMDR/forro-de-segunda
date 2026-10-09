@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   decidirPassada,
+  destinoDoPedidoRecusado,
   estadoDoPlayer,
   faixaDaApi,
   fimDaNoite,
@@ -151,7 +152,7 @@ describe('decidirPassada', () => {
       decidirPassada({
         ...base,
         player: player('spotify:track:playlist1', ['spotify:track:nosso', 'spotify:track:playlist2']),
-        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso' },
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
     ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: false })
   })
@@ -161,9 +162,23 @@ describe('decidirPassada', () => {
       decidirPassada({
         ...base,
         player: player('spotify:track:nosso', ['spotify:track:playlist2']),
-        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso' },
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
     ).toEqual({ tipo: 'passada', marcarTocou: 'p1', enviar: true })
+  })
+
+  it('pedido pulado que também está na playlist não trava a fila para sempre', () => {
+    // A fila do Spotify mostra o que foi enfileirado E as próximas da
+    // playlist, sem dizer qual é qual. Se o pedido foi pulado mas a mesma
+    // música vem mais adiante na playlist, ele parece "ainda na fila".
+    // Depois de 15 minutos, desiste dele e manda o próximo.
+    expect(
+      decidirPassada({
+        ...base,
+        player: player('spotify:track:playlist1', ['spotify:track:playlist2', 'spotify:track:nosso']),
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:14:00Z' },
+      }),
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true })
   })
 
   it('nosso pedido sumiu (pulado no Spotify): não conta, e manda o próximo', () => {
@@ -171,8 +186,22 @@ describe('decidirPassada', () => {
       decidirPassada({
         ...base,
         player: player('spotify:track:playlist3', ['spotify:track:playlist4']),
-        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso' },
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
     ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true })
+  })
+})
+
+describe('destinoDoPedidoRecusado', () => {
+  it('falha do player ou do Spotify: o pedido volta para a fila', () => {
+    for (const status of [401, 403, 429, 500, 502, 503]) {
+      expect(destinoDoPedidoRecusado(status)).toBe('devolver')
+    }
+  })
+
+  it('o Spotify recusou a música em si: o pedido sai, para não travar a noite', () => {
+    for (const status of [400, 404, 410]) {
+      expect(destinoDoPedidoRecusado(status)).toBe('descartar')
+    }
   })
 })
