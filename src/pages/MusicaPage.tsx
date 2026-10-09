@@ -1,21 +1,12 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { CapaAlbum, LinhaPedido } from '../components/LinhaPedido'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { diaDaNoite } from '../lib/dates'
 import type { FaixaSpotify, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
-
-function Capa({ url }: { url: string | null }) {
-  return url ? (
-    <img src={url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-  ) : (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-preto/5">
-      🎵
-    </span>
-  )
-}
 
 /** "toca daqui a ~N músicas" a partir da posição no rodízio. */
 function quando(posicao: number): string {
@@ -120,16 +111,19 @@ export function MusicaPage() {
       </div>
 
       {sessao.tocando && (
-        <div className="card flex items-center gap-3 p-4">
-          <Capa url={sessao.tocando.capa_url} />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase text-tinta-500">Tocando agora</p>
-            <p className="truncate font-bold">{sessao.tocando.titulo}</p>
-            <p className="truncate text-xs text-tinta-600">
-              {sessao.tocando.artista}
-              {sessao.tocando.pedido_por && ` · pedida por ${sessao.tocando.pedido_por}`}
-            </p>
-          </div>
+        <div className="card overflow-hidden">
+          <p className="px-4 pt-3 text-xs font-bold uppercase text-tinta-500">Tocando agora</p>
+          <LinhaPedido
+            titulo={sessao.tocando.titulo}
+            artista={sessao.tocando.artista}
+            capaUrl={sessao.tocando.capa_url}
+            tamanhoCapa={64}
+            pessoa={
+              sessao.tocando.pedido_por
+                ? { nome: sessao.tocando.pedido_por, avatarUrl: sessao.tocando.pedido_por_avatar }
+                : null
+            }
+          />
         </div>
       )}
 
@@ -153,7 +147,7 @@ export function MusicaPage() {
           )}
           {resultados.map((f) => (
             <div key={f.uri} className="flex items-center gap-3 p-3">
-              <Capa url={f.capa_url} />
+              <CapaAlbum url={f.capa_url} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{f.titulo}</p>
                 <p className="truncate text-xs text-tinta-500">{f.artista}</p>
@@ -182,18 +176,21 @@ export function MusicaPage() {
         <div className="card divide-y divide-preto/10">
           <p className="p-4 text-xs font-bold uppercase text-tinta-500">Meus pedidos</p>
           {meus.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 p-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{p.titulo}</p>
-                <p className="text-xs text-tinta-500">{quando(p.posicao)}</p>
-              </div>
-              <button
-                className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
-                onClick={() => void cancelar(p)}
-              >
-                Cancelar
-              </button>
-            </div>
+            <LinhaPedido
+              key={p.id}
+              titulo={p.titulo}
+              artista={p.artista}
+              capaUrl={p.capa_url}
+              detalhe={quando(p.posicao)}
+              acao={
+                <button
+                  className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
+                  onClick={() => void cancelar(p)}
+                >
+                  Cancelar
+                </button>
+              }
+            />
           ))}
         </div>
       )}
@@ -204,13 +201,14 @@ export function MusicaPage() {
           <p className="p-4 text-sm text-tinta-600">Nenhum pedido esperando — peça o seu!</p>
         )}
         {fila.slice(0, 5).map((p) => (
-          <div key={p.id} className="flex items-center gap-3 p-3">
-            <span className="w-6 text-center text-sm font-bold text-tinta-500">{p.posicao}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{p.titulo}</p>
-              <p className="truncate text-xs text-tinta-500">pedida por {p.nome}</p>
-            </div>
-          </div>
+          <LinhaPedido
+            key={p.id}
+            posicao={p.posicao}
+            titulo={p.titulo}
+            artista={p.artista}
+            capaUrl={p.capa_url}
+            pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
+          />
         ))}
       </div>
     </div>

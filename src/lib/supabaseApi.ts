@@ -2585,7 +2585,7 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('dj_sessoes')
         .select(
-          'id, dj_user_id, noite, aberta_em, aviso, tocando_titulo, tocando_artista, tocando_capa, tocando_pedido_id, atualizado_em, dj:profiles!dj_user_id(nome), pedido:pedidos_musica!tocando_pedido_id(perfil:profiles!user_id(nome))',
+          'id, dj_user_id, noite, aberta_em, aviso, tocando_titulo, tocando_artista, tocando_capa, tocando_pedido_id, atualizado_em, dj:profiles!dj_user_id(nome), pedido:pedidos_musica!tocando_pedido_id(perfil:profiles!user_id(nome, avatar_url))',
         )
         .is('fechada_em', null)
         .maybeSingle(),
@@ -2601,7 +2601,7 @@ export class SupabaseApi implements ForroApi {
       tocando_pedido_id: string | null
       atualizado_em: string | null
       dj: { nome: string } | null
-      pedido: { perfil: { nome: string } | null } | null
+      pedido: { perfil: { nome: string; avatar_url: string | null } | null } | null
     } | null
     if (!data) return null
     return {
@@ -2618,6 +2618,7 @@ export class SupabaseApi implements ForroApi {
             capa_url: data.tocando_capa,
             pedido_id: data.tocando_pedido_id,
             pedido_por: data.pedido?.perfil?.nome ?? null,
+            pedido_por_avatar: data.pedido?.perfil?.avatar_url ?? null,
           }
         : null,
       atualizado_em: data.atualizado_em,

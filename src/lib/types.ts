@@ -652,6 +652,8 @@ export interface SessaoDJ {
     capa_url: string | null
     pedido_id: string | null
     pedido_por: string | null
+    /** Foto de quem pediu, para aparecer junto do nome. */
+    pedido_por_avatar: string | null
   } | null
   atualizado_em: string | null
 }

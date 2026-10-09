@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Avatar } from '../components/Avatar'
+import { LinhaPedido } from '../components/LinhaPedido'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -156,30 +156,36 @@ export function DJPage() {
         </p>
       )}
 
-      <div className="card space-y-1 p-4">
-        <p className="text-xs font-bold uppercase text-tinta-500">Tocando agora</p>
+      <div className="card overflow-hidden">
+        <p className="px-4 pt-3 text-xs font-bold uppercase text-tinta-500">Tocando agora</p>
         {sessao?.tocando ? (
-          <>
-            <p className="font-bold">{sessao.tocando.titulo}</p>
-            <p className="text-sm text-tinta-600">{sessao.tocando.artista}</p>
-            {sessao.tocando.pedido_por && (
-              <p className="text-xs text-brasa-700">pedida por {sessao.tocando.pedido_por}</p>
-            )}
-          </>
+          <LinhaPedido
+            titulo={sessao.tocando.titulo}
+            artista={sessao.tocando.artista}
+            capaUrl={sessao.tocando.capa_url}
+            tamanhoCapa={64}
+            pessoa={
+              sessao.tocando.pedido_por
+                ? { nome: sessao.tocando.pedido_por, avatarUrl: sessao.tocando.pedido_por_avatar }
+                : null
+            }
+          />
         ) : (
-          <p className="text-sm text-tinta-600">Esperando a primeira leitura do Spotify…</p>
+          <p className="p-4 text-sm text-tinta-600">Esperando a primeira leitura do Spotify…</p>
         )}
       </div>
 
-      <div className="card space-y-1 p-4">
-        <p className="text-xs font-bold uppercase text-tinta-500">Próxima do rodízio</p>
+      <div className="card overflow-hidden">
+        <p className="px-4 pt-3 text-xs font-bold uppercase text-tinta-500">Próxima do rodízio</p>
         {proxima ? (
-          <p className="text-sm">
-            <strong>{proxima.titulo}</strong> — {proxima.artista}
-            <span className="text-tinta-500"> · pedida por {proxima.nome}</span>
-          </p>
+          <LinhaPedido
+            titulo={proxima.titulo}
+            artista={proxima.artista}
+            capaUrl={proxima.capa_url}
+            pessoa={{ nome: proxima.nome, avatarUrl: proxima.avatar_url }}
+          />
         ) : (
-          <p className="text-sm text-tinta-600">Nenhum pedido esperando: a playlist segue.</p>
+          <p className="p-4 text-sm text-tinta-600">Nenhum pedido esperando: a playlist segue.</p>
         )}
       </div>
 
@@ -188,22 +194,22 @@ export function DJPage() {
           Fila ({fila.length})
         </p>
         {fila.map((p) => (
-          <div key={p.id} className="flex items-center gap-3 p-3">
-            <span className="w-6 text-center text-sm font-bold text-tinta-500">{p.posicao}</span>
-            <Avatar nome={p.nome} url={p.avatar_url} tamanho={32} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{p.titulo}</p>
-              <p className="truncate text-xs text-tinta-500">
-                {p.artista} · {p.nome}
-              </p>
-            </div>
-            <button
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
-              onClick={() => void cancelar(p)}
-            >
-              Cancelar
-            </button>
-          </div>
+          <LinhaPedido
+            key={p.id}
+            posicao={p.posicao}
+            titulo={p.titulo}
+            artista={p.artista}
+            capaUrl={p.capa_url}
+            pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
+            acao={
+              <button
+                className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
+                onClick={() => void cancelar(p)}
+              >
+                Cancelar
+              </button>
+            }
+          />
         ))}
       </div>
     </div>

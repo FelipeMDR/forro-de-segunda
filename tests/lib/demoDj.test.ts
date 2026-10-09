@@ -92,6 +92,8 @@ describe('DemoApi — pedidos de música', () => {
     expect((await api.sessaoDJAberta())!.tocando!.pedido_por).toBe(
       (await api.getProfile(maria))!.nome,
     )
+    // A foto de quem pediu acompanha o nome (Maria do seed não tem foto)
+    expect((await api.sessaoDJAberta())!.tocando).toHaveProperty('pedido_por_avatar', null)
   })
 
   it('aluno não liga o Modo DJ', async () => {

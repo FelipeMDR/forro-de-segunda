@@ -2183,6 +2183,7 @@ export class DemoApi implements ForroApi {
             capa_url: tocando.capa_url,
             pedido_id: pedido?.id ?? null,
             pedido_por: pedido ? this.comPerfil(pedido).nome : null,
+            pedido_por_avatar: pedido ? this.comPerfil(pedido).avatar_url : null,
           }
         : null,
       atualizado_em: new Date().toISOString(),
