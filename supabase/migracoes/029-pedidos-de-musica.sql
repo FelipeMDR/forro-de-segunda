@@ -139,3 +139,215 @@ as $$
   join profiles pr on pr.id = e.user_id
   order by 14;
 $$;
+
+-- ---------- Pedir e cancelar ----------
+create or replace function public.pedir_musica(
+  p_uri text, p_titulo text, p_artista text, p_capa text, p_duracao int
+)
+returns uuid
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_noite date;
+  v_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Você precisa entrar primeiro';
+  end if;
+  if p_uri is null or p_uri !~ '^spotify:track:[A-Za-z0-9]+$' then
+    raise exception 'Música inválida';
+  end if;
+  -- A noite é a da sessão aberta, nunca a do relógio: um pedido às
+  -- 5h01 com o DJ ainda ligado não pode cair numa fila que ninguém toca.
+  select s.noite into v_noite from dj_sessoes s where s.fechada_em is null;
+  if v_noite is null then
+    raise exception 'O Modo DJ não está ligado agora';
+  end if;
+  if not exists (
+    select 1 from checkins c
+    where c.user_id = v_uid
+      and noite_do_checkin(c.criado_em) = v_noite
+      and not c.presenca_anulada
+  ) then
+    raise exception 'Faça seu check-in para pedir música';
+  end if;
+  begin
+    insert into pedidos_musica (noite, user_id, track_uri, titulo, artista, capa_url, duracao_ms)
+    values (v_noite, v_uid, p_uri, left(p_titulo, 200), left(p_artista, 200), p_capa, coalesce(p_duracao, 0))
+    returning pedidos_musica.id into v_id;
+  exception when unique_violation then
+    raise exception 'Essa música já foi pedida hoje';
+  end;
+  return v_id;
+end;
+$$;
+
+create or replace function public.cancelar_pedido(p_id uuid)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_dono uuid;
+  v_status text;
+  v_dj uuid;
+begin
+  select p.user_id, p.status into v_dono, v_status
+  from pedidos_musica p where p.id = p_id;
+  if not found then
+    raise exception 'Pedido não encontrado';
+  end if;
+  if v_status <> 'esperando' then
+    raise exception 'Esse pedido já foi para o Spotify';
+  end if;
+  select s.dj_user_id into v_dj from dj_sessoes s where s.fechada_em is null;
+  if v_dono <> v_uid and v_dj is distinct from v_uid and not is_organizador() then
+    raise exception 'Você só pode cancelar os seus pedidos';
+  end if;
+  update pedidos_musica
+  set status = 'cancelado', cancelado_por = v_uid
+  where id = p_id;
+end;
+$$;
+
+-- ---------- Ligar e desligar o Modo DJ ----------
+create or replace function public.ligar_modo_dj(p_assumir boolean)
+returns jsonb
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_aberta_id uuid;
+  v_aberta_dj uuid;
+  v_nome text;
+begin
+  if v_uid is null then
+    raise exception 'Você precisa entrar primeiro';
+  end if;
+  if not pode_ser_dj(v_uid) then
+    raise exception 'Só professores podem ligar o Modo DJ';
+  end if;
+  if not exists (select 1 from dj_conexoes where user_id = v_uid) then
+    raise exception 'Conecte seu Spotify antes de ligar o Modo DJ';
+  end if;
+  select s.id, s.dj_user_id into v_aberta_id, v_aberta_dj
+  from dj_sessoes s where s.fechada_em is null
+  for update;
+  if v_aberta_id is not null then
+    if v_aberta_dj = v_uid then
+      return jsonb_build_object('tipo', 'ligado');
+    end if;
+    if not p_assumir then
+      select nome into v_nome from profiles where id = v_aberta_dj;
+      return jsonb_build_object('tipo', 'ocupado', 'dj_nome', v_nome);
+    end if;
+    update dj_sessoes
+    set fechada_em = now(), motivo_fechamento = 'assumida'
+    where id = v_aberta_id;
+  end if;
+  insert into dj_sessoes (dj_user_id, noite)
+  values (v_uid, noite_do_checkin(now()));
+  return jsonb_build_object('tipo', 'ligado');
+end;
+$$;
+
+create or replace function public.desligar_modo_dj()
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  update dj_sessoes
+  set fechada_em = now(), motivo_fechamento = 'desligou'
+  where fechada_em is null
+    and (dj_user_id = auth.uid() or is_organizador());
+end;
+$$;
+
+-- ---------- Conexão vista pelo app (sem as chaves) ----------
+create or replace function public.minha_conexao_dj()
+returns jsonb
+language sql stable security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select jsonb_build_object(
+       'conectado', true, 'spotify_nome', spotify_nome, 'plano', plano)
+     from dj_conexoes where user_id = auth.uid()),
+    jsonb_build_object('conectado', false, 'spotify_nome', null, 'plano', null)
+  );
+$$;
+
+create or replace function public.desconectar_spotify()
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  -- Sem conexão não há quem toque: a sessão aberta dessa pessoa fecha junto
+  update dj_sessoes
+  set fechada_em = now(), motivo_fechamento = 'desligou'
+  where fechada_em is null and dj_user_id = auth.uid();
+  delete from dj_conexoes where user_id = auth.uid();
+end;
+$$;
+
+-- ---------- Só para o loop (service role) ----------
+-- Reserva o próximo do rodízio marcando como `enviado` ANTES de mandar
+-- ao Spotify: duas passadas ao mesmo tempo (cron + app cutucando)
+-- nunca mandam o mesmo pedido duas vezes — só uma ganha o update.
+create or replace function public.reservar_proximo_pedido(p_noite date)
+returns setof public.pedidos_musica
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  select f.id into v_id from fila_da_noite(p_noite) f limit 1;
+  if v_id is null then
+    return;
+  end if;
+  return query
+    update pedidos_musica
+    set status = 'enviado', enviado_em = now()
+    where pedidos_musica.id = v_id and pedidos_musica.status = 'esperando'
+    returning pedidos_musica.*;
+end;
+$$;
+
+-- Desfaz a reserva quando o Spotify recusou o envio
+create or replace function public.devolver_pedido(p_id uuid)
+returns void
+language sql security definer
+set search_path = public
+as $$
+  update pedidos_musica
+  set status = 'esperando', enviado_em = null
+  where id = p_id and status = 'enviado';
+$$;
+
+-- ---------- Permissões ----------
+revoke all on function public.pode_ser_dj(uuid) from public, anon;
+revoke all on function public.fila_da_noite(date) from public, anon;
+revoke all on function public.pedir_musica(text, text, text, text, int) from public, anon;
+revoke all on function public.cancelar_pedido(uuid) from public, anon;
+revoke all on function public.ligar_modo_dj(boolean) from public, anon;
+revoke all on function public.desligar_modo_dj() from public, anon;
+revoke all on function public.minha_conexao_dj() from public, anon;
+revoke all on function public.desconectar_spotify() from public, anon;
+grant execute on function public.pode_ser_dj(uuid) to authenticated;
+grant execute on function public.fila_da_noite(date) to authenticated;
+grant execute on function public.pedir_musica(text, text, text, text, int) to authenticated;
+grant execute on function public.cancelar_pedido(uuid) to authenticated;
+grant execute on function public.ligar_modo_dj(boolean) to authenticated;
+grant execute on function public.desligar_modo_dj() to authenticated;
+grant execute on function public.minha_conexao_dj() to authenticated;
+grant execute on function public.desconectar_spotify() to authenticated;
+-- O loop roda com a service role; aluno nenhum reserva nem devolve pedido
+revoke all on function public.reservar_proximo_pedido(date) from public, anon, authenticated;
+revoke all on function public.devolver_pedido(uuid) from public, anon, authenticated;

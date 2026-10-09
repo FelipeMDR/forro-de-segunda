@@ -82,7 +82,7 @@ export async function pessoa(
   if (opcoes.conectado) {
     await db.query(
       `insert into dj_conexoes (user_id, spotify_id, access_token, refresh_token, expira_em)
-       values ($1, 'sp-' || $1, 'acesso', 'renovacao', now() + interval '1 hour')`,
+       values ($1::uuid, 'sp-' || $1::text, 'acesso', 'renovacao', now() + interval '1 hour')`,
       [id],
     )
   }
