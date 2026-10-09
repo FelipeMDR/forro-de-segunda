@@ -59,10 +59,18 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (!sessao) return json({ feito: 'sem_sessao' })
 
-  // Cron (service role) ou o próprio DJ da noite, pelo app
-  const auth = req.headers.get('Authorization') ?? ''
-  if (auth !== `Bearer ${service}`) {
-    const { data } = await admin.auth.getUser(auth.replace(/^Bearer /, ''))
+  // Cron (service role) ou o próprio DJ da noite, pelo app.
+  //
+  // NÃO comparar o token com SUPABASE_SERVICE_ROLE_KEY como texto: as
+  // duas strings não batem (a chave entregue às funções não é a mesma
+  // copiada do painel), e o agendamento inteiro caía no 403 abaixo.
+  // Quem decide é o banco, como na limpeza de fotos: só a service_role
+  // executa dj_loop_autorizado (migração 030).
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  const comoQuemChamou = createClient(Deno.env.get('SUPABASE_URL')!, token)
+  const { data: ehAgendamento } = await comoQuemChamou.rpc('dj_loop_autorizado')
+  if (ehAgendamento !== true) {
+    const { data } = await admin.auth.getUser(token)
     if (data.user?.id !== sessao.dj_user_id) {
       return json({ erro: 'Só o DJ da noite pode fazer isso' }, 403)
     }

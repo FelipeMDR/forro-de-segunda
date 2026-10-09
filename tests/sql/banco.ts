@@ -2,9 +2,10 @@ import { PGlite } from '@electric-sql/pglite'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const MIGRACAO = fileURLToPath(
-  new URL('../../supabase/migracoes/029-pedidos-de-musica.sql', import.meta.url),
-)
+const MIGRACOES = [
+  '029-pedidos-de-musica.sql',
+  '030-dj-loop-autorizado.sql',
+].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
  * O mínimo do banco de produção de que a migração 029 depende. As
@@ -57,7 +58,7 @@ export const IDS = {
 export async function bancoComMigracao(): Promise<PGlite> {
   const db = new PGlite()
   await db.exec(BASE)
-  await db.exec(readFileSync(MIGRACAO, 'utf8'))
+  for (const m of MIGRACOES) await db.exec(readFileSync(m, 'utf8'))
   return db
 }
 

@@ -477,3 +477,20 @@ describe('migração', () => {
     await expect(db.exec(sql)).resolves.toBeDefined()
   })
 })
+
+describe('dj_loop_autorizado (migração 030)', () => {
+  it('só a service_role executa: é como o dj-loop reconhece o agendamento', async () => {
+    const db = await bancoComMigracao()
+    const pode = async (papel: string) =>
+      (
+        await db.query<{ ok: boolean }>(
+          `select has_function_privilege($1, 'public.dj_loop_autorizado()', 'execute') as ok`,
+          [papel],
+        )
+      ).rows[0].ok
+    expect(await pode('service_role')).toBe(true)
+    expect(await pode('authenticated')).toBe(false)
+    expect(await pode('anon')).toBe(false)
+    expect((await db.query<{ r: boolean }>(`select dj_loop_autorizado() as r`)).rows[0].r).toBe(true)
+  })
+})

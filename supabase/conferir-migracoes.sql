@@ -139,6 +139,10 @@ from (values
     '029 — pedidos de musica no Espaco Livre (Modo DJ)',
     to_regclass('public.pedidos_musica') is not null
       and exists (select 1 from pg_proc where proname = 'reservar_proximo_pedido')
+  ),
+  (
+    '030 — agendamento consegue chamar o dj-loop',
+    exists (select 1 from pg_proc where proname = 'dj_loop_autorizado')
   )
 ) as t(migracao, aplicada)
 order by migracao;
