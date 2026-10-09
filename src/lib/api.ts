@@ -14,24 +14,31 @@ import type {
   CheckinComReacoes,
   CheckinFavorito,
   Comment,
+  ConexaoDJ,
   ConfirmacaoPresenca,
   ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
   DistintivoRecebedor,
+  FaixaSpotify,
   FeedItem,
   Feriado,
+  FeriadoInput,
   Modalidade,
   Notificacao,
-  ParceiroDanca,
-  ParceiroPossivel,
-  FeriadoInput,
   Papel,
   PapelDanca,
+  ParceiroDanca,
+  ParceiroPossivel,
+  PedidoMusica,
+  PedidoNaFila,
   PerfilPublico,
   Profile,
   RankingEntry,
   Report,
+  ResultadoConexao,
+  ResultadoLigarDJ,
+  SessaoDJ,
   Turma,
 } from './types'
 
@@ -466,6 +473,35 @@ export interface ForroApi {
   revogarDistintivo(distintivoId: string, userId: string): Promise<void>
   /** Distintivos personalizados que um aluno específico já recebeu. */
   distintivosDe(userId: string): Promise<Badge[]>
+
+  // ---- Modo DJ e pedidos de música (migração 029) ----
+  /** Situação da conexão Spotify de quem está logado — sem as chaves. */
+  minhaConexaoDJ(): Promise<ConexaoDJ>
+  /**
+   * Termina a conexão OAuth: troca o `code` que o Spotify devolveu em
+   * /spotify/conectado. A troca usa o Client Secret e por isso acontece
+   * numa Edge Function.
+   */
+  conectarSpotify(code: string, redirectUri: string): Promise<ResultadoConexao>
+  /** Apaga a conexão (e fecha a sessão de DJ aberta dessa pessoa). */
+  desconectarSpotify(): Promise<void>
+  /** A sessão de DJ aberta, ou null. No máximo uma no projeto. */
+  sessaoDJAberta(): Promise<SessaoDJ | null>
+  /** `assumir` = fechar a sessão de outro professor e abrir a minha. */
+  ligarModoDJ(assumir: boolean): Promise<ResultadoLigarDJ>
+  desligarModoDJ(): Promise<void>
+  /** Roda uma passada do loop agora (ao ligar), sem esperar o cron. */
+  cutucarLoopDJ(): Promise<void>
+  /** Busca no Spotify. Só ao enviar o formulário — nunca a cada tecla. */
+  buscarMusicas(q: string): Promise<FaixaSpotify[]>
+  pedirMusica(f: FaixaSpotify): Promise<void>
+  cancelarPedido(id: string): Promise<void>
+  /** Pedidos esperando da noite da sessão aberta, na ordem do rodízio. */
+  filaDaNoite(): Promise<PedidoNaFila[]>
+  /** Todos os pedidos não cancelados da noite (para o "já pedida hoje"). */
+  pedidosDaNoite(): Promise<PedidoMusica[]>
+  /** Quantos pedidos dessa pessoa de fato tocaram — o distintivo de DJ. */
+  musicasTocadasDe(userId: string): Promise<number>
 
   // ---- Push (Fase 4) ----
   savePushSubscription(sub: PushSubscriptionJSON): Promise<void>

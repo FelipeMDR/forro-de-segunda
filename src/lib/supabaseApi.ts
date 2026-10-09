@@ -28,24 +28,31 @@ import type {
   CheckinComReacoes,
   CheckinFavorito,
   Comment,
+  ConexaoDJ,
   ConfirmacaoPresenca,
   ConvidadoDesafio,
   DistintivoDef,
   DistintivoDefInput,
   DistintivoRecebedor,
+  FaixaSpotify,
   FeedItem,
   Feriado,
+  FeriadoInput,
   Modalidade,
   Notificacao,
-  ParceiroDanca,
-  ParceiroPossivel,
-  FeriadoInput,
   Papel,
   PapelDanca,
+  ParceiroDanca,
+  ParceiroPossivel,
+  PedidoMusica,
+  PedidoNaFila,
   PerfilPublico,
   Profile,
   RankingEntry,
   Report,
+  ResultadoConexao,
+  ResultadoLigarDJ,
+  SessaoDJ,
   Turma,
   TurmaMembro,
 } from './types'
@@ -2527,6 +2534,206 @@ export class SupabaseApi implements ForroApi {
   }
 
   // ---- Push ----
+
+  // ---- Modo DJ e pedidos de música ----
+
+  /**
+   * Chama uma Edge Function e traz para a tela a mensagem `{ erro }` que
+   * ela devolveu — sem isso o aluno veria "Edge Function returned a
+   * non-2xx status code".
+   */
+  private async invocar<T>(nome: string, corpo: Record<string, unknown>): Promise<T> {
+    const { data, error } = await this.sb.functions.invoke(nome, { body: corpo })
+    if (error) {
+      let mensagem = error.message
+      const contexto = (error as { context?: Response }).context
+      if (contexto && typeof contexto.json === 'function') {
+        const j = (await contexto.json().catch(() => null)) as { erro?: string } | null
+        if (j?.erro) mensagem = j.erro
+      }
+      throw new Error(mensagem)
+    }
+    return data as T
+  }
+
+  /** RPC sem retorno útil, com a mensagem do banco traduzida. */
+  private async rpcSimples(nome: string, args?: Record<string, unknown>) {
+    const { error } = await this.sb.rpc(nome, args)
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async minhaConexaoDJ(): Promise<ConexaoDJ> {
+    const { data, error } = await this.sb.rpc('minha_conexao_dj')
+    if (error) throw new Error(traduz(error.message))
+    return data as ConexaoDJ
+  }
+
+  async conectarSpotify(code: string, redirectUri: string) {
+    const r = await this.invocar<{ resultado: ResultadoConexao }>('spotify-conectar', {
+      code,
+      redirect_uri: redirectUri,
+    })
+    return r.resultado
+  }
+
+  async desconectarSpotify() {
+    await this.rpcSimples('desconectar_spotify')
+  }
+
+  async sessaoDJAberta(): Promise<SessaoDJ | null> {
+    const data = ok(
+      await this.sb
+        .from('dj_sessoes')
+        .select(
+          'id, dj_user_id, noite, aberta_em, aviso, tocando_titulo, tocando_artista, tocando_capa, tocando_pedido_id, atualizado_em, dj:profiles!dj_user_id(nome), pedido:pedidos_musica!tocando_pedido_id(perfil:profiles!user_id(nome))',
+        )
+        .is('fechada_em', null)
+        .maybeSingle(),
+    ) as unknown as {
+      id: string
+      dj_user_id: string
+      noite: string
+      aberta_em: string
+      aviso: SessaoDJ['aviso']
+      tocando_titulo: string | null
+      tocando_artista: string | null
+      tocando_capa: string | null
+      tocando_pedido_id: string | null
+      atualizado_em: string | null
+      dj: { nome: string } | null
+      pedido: { perfil: { nome: string } | null } | null
+    } | null
+    if (!data) return null
+    return {
+      id: data.id,
+      dj_user_id: data.dj_user_id,
+      dj_nome: data.dj?.nome ?? 'Alguém',
+      noite: data.noite,
+      aberta_em: data.aberta_em,
+      aviso: data.aviso,
+      tocando: data.tocando_titulo
+        ? {
+            titulo: data.tocando_titulo,
+            artista: data.tocando_artista ?? '',
+            capa_url: data.tocando_capa,
+            pedido_id: data.tocando_pedido_id,
+            pedido_por: data.pedido?.perfil?.nome ?? null,
+          }
+        : null,
+      atualizado_em: data.atualizado_em,
+    }
+  }
+
+  async ligarModoDJ(assumir: boolean): Promise<ResultadoLigarDJ> {
+    const { data, error } = await this.sb.rpc('ligar_modo_dj', { p_assumir: assumir })
+    if (error) throw new Error(traduz(error.message))
+    return data as ResultadoLigarDJ
+  }
+
+  async desligarModoDJ() {
+    await this.rpcSimples('desligar_modo_dj')
+  }
+
+  async cutucarLoopDJ() {
+    // Não é crítico: se falhar, o cron passa no próximo minuto
+    try {
+      await this.invocar('dj-loop', {})
+    } catch (e) {
+      console.warn('[dj] o loop não respondeu agora', e)
+    }
+  }
+
+  async buscarMusicas(q: string) {
+    const r = await this.invocar<{ faixas: FaixaSpotify[] }>('spotify-buscar', { q })
+    return r.faixas
+  }
+
+  async pedirMusica(f: FaixaSpotify) {
+    await this.rpcSimples('pedir_musica', {
+      p_uri: f.uri,
+      p_titulo: f.titulo,
+      p_artista: f.artista,
+      p_capa: f.capa_url,
+      p_duracao: f.duracao_ms,
+    })
+  }
+
+  async cancelarPedido(id: string) {
+    await this.rpcSimples('cancelar_pedido', { p_id: id })
+  }
+
+  /** A noite da sessão aberta — é dela que a fila é. */
+  private async noiteDaSessao(): Promise<string | null> {
+    const d = ok(
+      await this.sb.from('dj_sessoes').select('noite').is('fechada_em', null).maybeSingle(),
+    ) as { noite: string } | null
+    return d?.noite ?? null
+  }
+
+  async filaDaNoite(): Promise<PedidoNaFila[]> {
+    const noite = await this.noiteDaSessao()
+    if (!noite) return []
+    const rows = ok(await this.sb.rpc('fila_da_noite', { p_noite: noite })) as Array<
+      Omit<PedidoNaFila, 'uri' | 'status'> & { track_uri: string; status: string }
+    >
+    return rows.map(({ track_uri, ...r }) => ({
+      ...r,
+      uri: track_uri,
+      status: r.status as PedidoNaFila['status'],
+    }))
+  }
+
+  async pedidosDaNoite(): Promise<PedidoMusica[]> {
+    const noite = await this.noiteDaSessao()
+    if (!noite) return []
+    // Uma noite tem dezenas de pedidos, longe do teto de 1000 linhas
+    const rows = ok(
+      await this.sb
+        .from('pedidos_musica')
+        .select(
+          'id, noite, user_id, track_uri, titulo, artista, capa_url, duracao_ms, pedido_em, status, perfil:profiles!user_id(nome, avatar_url)',
+        )
+        .eq('noite', noite)
+        .neq('status', 'cancelado')
+        .order('pedido_em'),
+    ) as unknown as Array<{
+      id: string
+      noite: string
+      user_id: string
+      track_uri: string
+      titulo: string
+      artista: string
+      capa_url: string | null
+      duracao_ms: number
+      pedido_em: string
+      status: PedidoMusica['status']
+      perfil: { nome: string; avatar_url: string | null } | null
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      noite: r.noite,
+      user_id: r.user_id,
+      nome: r.perfil?.nome ?? 'Alguém',
+      avatar_url: r.perfil?.avatar_url ?? null,
+      uri: r.track_uri,
+      titulo: r.titulo,
+      artista: r.artista,
+      capa_url: r.capa_url,
+      duracao_ms: r.duracao_ms,
+      pedido_em: r.pedido_em,
+      status: r.status,
+    }))
+  }
+
+  async musicasTocadasDe(userId: string) {
+    const { count, error } = await this.sb
+      .from('pedidos_musica')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'tocou')
+    if (error) throw new Error(traduz(error.message))
+    return count ?? 0
+  }
 
   async savePushSubscription(sub: PushSubscriptionJSON) {
     const uid = await this.requireUid()

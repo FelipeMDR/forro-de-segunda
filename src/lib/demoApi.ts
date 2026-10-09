@@ -1,3 +1,4 @@
+import { decidirPassada } from '../../supabase/functions/_shared/djPuro'
 import type { ForroApi } from './api'
 import {
   addDays,
@@ -8,11 +9,14 @@ import {
   proximaOcorrencia,
   toISODate,
 } from './dates'
+import { CATALOGO_DEMO, DURACAO_DEMO_MS, PLAYLIST_DEMO } from './catalogoDemo'
+import { podeSerDJ } from './dj'
 import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
+import { ordenarFila } from './filaMusica'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
@@ -34,26 +38,34 @@ import type {
   ChallengeInput,
   ChallengeJanela,
   ChallengeLocal,
-  CheckinFavorito,
   CheckinComReacoes,
+  CheckinFavorito,
   Comment,
+  ConexaoDJ,
   ConfirmacaoPresenca,
   DistintivoDef,
-  Modalidade,
-  Notificacao,
-  ParceiroDanca,
-  ParceiroPossivel,
   DistintivoDefInput,
   DistintivoRecebedor,
+  FaixaSpotify,
   FeedItem,
   Feriado,
   FeriadoInput,
+  Modalidade,
+  Notificacao,
   Papel,
   PapelDanca,
+  ParceiroDanca,
+  ParceiroPossivel,
+  PedidoMusica,
+  PedidoNaFila,
   PerfilPublico,
   Profile,
   RankingEntry,
   Report,
+  ResultadoConexao,
+  ResultadoLigarDJ,
+  SessaoDJ,
+  StatusPedido,
   Turma,
 } from './types'
 
@@ -156,6 +168,38 @@ interface DB {
     user_id: string
     concedido_em: string
   }[]
+  // ---- Modo DJ (migração 029) — opcionais: bancos demo antigos não têm ----
+  djConexoes?: Record<string, { spotify_nome: string; plano: string }>
+  djSessoes?: Array<{
+    id: string
+    dj_user_id: string
+    noite: string
+    aberta_em: string
+    fechada_em: string | null
+    motivo_fechamento: string | null
+    tocando_pedido_id: string | null
+  }>
+  pedidosMusica?: Array<{
+    id: string
+    noite: string
+    user_id: string
+    uri: string
+    titulo: string
+    artista: string
+    capa_url: string | null
+    duracao_ms: number
+    pedido_em: string
+    status: StatusPedido
+    enviado_em: string | null
+    tocou_em: string | null
+  }>
+  /** O "Spotify de mentira": o que toca, desde quando, e a fila dele. */
+  djSim?: {
+    tocandoUri: string
+    desde: number
+    filaSpotify: string[]
+    playlistIdx: number
+  } | null
 }
 
 const DB_KEY = 'fds-demo-db-v10'
@@ -1987,6 +2031,291 @@ export class DemoApi implements ForroApi {
   }
 
   // ---- Push ----
+
+  // ---- Modo DJ e pedidos de música (espelha a migração 029) ----
+
+  private sessaoAberta() {
+    return (this.db.djSessoes ?? []).find((s) => s.fechada_em === null) ?? null
+  }
+
+  private pedidosDe(noite: string) {
+    return (this.db.pedidosMusica ?? []).filter((p) => p.noite === noite)
+  }
+
+  private comPerfil<T extends { user_id: string }>(p: T) {
+    const perfil = this.db.profiles.find((x) => x.id === p.user_id)
+    return { ...p, nome: perfil?.nome ?? 'Alguém', avatar_url: perfil?.avatar_url ?? null }
+  }
+
+  /**
+   * O "Spotify de mentira" anda até agora: uma música a cada
+   * DURACAO_DEMO_MS. A cada música que acaba, roda a MESMA decisão do
+   * loop de produção (decidirPassada), como se o cron passasse ali.
+   *
+   * `passadaAgora` só vem do "cutucar" (ligar o Modo DJ), como em
+   * produção: LER a fila nunca manda pedido ao Spotify — só o loop.
+   */
+  private avancarDJ(passadaAgora = false) {
+    const s = this.sessaoAberta()
+    if (!s) return
+    if (!this.db.djSim) {
+      this.db.djSim = {
+        tocandoUri: PLAYLIST_DEMO[0].uri,
+        desde: Date.now(),
+        filaSpotify: [],
+        playlistIdx: 0,
+      }
+    }
+    const sim = this.db.djSim
+    while (Date.now() - sim.desde >= DURACAO_DEMO_MS) {
+      sim.desde += DURACAO_DEMO_MS
+      const proxima = sim.filaSpotify.shift()
+      if (proxima) {
+        sim.tocandoUri = proxima
+      } else {
+        sim.playlistIdx = (sim.playlistIdx + 1) % PLAYLIST_DEMO.length
+        sim.tocandoUri = PLAYLIST_DEMO[sim.playlistIdx].uri
+      }
+      this.passadaDJ(new Date(sim.desde))
+      if (!this.sessaoAberta()) break
+    }
+    if (passadaAgora && this.sessaoAberta()) this.passadaDJ(new Date())
+    this.persist()
+  }
+
+  private passadaDJ(agora: Date) {
+    const s = this.sessaoAberta()
+    const sim = this.db.djSim
+    if (!s || !sim) return
+    const pedidos = this.pedidosDe(s.noite)
+    const pendente =
+      pedidos
+        .filter((p) => p.status === 'enviado')
+        .sort((a, b) => (b.enviado_em ?? '').localeCompare(a.enviado_em ?? ''))[0] ?? null
+    const fila = ordenarFila(pedidos)
+    const tocando = CATALOGO_DEMO.find((f) => f.uri === sim.tocandoUri) ?? PLAYLIST_DEMO[0]
+
+    const acao = decidirPassada({
+      agora,
+      noite: s.noite,
+      temConexao: Boolean(this.db.djConexoes?.[s.dj_user_id]),
+      player: { tocando, filaUris: sim.filaSpotify },
+      enviadoPendente: pendente ? { id: pendente.id, trackUri: pendente.uri } : null,
+      temProximo: fila.length > 0,
+    })
+    if (acao.tipo === 'fechar') {
+      s.fechada_em = agora.toISOString()
+      s.motivo_fechamento = acao.motivo
+      return
+    }
+    if (acao.tipo !== 'passada') return
+    if (acao.marcarTocou && pendente) {
+      pendente.status = 'tocou'
+      pendente.tocou_em = agora.toISOString()
+    }
+    s.tocando_pedido_id =
+      pedidos.find(
+        (p) => p.uri === sim.tocandoUri && (p.status === 'enviado' || p.status === 'tocou'),
+      )?.id ?? null
+    if (acao.enviar && fila[0]) {
+      const proximo = pedidos.find((p) => p.id === fila[0].id)!
+      proximo.status = 'enviado'
+      proximo.enviado_em = agora.toISOString()
+      sim.filaSpotify.push(proximo.uri)
+    }
+  }
+
+  async minhaConexaoDJ(): Promise<ConexaoDJ> {
+    const c = this.db.djConexoes?.[this.uid()]
+    return c
+      ? { conectado: true, spotify_nome: c.spotify_nome, plano: c.plano }
+      : { conectado: false, spotify_nome: null, plano: null }
+  }
+
+  async conectarSpotify(_code: string, _redirectUri: string): Promise<ResultadoConexao> {
+    const uid = this.uid()
+    const perfil = this.db.profiles.find((p) => p.id === uid)
+    if (!perfil || !podeSerDJ(perfil.cargos, this.db.roles[uid] ?? 'aluno')) {
+      throw new Error('Só professores podem ser DJ')
+    }
+    // No demo não há Spotify: a conexão só fica marcada como feita
+    this.db.djConexoes = {
+      ...(this.db.djConexoes ?? {}),
+      [uid]: { spotify_nome: perfil.nome, plano: 'premium' },
+    }
+    this.persist()
+    return 'ok'
+  }
+
+  async desconectarSpotify() {
+    const uid = this.uid()
+    const s = this.sessaoAberta()
+    if (s?.dj_user_id === uid) {
+      s.fechada_em = new Date().toISOString()
+      s.motivo_fechamento = 'desligou'
+    }
+    if (this.db.djConexoes) delete this.db.djConexoes[uid]
+    this.persist()
+  }
+
+  async sessaoDJAberta(): Promise<SessaoDJ | null> {
+    this.avancarDJ()
+    const s = this.sessaoAberta()
+    if (!s) return null
+    const sim = this.db.djSim
+    const tocando = sim ? CATALOGO_DEMO.find((f) => f.uri === sim.tocandoUri) : undefined
+    const pedido = s.tocando_pedido_id
+      ? (this.db.pedidosMusica ?? []).find((p) => p.id === s.tocando_pedido_id)
+      : undefined
+    return {
+      id: s.id,
+      dj_user_id: s.dj_user_id,
+      dj_nome: this.db.profiles.find((p) => p.id === s.dj_user_id)?.nome ?? 'Alguém',
+      noite: s.noite,
+      aberta_em: s.aberta_em,
+      aviso: null,
+      tocando: tocando
+        ? {
+            titulo: tocando.titulo,
+            artista: tocando.artista,
+            capa_url: tocando.capa_url,
+            pedido_id: pedido?.id ?? null,
+            pedido_por: pedido ? this.comPerfil(pedido).nome : null,
+          }
+        : null,
+      atualizado_em: new Date().toISOString(),
+    }
+  }
+
+  async ligarModoDJ(assumir: boolean): Promise<ResultadoLigarDJ> {
+    const uid = this.uid()
+    const perfil = this.db.profiles.find((p) => p.id === uid)
+    if (!perfil || !podeSerDJ(perfil.cargos, this.db.roles[uid] ?? 'aluno')) {
+      throw new Error('Só professores podem ligar o Modo DJ')
+    }
+    if (!this.db.djConexoes?.[uid]) {
+      throw new Error('Conecte seu Spotify antes de ligar o Modo DJ')
+    }
+    const aberta = this.sessaoAberta()
+    if (aberta) {
+      if (aberta.dj_user_id === uid) return { tipo: 'ligado' }
+      if (!assumir) {
+        return {
+          tipo: 'ocupado',
+          dj_nome: this.db.profiles.find((p) => p.id === aberta.dj_user_id)?.nome ?? 'Alguém',
+        }
+      }
+      aberta.fechada_em = new Date().toISOString()
+      aberta.motivo_fechamento = 'assumida'
+    }
+    this.db.djSessoes = [
+      ...(this.db.djSessoes ?? []),
+      {
+        id: uuid(),
+        dj_user_id: uid,
+        noite: diaDaNoite(new Date()),
+        aberta_em: new Date().toISOString(),
+        fechada_em: null,
+        motivo_fechamento: null,
+        tocando_pedido_id: null,
+      },
+    ]
+    // Spotify de mentira recomeça com a playlist
+    this.db.djSim = null
+    this.persist()
+    return { tipo: 'ligado' }
+  }
+
+  async desligarModoDJ() {
+    const uid = this.uid()
+    const s = this.sessaoAberta()
+    if (s && (s.dj_user_id === uid || this.db.roles[uid] === 'organizador')) {
+      s.fechada_em = new Date().toISOString()
+      s.motivo_fechamento = 'desligou'
+      this.persist()
+    }
+  }
+
+  async cutucarLoopDJ() {
+    this.avancarDJ(true)
+  }
+
+  async buscarMusicas(q: string) {
+    const normal = (t: string) =>
+      t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    const termo = normal(q.trim())
+    if (termo.length < 2) return []
+    return CATALOGO_DEMO.filter((f) => normal(`${f.titulo} ${f.artista}`).includes(termo))
+  }
+
+  async pedirMusica(f: FaixaSpotify) {
+    const uid = this.uid()
+    const s = this.sessaoAberta()
+    if (!s) throw new Error('O Modo DJ não está ligado agora')
+    const temCheckin = this.db.checkins.some(
+      (c) =>
+        c.user_id === uid &&
+        !c.presenca_anulada &&
+        diaDaNoite(new Date(c.criado_em)) === s.noite,
+    )
+    if (!temCheckin) throw new Error('Faça seu check-in para pedir música')
+    if (this.pedidosDe(s.noite).some((p) => p.uri === f.uri && p.status !== 'cancelado')) {
+      throw new Error('Essa música já foi pedida hoje')
+    }
+    this.db.pedidosMusica = [
+      ...(this.db.pedidosMusica ?? []),
+      {
+        id: uuid(),
+        noite: s.noite,
+        user_id: uid,
+        uri: f.uri,
+        titulo: f.titulo,
+        artista: f.artista,
+        capa_url: f.capa_url,
+        duracao_ms: f.duracao_ms,
+        pedido_em: new Date().toISOString(),
+        status: 'esperando',
+        enviado_em: null,
+        tocou_em: null,
+      },
+    ]
+    this.persist()
+  }
+
+  async cancelarPedido(id: string) {
+    const uid = this.uid()
+    const p = (this.db.pedidosMusica ?? []).find((x) => x.id === id)
+    if (!p) throw new Error('Pedido não encontrado')
+    if (p.status !== 'esperando') throw new Error('Esse pedido já foi para o Spotify')
+    const dj = this.sessaoAberta()?.dj_user_id
+    if (p.user_id !== uid && dj !== uid && this.db.roles[uid] !== 'organizador') {
+      throw new Error('Você só pode cancelar os seus pedidos')
+    }
+    p.status = 'cancelado'
+    this.persist()
+  }
+
+  async filaDaNoite(): Promise<PedidoNaFila[]> {
+    this.avancarDJ()
+    const s = this.sessaoAberta()
+    if (!s) return []
+    return ordenarFila(this.pedidosDe(s.noite)).map((p) => this.comPerfil(p))
+  }
+
+  async pedidosDaNoite(): Promise<PedidoMusica[]> {
+    this.avancarDJ()
+    const s = this.sessaoAberta()
+    if (!s) return []
+    return this.pedidosDe(s.noite)
+      .filter((p) => p.status !== 'cancelado')
+      .map((p) => this.comPerfil(p))
+  }
+
+  async musicasTocadasDe(userId: string) {
+    return (this.db.pedidosMusica ?? []).filter(
+      (p) => p.user_id === userId && p.status === 'tocou',
+    ).length
+  }
 
   async savePushSubscription() {
     // Sem backend no modo demo — nada a fazer.
