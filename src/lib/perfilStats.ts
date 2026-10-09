@@ -41,6 +41,7 @@ export async function carregarPerfilStats(
     desafios,
     feriados,
     aberturas,
+    musicasTocadas,
   ] = await Promise.all([
     api.checkinsDe(userId),
     api.contarDesafios(userId),
@@ -52,6 +53,8 @@ export async function carregarPerfilStats(
     api.listChallenges().catch(() => [] as Challenge[]),
     api.listFeriados().catch(() => [] as Feriado[]),
     api.listAberturas().catch(() => [] as AberturaAntecipada[]),
+    // Sem a migração 029 a tabela não existe — o perfil vale sem isso
+    api.musicasTocadasDe(userId).catch(() => 0),
   ])
 
   // Uma noite só entra na conta se a foto marcou ponto em algum desafio
@@ -78,6 +81,7 @@ export async function carregarPerfilStats(
       distintivosCustom,
       checkinDates: datas,
       parceiros: parceiros.length,
+      musicasTocadas,
     }),
   }
 }

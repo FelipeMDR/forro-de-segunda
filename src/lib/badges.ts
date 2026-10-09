@@ -55,6 +55,18 @@ const MARCOS_RODIZIO: Marco[] = [
   [50, '🪩', 'Dançou com 50 pessoas'],
 ]
 
+/**
+ * DJ do Espaço Livre: pedidos que DE FATO tocaram (o loop viu tocando),
+ * não os que ficaram esperando quando a fila fechou. 🪩 já é do
+ * rodízio, por isso o último nível é 🔊.
+ */
+const MARCOS_DJ: Marco[] = [
+  [1, '🎵', 'Primeira música tocada'],
+  [10, '🎶', '10 músicas tocadas'],
+  [25, '🎧', '25 músicas tocadas'],
+  [50, '🔊', '50 músicas tocadas'],
+]
+
 export function computeBadges(input: {
   userId: string
   turmas: TurmaMembro[]
@@ -73,6 +85,8 @@ export function computeBadges(input: {
    * marcando gente que nem dançou com você.
    */
   parceiros?: number
+  /** Pedidos de música que tocaram no Espaço Livre (migração 029). */
+  musicasTocadas?: number
 }): Badge[] {
   const badges: Badge[] = []
 
@@ -136,6 +150,21 @@ export function computeBadges(input: {
       descricao: `${parceiros} ${
         parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
       }`,
+    })
+  }
+
+  // 2.6 DJ do Espaço Livre — músicas pedidas que tocaram
+  const tocadas = input.musicasTocadas ?? 0
+  const dj = marcoAlcancado(MARCOS_DJ, tocadas)
+  if (dj) {
+    const [minimo, emoji, titulo] = dj
+    badges.push({
+      id: `dj-${minimo}`,
+      emoji,
+      titulo,
+      descricao: `${tocadas} ${
+        tocadas === 1 ? 'música tocada' : 'músicas tocadas'
+      } no Espaço Livre`,
     })
   }
 
