@@ -8,6 +8,7 @@ import { podeSerDJ } from '../lib/dj'
 import { proximasNaTela } from '../lib/filaMusica'
 import type { ConexaoDJ, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
+import { useSessaoDJAoVivo } from '../lib/useSessaoDJAoVivo'
 
 const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
   sem_aparelho:
@@ -44,7 +45,10 @@ export function DJPage() {
     setFila(f)
     setPedidos(p)
   }, [api, pode])
-  useAtualizacaoPeriodica(carregar, 30_000)
+  // A troca de música chega na hora, pela sessão (tempo real); a busca
+  // periódica fica só para pedidos novos de outras pessoas
+  useSessaoDJAoVivo(api, carregar)
+  useAtualizacaoPeriodica(carregar, 120_000)
 
   const ligar = async (assumir: boolean) => {
     setOcupado(true)

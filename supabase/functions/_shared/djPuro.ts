@@ -132,6 +132,32 @@ export function destinoDoPedidoRecusado(status: number): 'devolver' | 'descartar
   return 'descartar'
 }
 
+/** O que o loop grava na sessão e a tela mostra. */
+export interface EstadoSessao {
+  tocando_uri: string | null
+  tocando_pedido_id: string | null
+  aviso: 'sem_aparelho' | 'sem_premium' | null
+}
+
+/**
+ * Só o que mudou, ou null se nada mudou.
+ *
+ * A tela escuta a linha da sessão em tempo real: cada gravação vira um
+ * evento para todo mundo com a tela aberta, e cada evento, uma recarga.
+ * Gravar a cada passada (a cada 15 s) seria um evento a cada 15 s por
+ * pessoa, mesmo com a mesma música tocando. Gravando só a mudança, é um
+ * evento por música — o que a tela de fato precisa saber.
+ */
+export function camposQueMudaram(
+  atual: EstadoSessao,
+  novo: Partial<EstadoSessao>,
+): Partial<EstadoSessao> | null {
+  const mudou = (Object.keys(novo) as Array<keyof EstadoSessao>).some(
+    (k) => novo[k] !== atual[k],
+  )
+  return mudou ? novo : null
+}
+
 export type AcaoLoop =
   | { tipo: 'fechar'; motivo: 'virada' | 'conexao_perdida' }
   | { tipo: 'sem_aparelho' }

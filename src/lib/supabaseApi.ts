@@ -2644,6 +2644,16 @@ export class SupabaseApi implements ForroApi {
     }
   }
 
+  assinarSessaoDJ(cb: () => void) {
+    const channel = this.sb
+      .channel('dj-sessao')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dj_sessoes' }, cb)
+      .subscribe()
+    return () => {
+      void this.sb.removeChannel(channel)
+    }
+  }
+
   async buscarMusicas(q: string) {
     const r = await this.invocar<{ faixas: FaixaSpotify[] }>('spotify-buscar', { q })
     return r.faixas

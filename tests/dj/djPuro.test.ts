@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  camposQueMudaram,
   decidirPassada,
   destinoDoPedidoRecusado,
   estadoDoPlayer,
@@ -203,5 +204,37 @@ describe('destinoDoPedidoRecusado', () => {
     for (const status of [400, 404, 410]) {
       expect(destinoDoPedidoRecusado(status)).toBe('descartar')
     }
+  })
+})
+
+describe('camposQueMudaram', () => {
+  const atual = { tocando_uri: 'spotify:track:a', tocando_pedido_id: null, aviso: null }
+
+  it('mesma música e mesmo aviso: nada para gravar (e nenhum evento de tempo real)', () => {
+    expect(camposQueMudaram(atual, { ...atual })).toBeNull()
+  })
+
+  it('a música trocou: grava', () => {
+    expect(camposQueMudaram(atual, { ...atual, tocando_uri: 'spotify:track:b' })).toEqual({
+      tocando_uri: 'spotify:track:b',
+      tocando_pedido_id: null,
+      aviso: null,
+    })
+  })
+
+  it('o pedido que toca foi reconhecido (mesma música): grava', () => {
+    expect(camposQueMudaram(atual, { ...atual, tocando_pedido_id: 'p1' })).not.toBeNull()
+  })
+
+  it('o aviso apareceu ou sumiu: grava', () => {
+    expect(camposQueMudaram(atual, { ...atual, aviso: 'sem_aparelho' })).not.toBeNull()
+    expect(
+      camposQueMudaram({ ...atual, aviso: 'sem_aparelho' }, { ...atual, aviso: null }),
+    ).not.toBeNull()
+  })
+
+  it('só compara os campos pedidos: o aviso sozinho não apaga a música', () => {
+    expect(camposQueMudaram(atual, { aviso: 'sem_premium' })).toEqual({ aviso: 'sem_premium' })
+    expect(camposQueMudaram(atual, { aviso: null })).toBeNull()
   })
 })

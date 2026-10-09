@@ -121,6 +121,21 @@ describe('DemoApi — pedidos de música', () => {
     expect(await api.buscarMusicas('x')).toEqual([])
   })
 
+  it('quem assina a sessão é avisado quando ela pode ter mudado, e para ao cancelar', async () => {
+    // O beforeEach só falsifica o Date; aqui o setInterval também precisa
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    const { DemoApi } = await import('../../src/lib/demoApi')
+    const api = new DemoApi()
+    let avisos = 0
+    const cancelar = api.assinarSessaoDJ(() => avisos++)
+    vi.advanceTimersByTime(5_000)
+    expect(avisos).toBe(1)
+    cancelar()
+    vi.advanceTimersByTime(20_000)
+    expect(avisos).toBe(1)
+  })
+
   it('a busca devolve no máximo 5 músicas', async () => {
     const { DemoApi } = await import('../../src/lib/demoApi')
     const api = new DemoApi()

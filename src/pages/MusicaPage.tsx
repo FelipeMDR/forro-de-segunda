@@ -8,6 +8,7 @@ import { diaDaNoite } from '../lib/dates'
 import { proximasNaTela } from '../lib/filaMusica'
 import type { FaixaSpotify, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
+import { useSessaoDJAoVivo } from '../lib/useSessaoDJAoVivo'
 
 /** "toca daqui a ~N músicas" a partir da posição na lista de próximas. */
 function quando(posicao: number, naFilaDoSpotify: boolean): string {
@@ -51,7 +52,10 @@ export function MusicaPage() {
       if (tem) checkinConfirmadoNa.current = s.noite
     }
   }, [api, userId])
-  useAtualizacaoPeriodica(carregar, 30_000)
+  // A troca de música chega na hora, pela sessão (tempo real); a busca
+  // periódica fica só para pedidos novos de outras pessoas
+  useSessaoDJAoVivo(api, carregar)
+  useAtualizacaoPeriodica(carregar, 120_000)
 
   // Só ao enviar o formulário: buscar a cada tecla multiplicaria as
   // chamadas (e os logs) por dez

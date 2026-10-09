@@ -2243,6 +2243,16 @@ export class DemoApi implements ForroApi {
     this.avancarDJ(true)
   }
 
+  /**
+   * No demo não há banco para escutar: a cada 5 s avisa que a sessão
+   * pode ter mudado, e a leitura que a tela faz em seguida anda o
+   * Spotify de mentira. Tudo local, sem custo nenhum.
+   */
+  assinarSessaoDJ(cb: () => void) {
+    const timer = setInterval(cb, 5_000)
+    return () => clearInterval(timer)
+  }
+
   async buscarMusicas(q: string) {
     const normal = (t: string) =>
       t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

@@ -1,15 +1,17 @@
 // Edge Function: o loop do Modo DJ.
 //
-// O pg_cron chama a cada minuto, mas SÓ quando há sessão aberta (ver o
-// agendamento no topo da migração 029); o app chama uma vez quando o
-// professor liga o Modo DJ, para o primeiro pedido não esperar o
-// minuto virar. Cada passada faz uma leitura do player do professor e,
-// no máximo, um envio. O que decidir mora em `_shared/djPuro.ts`.
+// O pg_cron chama a cada 15 s, mas SÓ quando há sessão aberta (ver a
+// migração 031); o app chama uma vez quando o professor liga o Modo
+// DJ, para o primeiro pedido não esperar a próxima passada. Cada
+// passada faz uma leitura do player do professor e, no máximo, um
+// envio, e só grava a sessão quando algo muda — a tela escuta essa
+// linha em tempo real. O que decidir mora em `_shared/djPuro.ts`.
 //
 // Publicar: npx supabase functions deploy dj-loop
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import {
+  camposQueMudaram,
   decidirPassada,
   destinoDoPedidoRecusado,
   estadoDoPlayer,
@@ -17,6 +19,7 @@ import {
   mesclarToken,
   precisaRenovar,
   type EstadoPlayer,
+  type EstadoSessao,
 } from '../_shared/djPuro.ts'
 import { cors, json } from '../_shared/http.ts'
 import { chamarSpotify, ErroSpotify, pedirToken } from '../_shared/spotify.ts'
@@ -69,7 +72,7 @@ Deno.serve(async (req) => {
 
   const { data: sessao } = await admin
     .from('dj_sessoes')
-    .select('id, dj_user_id, noite')
+    .select('id, dj_user_id, noite, tocando_uri, tocando_pedido_id, aviso')
     .is('fechada_em', null)
     .maybeSingle()
   if (!sessao) return json({ feito: 'sem_sessao' })
@@ -94,6 +97,22 @@ Deno.serve(async (req) => {
   const agoraIso = () => new Date().toISOString()
   const atualizarSessao = (campos: Record<string, unknown>) =>
     admin.from('dj_sessoes').update(campos).eq('id', sessao.id)
+
+  // A tela escuta esta linha em tempo real: só grava o que mudou, para
+  // virar um evento por música, e não um a cada passada (ver
+  // camposQueMudaram). `extras` vai junto só quando há mudança.
+  const atual: EstadoSessao = {
+    tocando_uri: sessao.tocando_uri,
+    tocando_pedido_id: sessao.tocando_pedido_id,
+    aviso: sessao.aviso,
+  }
+  const gravarSeMudou = async (
+    novo: Partial<EstadoSessao>,
+    extras: Record<string, unknown> = {},
+  ) => {
+    const mudou = camposQueMudaram(atual, novo)
+    if (mudou) await atualizarSessao({ ...mudou, ...extras, atualizado_em: agoraIso() })
+  }
 
   // A virada das 5h vem ANTES de qualquer chamada ao Spotify: se o
   // Spotify falhasse depois das 5h, a sessão nunca fecharia, o cron
@@ -169,7 +188,7 @@ Deno.serve(async (req) => {
       return json({ feito: acao.motivo })
     }
     if (acao.tipo === 'sem_aparelho' || !player || !token) {
-      await atualizarSessao({ aviso: 'sem_aparelho', atualizado_em: agoraIso() })
+      await gravarSeMudou({ aviso: 'sem_aparelho' })
       return json({ feito: 'sem_aparelho' })
     }
 
@@ -189,15 +208,18 @@ Deno.serve(async (req) => {
       .eq('track_uri', player.tocando.uri)
       .in('status', ['enviado', 'tocou'])
       .maybeSingle()
-    await atualizarSessao({
-      aviso: null,
-      tocando_uri: player.tocando.uri,
-      tocando_titulo: player.tocando.titulo,
-      tocando_artista: player.tocando.artista,
-      tocando_capa: player.tocando.capa_url,
-      tocando_pedido_id: pedidoTocando?.id ?? null,
-      atualizado_em: agoraIso(),
-    })
+    await gravarSeMudou(
+      {
+        aviso: null,
+        tocando_uri: player.tocando.uri,
+        tocando_pedido_id: pedidoTocando?.id ?? null,
+      },
+      {
+        tocando_titulo: player.tocando.titulo,
+        tocando_artista: player.tocando.artista,
+        tocando_capa: player.tocando.capa_url,
+      },
+    )
 
     // Vai na resposta: "enviar: true" sem música enviada é a pista de que
     // a reserva desistiu (outra passada mandou antes) ou a fila esvaziou
@@ -236,15 +258,15 @@ Deno.serve(async (req) => {
     return json({ feito: 'passada', acao, enviou })
   } catch (e) {
     if (e instanceof ErroSpotify && e.status === 403) {
-      await atualizarSessao({ aviso: 'sem_premium', atualizado_em: agoraIso() })
+      await gravarSeMudou({ aviso: 'sem_premium' })
       return json({ feito: 'sem_premium' })
     }
     if (e instanceof ErroSpotify && e.status === 404) {
-      await atualizarSessao({ aviso: 'sem_aparelho', atualizado_em: agoraIso() })
+      await gravarSeMudou({ aviso: 'sem_aparelho' })
       return json({ feito: 'sem_aparelho' })
     }
     if (e instanceof ErroSpotify && e.status === 429) {
-      // O Spotify pediu calma: o próximo minuto tenta de novo
+      // O Spotify pediu calma: a próxima passada tenta de novo
       return json({ feito: 'esperar' })
     }
     console.error('[dj-loop]', e)

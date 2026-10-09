@@ -143,6 +143,14 @@ from (values
   (
     '030 — agendamento consegue chamar o dj-loop',
     exists (select 1 from pg_proc where proname = 'dj_loop_autorizado')
+  ),
+  (
+    '031 — tempo real na sessao do DJ e loop a cada 15 s',
+    exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public'
+        and tablename = 'dj_sessoes'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

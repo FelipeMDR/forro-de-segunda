@@ -492,6 +492,14 @@ export interface ForroApi {
   desligarModoDJ(): Promise<void>
   /** Roda uma passada do loop agora (ao ligar), sem esperar o cron. */
   cutucarLoopDJ(): Promise<void>
+  /**
+   * Avisa quando a sessão de DJ muda — na prática, quando troca a
+   * música que está tocando. Devolve a função que cancela a assinatura.
+   *
+   * É o único tempo real do Modo DJ, e é barato de propósito: o loop só
+   * grava a sessão quando algo muda, então é um aviso por música.
+   */
+  assinarSessaoDJ(cb: () => void): () => void
   /** Busca no Spotify. Só ao enviar o formulário — nunca a cada tecla. */
   buscarMusicas(q: string): Promise<FaixaSpotify[]>
   pedirMusica(f: FaixaSpotify): Promise<void>
