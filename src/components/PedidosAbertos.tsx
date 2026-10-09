@@ -41,8 +41,16 @@ export function PedidosAbertos() {
   if (!sessao) return null
 
   return (
-    <Link to="/musica" className="card flex items-center gap-3 border-brasa-500/40 p-4">
-      <span className="text-2xl">🎶</span>
+    <Link
+      to="/musica"
+      className="card brilho-pedidos flex items-center gap-3 border-brasa-500/40 p-4"
+    >
+      {/* Equalizador animado (index.css): "tem música tocando agora" */}
+      <span className="equalizador shrink-0 px-1" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-extrabold">Pedidos de música abertos</p>
         <p className="truncate text-xs text-tinta-600">
