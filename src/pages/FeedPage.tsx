@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AceiteTermos } from '../components/AceiteTermos'
+import { PedidosAbertos } from '../components/PedidosAbertos'
 import { PedirNome } from '../components/PedirNome'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
@@ -418,6 +419,7 @@ export function FeedPage() {
       {/* Quem ficou com o nome de preenchimento também é perguntado
           aqui: é a única tela que todo mundo abre. */}
       <PedirNome />
+      <PedidosAbertos />
       <InstallPrompt />
       <AgendaCard
         ocorrencias={agenda}
