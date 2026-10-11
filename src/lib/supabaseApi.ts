@@ -9,6 +9,7 @@ import {
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
+import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
@@ -2738,6 +2739,25 @@ export class SupabaseApi implements ForroApi {
       status: r.status,
       enviado_em: r.enviado_em,
     }))
+  }
+
+  async musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]> {
+    // Um semestre de pedidos de uma pessoa fica longe das 1000 linhas
+    const rows = ok(
+      await this.sb
+        .from('pedidos_musica')
+        .select('track_uri, titulo, artista, capa_url, tocou_em')
+        .eq('user_id', userId)
+        .eq('status', 'tocou')
+        .gte('tocou_em', desde),
+    ) as Array<{
+      track_uri: string
+      titulo: string
+      artista: string
+      capa_url: string | null
+      tocou_em: string
+    }>
+    return rows.map(({ track_uri, ...r }) => ({ ...r, uri: track_uri }))
   }
 
   async musicasTocadasDe(userId: string) {

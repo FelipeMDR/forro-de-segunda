@@ -18,6 +18,7 @@ import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
 import { compactarNotificacoes } from './notificacoes'
+import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
   CARGOS_PADRAO,
@@ -2324,6 +2325,21 @@ export class DemoApi implements ForroApi {
     return this.pedidosDe(s.noite)
       .filter((p) => p.status !== 'cancelado')
       .map((p) => this.comPerfil(p))
+  }
+
+  async musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]> {
+    return (this.db.pedidosMusica ?? [])
+      .filter(
+        (p) =>
+          p.user_id === userId && p.status === 'tocou' && p.tocou_em !== null && p.tocou_em >= desde,
+      )
+      .map((p) => ({
+        uri: p.uri,
+        titulo: p.titulo,
+        artista: p.artista,
+        capa_url: p.capa_url,
+        tocou_em: p.tocou_em!,
+      }))
   }
 
   async musicasTocadasDe(userId: string) {

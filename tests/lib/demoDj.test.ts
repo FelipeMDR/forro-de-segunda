@@ -88,6 +88,11 @@ describe('DemoApi — pedidos de música', () => {
     }
     expect(tocadas).toEqual([m1.titulo, j1.titulo, m2.titulo, m3.titulo])
     expect(await api.musicasTocadasDe(maria)).toBe(3)
+    // A retrospectiva lê as tocadas a partir do início do semestre
+    const doSemestre = await api.musicasTocadasDesde(maria, '2026-01-01T00:00:00.000Z')
+    expect(doSemestre.map((t) => t.titulo).sort()).toEqual([m1.titulo, m2.titulo, m3.titulo].sort())
+    expect(doSemestre[0]).toHaveProperty('tocou_em')
+    expect(await api.musicasTocadasDesde(maria, '2027-01-01T00:00:00.000Z')).toEqual([])
     expect(await api.musicasTocadasDe(joao)).toBe(1)
     expect((await api.sessaoDJAberta())!.tocando!.pedido_por).toBe(
       (await api.getProfile(maria))!.nome,

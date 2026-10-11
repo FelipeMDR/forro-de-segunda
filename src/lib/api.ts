@@ -1,4 +1,5 @@
 import type { Coordenada } from './geo'
+import type { MusicaTocada } from './retrospectiva'
 import type { PessoaMatricula } from './matricula'
 import type {
   AberturaAntecipada,
@@ -510,6 +511,11 @@ export interface ForroApi {
   pedidosDaNoite(): Promise<PedidoMusica[]>
   /** Quantos pedidos dessa pessoa de fato tocaram — o distintivo de DJ. */
   musicasTocadasDe(userId: string): Promise<number>
+  /**
+   * Os pedidos dessa pessoa que tocaram a partir de `desde` (ISO) — a
+   * retrospectiva usa o início do semestre e escolhe a "música dela".
+   */
+  musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]>
 
   // ---- Push (Fase 4) ----
   savePushSubscription(sub: PushSubscriptionJSON): Promise<void>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { CapaAlbum } from '../components/LinhaPedido'
 import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +10,8 @@ import { diasSuspensos, mapaAberturas } from '../lib/dates'
 import {
   fraseDaRetrospectiva,
   montarRetrospectiva,
+  musicaMaisTocada,
+  type MusicaDoSemestre,
   type Retrospectiva,
 } from '../lib/retrospectiva'
 
@@ -78,6 +81,7 @@ export function RetrospectivaPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [r, setR] = useState<Retrospectiva | null>(null)
+  const [musica, setMusica] = useState<MusicaDoSemestre | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [gerando, setGerando] = useState(false)
   const cardRef = useRef<HTMLCanvasElement | null>(null)
@@ -96,15 +100,18 @@ export function RetrospectivaPage() {
           .catch(() => null)
         const desde =
           ultimoEncerramento ?? profile?.criado_em ?? new Date(0).toISOString()
-        const [checkins, parceiros, desafios, feriados, aberturas] =
+        const [checkins, parceiros, desafios, feriados, aberturas, tocadas] =
           await Promise.all([
             api.checkinsComReacoes(userId, desde),
             api.parceirosDe(userId, desde).catch(() => []),
             api.listChallenges().catch(() => []),
             api.listFeriados().catch(() => []),
             api.listAberturas().catch(() => []),
+            // Sem a migração 029 a tabela não existe — o cartão some
+            api.musicasTocadasDesde(userId, desde).catch(() => []),
           ])
         if (cancelado) return
+        setMusica(musicaMaisTocada(tocadas))
         setR(
           montarRetrospectiva(checkins, parceiros, new Date(desde), {
             desafios,
@@ -217,6 +224,25 @@ export function RetrospectivaPage() {
             <p className="text-xs text-tinta-500">
               {r.parceiroTop.noites}{' '}
               {r.parceiroTop.noites === 1 ? 'noite' : 'noites'} juntos
+            </p>
+          </div>
+        </div>
+      )}
+
+      {musica && (
+        <div className="card flex items-center gap-3 p-5">
+          <CapaAlbum url={musica.capa_url} tamanho={56} />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase text-tinta-500">
+              Sua música no Espaço Livre 🎶
+            </p>
+            <p className="truncate font-bold">{musica.titulo}</p>
+            <p className="truncate text-xs text-tinta-600">{musica.artista}</p>
+            <p className="text-xs text-tinta-500">
+              tocou {musica.vezes} {musica.vezes === 1 ? 'vez' : 'vezes'} ·{' '}
+              {musica.total}{' '}
+              {musica.total === 1 ? 'música sua tocou' : 'músicas suas tocaram'} no
+              semestre
             </p>
           </div>
         </div>
