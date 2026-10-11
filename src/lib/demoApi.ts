@@ -969,6 +969,22 @@ export class DemoApi implements ForroApi {
     this.notifyFeed()
   }
 
+  async editarLegenda(checkinId: string, legenda: string) {
+    // Mesmas travas da função editar_legenda (migração 032)
+    const c = this.db.checkins.find((x) => x.id === checkinId)
+    if (!c) throw new Error('Check-in não encontrado')
+    if (c.user_id !== this.uid()) {
+      throw new Error('Você só pode editar os seus próprios check-ins')
+    }
+    const nova = legenda.trim()
+    if (nova.length > 200) {
+      throw new Error('A legenda pode ter no máximo 200 caracteres')
+    }
+    c.legenda = nova || null
+    this.persist()
+    this.notifyFeed()
+  }
+
   async deleteCheckin(id: string) {
     this.db.checkins = this.db.checkins.filter((c) => c.id !== id)
     this.db.reactions = this.db.reactions.filter((r) => r.checkin_id !== id)

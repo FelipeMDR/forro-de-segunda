@@ -536,9 +536,9 @@ create trigger profiles_protege_telefone
   before update on public.profiles
   for each row execute function public.protege_telefone();
 
--- Favoritar é a ÚNICA alteração permitida num check-in — por isso uma
--- função em vez de policy de update (que deixaria o dono trocar foto e
--- legenda depois de publicadas). O teto de 12 existe porque favorito
+-- Check-in não tem policy de update: favoritar e editar a legenda são as
+-- ÚNICAS alterações permitidas, cada uma pela sua função (uma policy
+-- deixaria o dono trocar também a foto e a data depois de publicadas). O teto de 12 existe porque favorito
 -- significa foto guardada pra sempre (ver LIMITE_FAVORITOS no app).
 create or replace function public.favoritar_checkin(
   p_checkin uuid,
@@ -576,6 +576,40 @@ $$;
 
 revoke all on function public.favoritar_checkin(uuid, boolean) from public;
 grant execute on function public.favoritar_checkin(uuid, boolean) to authenticated;
+
+-- Editar a legenda: mesma ideia — uma função que mexe SÓ na legenda,
+-- e só do próprio dono. A foto e a data seguem intocáveis.
+create or replace function public.editar_legenda(
+  p_checkin uuid,
+  p_legenda text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_dono uuid;
+  v_legenda text := nullif(btrim(coalesce(p_legenda, '')), '');
+begin
+  select user_id into v_dono from public.checkins where id = p_checkin;
+  if v_dono is null then
+    raise exception 'Check-in não encontrado';
+  end if;
+  if v_dono <> auth.uid() then
+    raise exception 'Você só pode editar os seus próprios check-ins';
+  end if;
+  -- Mesmo teto do campo na tela de check-in
+  if char_length(v_legenda) > 200 then
+    raise exception 'A legenda pode ter no máximo 200 caracteres';
+  end if;
+
+  update public.checkins set legenda = v_legenda where id = p_checkin;
+end;
+$$;
+
+revoke all on function public.editar_legenda(uuid, text) from public;
+grant execute on function public.editar_legenda(uuid, text) to authenticated;
 
 -- Keep-alive: chamada semanal via GitHub Actions evita a pausa por inatividade
 create or replace function public.ping()

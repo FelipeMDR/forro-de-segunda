@@ -972,6 +972,16 @@ export class SupabaseApi implements ForroApi {
     if (error) throw new Error(traduz(error.message))
   }
 
+  async editarLegenda(checkinId: string, legenda: string) {
+    // Via função, como favoritar: não há policy de update em checkins
+    // (migração 032)
+    const { error } = await this.sb.rpc('editar_legenda', {
+      p_checkin: checkinId,
+      p_legenda: legenda.trim() || null,
+    })
+    if (error) throw new Error(traduz(error.message))
+  }
+
   async deleteCheckin(id: string) {
     // Guarda a URL antes: depois do delete não há como descobrir o arquivo,
     // e ele ficaria ocupando o bucket para sempre.

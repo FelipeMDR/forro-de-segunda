@@ -201,6 +201,11 @@ export interface ForroApi {
     coords?: Coordenada | null,
   ): Promise<void>
   deleteCheckin(id: string): Promise<void>
+  /**
+   * Troca a legenda de um check-in próprio (só a legenda — a foto e a
+   * data não mudam). Vazia remove a legenda.
+   */
+  editarLegenda(checkinId: string, legenda: string): Promise<void>
   toggleReaction(checkinId: string, tipo: string): Promise<void>
   getComments(checkinId: string): Promise<Comment[]>
   addComment(checkinId: string, texto: string): Promise<void>

@@ -24,6 +24,18 @@ export function CheckinCard({
   const [menuAberto, setMenuAberto] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
+  /** Texto em edição; `null` quando a legenda não está sendo editada. */
+  const [rascunho, setRascunho] = useState<string | null>(null)
+  const [salvandoLegenda, setSalvandoLegenda] = useState(false)
+  /**
+   * Cópia local da legenda, pelo mesmo motivo das reações: a nova aparece
+   * assim que salva, sem esperar a recarga da lista (que no feed pode
+   * nem pegar este cartão, se ele estiver além da primeira página).
+   */
+  const [legenda, setLegenda] = useState(item.legenda)
+  useEffect(() => {
+    setLegenda(item.legenda)
+  }, [item.legenda])
 
   // Só o cargo mais alto vai para o feed — a lista completa fica no perfil
   const cargo = cargoPrincipal(item.autor.cargos)
@@ -103,6 +115,27 @@ export function CheckinCard({
   // Só o dono favorita: é o arquivo pessoal dele, não uma curtida
   const meuCheckin = item.user_id === userId
 
+  const salvarLegenda = async () => {
+    if (rascunho === null || salvandoLegenda) return
+    const nova = rascunho.trim() || null
+    if (nova === legenda) {
+      setRascunho(null)
+      return
+    }
+    setSalvandoLegenda(true)
+    try {
+      await api.editarLegenda(item.id, rascunho)
+      setLegenda(nova)
+      setRascunho(null)
+      toast('Legenda atualizada')
+      onChanged()
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setSalvandoLegenda(false)
+    }
+  }
+
   const favoritar = async () => {
     try {
       await api.setFavorito(item.id, !item.favorito)
@@ -160,6 +193,17 @@ export function CheckinCard({
           </button>
           {menuAberto && (
             <div className="absolute right-0 top-9 z-20 w-52 overflow-hidden rounded-xl border border-preto/10 bg-papel shadow-xl">
+              {meuCheckin && (
+                <button
+                  className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
+                  onClick={() => {
+                    setMenuAberto(false)
+                    setRascunho(legenda ?? '')
+                  }}
+                >
+                  ✏️ {legenda ? 'Editar legenda' : 'Escrever legenda'}
+                </button>
+              )}
               <button
                 className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
                 onClick={() => void denunciar()}
@@ -190,7 +234,7 @@ export function CheckinCard({
       {item.foto_url ? (
         <img
           src={item.foto_url}
-          alt={item.legenda ?? `Check-in de ${item.autor.nome}`}
+          alt={legenda ?? `Check-in de ${item.autor.nome}`}
           loading="lazy"
           className="aspect-[4/5] w-full bg-fundo object-cover"
         />
@@ -203,8 +247,37 @@ export function CheckinCard({
         </div>
       )}
 
-      {item.legenda && (
-        <p className="px-4 pt-3 text-sm text-tinta-900">{item.legenda}</p>
+      {rascunho !== null ? (
+        <div className="space-y-2 px-4 pt-3">
+          <textarea
+            className="input resize-none"
+            rows={2}
+            maxLength={200}
+            autoFocus
+            aria-label="Legenda"
+            placeholder="Escreva algo sobre a noite…"
+            value={rascunho}
+            onChange={(e) => setRascunho(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              className="btn-ghost"
+              disabled={salvandoLegenda}
+              onClick={() => setRascunho(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn-primary"
+              disabled={salvandoLegenda}
+              onClick={() => void salvarLegenda()}
+            >
+              {salvandoLegenda ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        legenda && <p className="px-4 pt-3 text-sm text-tinta-900">{legenda}</p>
       )}
 
       <footer className="flex items-center gap-1.5 px-3 py-2.5">
