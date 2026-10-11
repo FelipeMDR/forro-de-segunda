@@ -9,7 +9,6 @@ import {
   agruparPorTurma,
   montarForrodex,
   ordenarTurmas,
-  turmasDe,
   type CartaForrodex,
 } from '../lib/forrodex'
 import type { ParceiroDanca, PerfilPublico } from '../lib/types'
@@ -106,8 +105,8 @@ export function ForrodexPage() {
   }, [api, userId, profile?.criado_em])
 
   const turmas = useMemo(
-    () => (dados ? ordenarTurmas(dados.turmas, turmasDe(profile)) : []),
-    [dados, profile],
+    () => (dados ? ordenarTurmas(dados.turmas) : []),
+    [dados],
   )
   const dex = useMemo(
     () =>

@@ -73,12 +73,38 @@ export function montarForrodex(
   return { descobertos, faltam, total: descobertos.length + faltam.length }
 }
 
-/** Ordem das chips e das seções: as minhas primeiro, depois as outras. */
-export function ordenarTurmas(todas: string[], minhas: string[]): string[] {
-  const outras = todas
-    .filter((t) => !minhas.includes(t))
-    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  return [...new Set([...minhas, ...outras])]
+const DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+
+/**
+ * Posição da turma pelo nível e, nas iniciantes, pelo dia da semana.
+ * Reconhece por palavra, não pelo nome exato: "Iniciante (Sábado)" e
+ * "iniciante sabado" caem no mesmo lugar, e a ordem sobrevive às turmas
+ * serem renomeadas no semestre seguinte.
+ */
+function pesoTurma(nome: string): number {
+  const n = nome
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+  if (n.includes('avanc')) return 0
+  if (n.includes('inter')) return 1
+  if (n.includes('inici')) {
+    const dia = DIAS.findIndex((d) => n.includes(d))
+    // Sem dia no nome: depois das que têm
+    return 2 + (dia === -1 ? DIAS.length : dia)
+  }
+  return 100
+}
+
+/**
+ * Ordem das chips e das seções: Avançada, Intermediária e as
+ * iniciantes de terça a sábado. O que não se encaixa vai para o fim,
+ * em ordem alfabética.
+ */
+export function ordenarTurmas(todas: string[]): string[] {
+  return [...new Set(todas)].sort(
+    (a, b) => pesoTurma(a) - pesoTurma(b) || a.localeCompare(b, 'pt-BR'),
+  )
 }
 
 /** Uma seção da visão "Todos". `turma` null = "Sem turma". */

@@ -114,14 +114,44 @@ describe('turmasDe', () => {
 })
 
 describe('ordenarTurmas', () => {
-  it('as minhas primeiro, as outras em ordem alfabética, sem repetir', () => {
+  it('nível primeiro, e as iniciantes pelo dia da semana', () => {
     expect(
-      ordenarTurmas(['Avançado', 'Iniciante 01', 'Intermediário'], ['Intermediário']),
-    ).toEqual(['Intermediário', 'Avançado', 'Iniciante 01'])
+      ordenarTurmas([
+        'Iniciante (Sábado)',
+        'Intermediária',
+        'Iniciante (Quarta)',
+        'Avançada',
+        'Iniciante (Sexta)',
+        'Iniciante (Terça)',
+      ]),
+    ).toEqual([
+      'Avançada',
+      'Intermediária',
+      'Iniciante (Terça)',
+      'Iniciante (Quarta)',
+      'Iniciante (Sexta)',
+      'Iniciante (Sábado)',
+    ])
   })
 
-  it('turma minha que não está na lista ainda aparece', () => {
-    expect(ordenarTurmas(['AV'], ['Velha'])).toEqual(['Velha', 'AV'])
+  it('reconhece sem acento, sem parênteses e em qualquer caixa', () => {
+    expect(
+      ordenarTurmas(['iniciante sabado', 'INICIANTE TERCA', 'Intermediario', 'Avancado']),
+    ).toEqual(['Avancado', 'Intermediario', 'INICIANTE TERCA', 'iniciante sabado'])
+  })
+
+  it('iniciante de outro dia entra na posição do dia; sem dia, depois dos dias', () => {
+    expect(
+      ordenarTurmas(['Iniciante 01', 'Iniciante Quinta', 'Iniciante Quarta', 'Iniciante Segunda']),
+    ).toEqual(['Iniciante Segunda', 'Iniciante Quarta', 'Iniciante Quinta', 'Iniciante 01'])
+  })
+
+  it('turma que não se encaixa vai para o fim, em ordem alfabética', () => {
+    expect(ordenarTurmas(['Zouk', 'Avançada', 'Bailinho'])).toEqual([
+      'Avançada',
+      'Bailinho',
+      'Zouk',
+    ])
   })
 })
 
