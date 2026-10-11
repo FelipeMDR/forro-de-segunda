@@ -128,7 +128,7 @@ export function ProfilePage() {
           <TurmaChips turmas={profile.turmas} />
         </div>
 
-        <StatsRow stats={stats} />
+        <StatsRow stats={stats} duplasHref="/perfil/duplas" />
 
         {/* Só quando o semestre fecha. Durante o semestre a retrospectiva
             seria um balanço pela metade; ela some sozinha quando a

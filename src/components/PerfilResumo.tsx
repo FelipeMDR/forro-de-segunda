@@ -50,7 +50,14 @@ export function CargoChips({ cargos }: { cargos: string[] }) {
   )
 }
 
-export function StatsRow({ stats }: { stats: PerfilStats | null }) {
+export function StatsRow({
+  stats,
+  duplasHref,
+}: {
+  stats: PerfilStats | null
+  /** Só no próprio perfil: o número de duplas abre a Forródex. */
+  duplasHref?: string
+}) {
   const itens: Array<[string, string, string]> = [
     ['🔥 ' + (stats ? String(stats.streak) : '–'), 'semanas seguidas', 'text-brasa-700'],
     [stats ? String(stats.presencas) : '–', 'presenças', ''],
@@ -60,14 +67,30 @@ export function StatsRow({ stats }: { stats: PerfilStats | null }) {
   ]
   return (
     <div className="grid w-full grid-cols-4 gap-2 pt-2">
-      {itens.map(([valor, rotulo, cor]) => (
-        <div key={rotulo} className="rounded-2xl bg-fundo px-2 py-3 text-center">
-          <p className={`text-2xl font-extrabold ${cor}`}>{valor}</p>
-          <p className="text-[10px] font-bold uppercase text-tinta-500">
-            {rotulo}
-          </p>
-        </div>
-      ))}
+      {itens.map(([valor, rotulo, cor]) => {
+        const conteudo = (
+          <>
+            <p className={`text-2xl font-extrabold ${cor}`}>{valor}</p>
+            <p className="text-[10px] font-bold uppercase text-tinta-500">
+              {rotulo}
+            </p>
+          </>
+        )
+        return rotulo === 'duplas' && duplasHref ? (
+          <Link
+            key={rotulo}
+            to={duplasHref}
+            aria-label="Abrir a Forródex"
+            className="rounded-2xl bg-fundo px-2 py-3 text-center ring-1 ring-brasa-500/30 transition hover:bg-brasa-500/10"
+          >
+            {conteudo}
+          </Link>
+        ) : (
+          <div key={rotulo} className="rounded-2xl bg-fundo px-2 py-3 text-center">
+            {conteudo}
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -180,3 +180,19 @@
     transform: scaleY(0.7);
   }
 }
+
+/* Fileira que rola de lado (chips da Forródex): sem a barra cinza do
+   navegador e com as pontas esmaecendo, que já avisam que tem mais. */
+.rolagem-lateral {
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 1rem,
+    #000 calc(100% - 1.5rem),
+    transparent
+  );
+}
+.rolagem-lateral::-webkit-scrollbar {
+  display: none;
+}

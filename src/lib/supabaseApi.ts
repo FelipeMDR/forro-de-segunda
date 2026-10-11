@@ -1953,20 +1953,23 @@ export class SupabaseApi implements ForroApi {
 
   async parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]> {
     // Só confirmadas contam. Como a dupla confirmada tem as duas
-    // linhas, olhar por de_user já cobre tudo sem duplicar.
-    let consulta = this.sb
-      .from('duplas')
-      .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
-      .eq('de_user', userId)
-      .eq('confirmada', true)
-    // `desde` é ISO datetime, `duplas.data` é só a data — corta na
-    // parte do dia para não excluir a própria noite do encerramento.
-    if (desde) consulta = consulta.gte('data', desde.slice(0, 10))
-    const rows = ok(await consulta) as unknown as Array<{
+    // linhas, olhar por de_user já cobre tudo sem duplicar. Paginado:
+    // quem roda muito o salão passa de 1000 noites-pessoa no histórico.
+    const rows = await todasAsLinhas<{
       data: string
       para_user: string
       perfil: { nome: string; avatar_url: string | null } | null
-    }>
+    }>((de, ate) => {
+      let consulta = this.sb
+        .from('duplas')
+        .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
+        .eq('de_user', userId)
+        .eq('confirmada', true)
+      // `desde` é ISO datetime, `duplas.data` é só a data — corta na
+      // parte do dia para não excluir a própria noite do encerramento.
+      if (desde) consulta = consulta.gte('data', desde.slice(0, 10))
+      return consulta.order('id').range(de, ate)
+    })
 
     const porPessoa = new Map<string, ParceiroDanca & { dias: Set<string> }>()
     for (const r of rows) {

@@ -13,6 +13,7 @@ import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
 import { FeedPage } from './pages/FeedPage'
+import { ForrodexPage } from './pages/ForrodexPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
 import { NovaSenhaPage } from './pages/NovaSenhaPage'
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="/perfil" element={<ProfilePage />} />
               {/* Antes de /perfil/:id, senão "conta" viraria um id */}
               <Route path="/perfil/conta" element={<ContaPage />} />
+              <Route path="/perfil/duplas" element={<ForrodexPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/organizador" element={<AdminPage />} />
               <Route path="/dj" element={<DJPage />} />
