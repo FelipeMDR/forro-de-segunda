@@ -896,6 +896,13 @@ export class DemoApi implements ForroApi {
     return c ? this.toFeedItem(c) : null
   }
 
+  async favoritosCompletosDe(userId: string): Promise<FeedItem[]> {
+    return this.db.checkins
+      .filter((c) => c.user_id === userId && c.favorito)
+      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+      .map((c) => this.toFeedItem(c))
+  }
+
   private toFeedItem(c: CheckinRow): FeedItem {
     const autor = this.db.profiles.find((p) => p.id === c.user_id)
     return {

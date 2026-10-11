@@ -236,6 +236,11 @@ export interface ForroApi {
   setFavorito(checkinId: string, favorito: boolean): Promise<void>
   /** Galeria de favoritos de alguém (própria ou de outro aluno). */
   favoritosDe(userId: string): Promise<CheckinFavorito[]>
+  /**
+   * Os mesmos favoritos, mas como publicações inteiras (reações,
+   * comentários, autor) — é o que a tela de favoritos rola como feed.
+   */
+  favoritosCompletosDe(userId: string): Promise<FeedItem[]>
 
   // ---- Desafios (competição de presença) ----
   listChallenges(): Promise<Challenge[]>

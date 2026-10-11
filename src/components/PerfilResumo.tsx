@@ -96,13 +96,6 @@ export function StatsRow({
 }
 
 /**
- * Galeria dos check-ins favoritos. Miniaturas em grade; tocar numa
- * abre a MESMA tela de publicação usada pelas notificações — reações,
- * comentários e (no próprio perfil) a opção de tirar dos favoritos,
- * tudo através do `CheckinCard` de sempre, em vez de um visualizador à
- * parte que precisava reimplementar cada um desses pedaços.
- */
-/**
  * Título de seção do perfil.
  *
  * Fica FORA do cartão. Distintivos e favoritos moravam cada um dentro de
@@ -127,11 +120,21 @@ function TituloSecao({
   )
 }
 
+/**
+ * Galeria dos check-ins favoritos. Miniaturas em grade; tocar numa abre
+ * os favoritos como um feed (`FavoritosPage`), já na foto tocada — com
+ * reações, comentários e (no próprio perfil) a opção de tirar dos
+ * favoritos, tudo pelo `CheckinCard` de sempre. Navegar entre elas é só
+ * rolar, em vez de voltar ao perfil a cada foto.
+ */
 export function FavoritosGrid({
+  userId,
   favoritos,
   vazio,
   mostrarLimite = false,
 }: {
+  /** Dono dos favoritos — para onde a miniatura leva. */
+  userId: string
   favoritos: CheckinFavorito[] | null
   vazio: string
   /** Só no próprio perfil: lembra quantos ainda dá pra guardar. */
@@ -161,7 +164,7 @@ export function FavoritosGrid({
           {favoritos.map((f) => (
             <Link
               key={f.id}
-              to={`/publicacao/${f.id}`}
+              to={`/perfil/${userId}/favoritos?foto=${f.id}`}
               className="overflow-hidden rounded-2xl bg-papel"
               aria-label={
                 f.legenda ?? `Favorito de ${formatRelative(f.criado_em)}`

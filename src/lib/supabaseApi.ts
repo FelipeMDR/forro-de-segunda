@@ -777,18 +777,48 @@ export class SupabaseApi implements ForroApi {
     return res.data ? this.mapFeedRow(res.data as Record<string, unknown>) : null
   }
 
+  async favoritosCompletosDe(userId: string): Promise<FeedItem[]> {
+    // Sem paginação: o teto de favoritos (LIMITE_FAVORITOS) já segura o
+    // tamanho, e uma consulta só sai mais barato que uma por foto.
+    const res = await this.sb
+      .from('checkins')
+      .select(
+        `id, user_id, foto_url, legenda, criado_em, favorito,
+           autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo)),
+           reacoes:reactions(tipo, user_id),
+           comentarios:comments(count)`,
+      )
+      .eq('user_id', userId)
+      .eq('favorito', true)
+      .order('criado_em', { ascending: false })
+
+    if (res.error) {
+      console.warn('[favoritos] embed falhou, usando consultas simples:', res.error)
+      const ids = (await this.favoritosDe(userId)).map((f) => f.id)
+      if (ids.length === 0) return []
+      const lista = await this.getFeedSimples({ ids })
+      return lista.map((i) => ({ ...i, favorito: true }))
+    }
+    const data = res.data as unknown as Array<Record<string, unknown>>
+    return data.map((c) => this.mapFeedRow(c))
+  }
+
   /** Plano B do feed: sem embeds, só consultas diretas + junção no cliente. */
   private async getFeedSimples(opcoes?: {
     limite?: number
     antesDe?: string
     /** Uma publicação específica em vez de uma página — ver `getCheckin`. */
     id?: string
+    /** Publicações específicas, mais novas primeiro — ver `favoritosCompletosDe`. */
+    ids?: string[]
   }): Promise<FeedItem[]> {
     let base = this.sb
       .from('checkins')
       .select('id, user_id, foto_url, legenda, criado_em')
     if (opcoes?.id) {
       base = base.eq('id', opcoes.id)
+    } else if (opcoes?.ids) {
+      base = base.in('id', opcoes.ids).order('criado_em', { ascending: false })
     } else {
       base = base
         .order('criado_em', { ascending: false })

@@ -12,6 +12,7 @@ import { DJPage } from './pages/DJPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
+import { FavoritosPage } from './pages/FavoritosPage'
 import { FeedPage } from './pages/FeedPage'
 import { ForrodexPage } from './pages/ForrodexPage'
 import { LoginPage } from './pages/LoginPage'
@@ -73,6 +74,7 @@ export default function App() {
               <Route path="/perfil/conta" element={<ContaPage />} />
               <Route path="/perfil/duplas" element={<ForrodexPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
+              <Route path="/perfil/:id/favoritos" element={<FavoritosPage />} />
               <Route path="/organizador" element={<AdminPage />} />
               <Route path="/dj" element={<DJPage />} />
               <Route path="/musica" element={<MusicaPage />} />

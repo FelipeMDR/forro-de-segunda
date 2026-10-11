@@ -188,6 +188,7 @@ export function UserProfilePage() {
       />
 
       <FavoritosGrid
+        userId={perfil.id}
         favoritos={favoritos}
         vazio={`${primeiroNome} ainda não guardou nenhum check-in nos favoritos.`}
       />

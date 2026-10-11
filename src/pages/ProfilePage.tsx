@@ -151,6 +151,7 @@ export function ProfilePage() {
       />
 
       <FavoritosGrid
+        userId={profile.id}
         favoritos={favoritos}
         mostrarLimite
         vazio="Toque na ☆ de um check-in seu no feed para guardar aqui. Favoritos ficam salvos para sempre — os outros são arquivados depois de 4 meses."
