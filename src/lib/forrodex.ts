@@ -151,21 +151,19 @@ export function agruparPorTurma(
 export interface NivelDupla {
   nivel: number
   nome: string
-  emoji: string
   /** Noites juntos a partir das quais a dupla chega neste nível. */
   minimo: number
 }
 
 /**
- * A carta evolui com as noites juntos, como medalha de jogo: bronze,
- * prata e ouro. Os números cabem num semestre de uma aula por semana
+ * A carta evolui com as noites juntos: neutra, bronze, prata e ouro. Os números cabem num semestre de uma aula por semana
  * (~16 noites): Dupla de ouro é difícil, mas dá.
  */
 export const NIVEIS_DUPLA: NivelDupla[] = [
-  { nivel: 1, nome: 'Primeira dança', emoji: '👋', minimo: 1 },
-  { nivel: 2, nome: 'Parceria', emoji: '🥉', minimo: 3 },
-  { nivel: 3, nome: 'Dupla afinada', emoji: '🥈', minimo: 6 },
-  { nivel: 4, nome: 'Dupla de ouro', emoji: '🥇', minimo: 10 },
+  { nivel: 1, nome: 'Primeira dança', minimo: 1 },
+  { nivel: 2, nome: 'Parceria', minimo: 3 },
+  { nivel: 3, nome: 'Dupla afinada', minimo: 6 },
+  { nivel: 4, nome: 'Dupla de ouro', minimo: 10 },
 ]
 
 export interface ProgressoDupla {

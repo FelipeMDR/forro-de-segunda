@@ -17,7 +17,7 @@ import {
 import type { ParceiroDanca, PerfilPublico } from '../lib/types'
 
 /**
- * Visual de cada nível, como medalha de jogo: a Primeira dança é neutra,
+ * Visual de cada nível: a Primeira dança é neutra,
  * e daí em diante bronze, prata e ouro — no anel da foto e na moldura
  * da carta. O degradê cônico imita o reflexo do metal.
  */
@@ -53,6 +53,17 @@ const ESTILO_NIVEL: Record<
     cor: '#d9a21b',
     texto: 'text-[#855c08]',
   },
+}
+
+/** Bolinha com o metal do nível, para a contagem e a explicação. */
+function Metal({ nivel }: { nivel: number }) {
+  return (
+    <span
+      className="inline-block h-3 w-3 shrink-0 rounded-full"
+      style={{ background: ESTILO_NIVEL[nivel].anel }}
+      aria-hidden
+    />
+  )
 }
 
 /**
@@ -138,7 +149,7 @@ function Carta({ carta }: { carta: CartaForrodex }) {
         </div>
         <p className="mt-1.5 w-full truncate text-xs font-bold">{primeiroNome}</p>
         <p className={`w-full truncate text-[10px] font-extrabold ${estilo.texto}`}>
-          {progresso.atual.emoji} {progresso.atual.nome}
+          {progresso.atual.nome}
         </p>
         <p className="text-[10px] text-tinta-500">
           ×{carta.noites} {carta.noites === 1 ? 'noite' : 'noites'}
@@ -279,8 +290,9 @@ export function ForrodexPage() {
         >
           <span className="flex gap-3">
             {NIVEIS_DUPLA.map((n, i) => (
-              <span key={n.nivel} title={n.nome}>
-                {n.emoji} {porNivel[i]}
+              <span key={n.nivel} title={n.nome} className="flex items-center gap-1.5">
+                <Metal nivel={n.nivel} />
+                {porNivel[i]}
               </span>
             ))}
           </span>
@@ -296,8 +308,9 @@ export function ForrodexPage() {
             <ul className="space-y-1">
               {NIVEIS_DUPLA.map((n) => (
                 <li key={n.nivel} className="flex justify-between">
-                  <span className="font-bold">
-                    {n.emoji} {n.nome}
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Metal nivel={n.nivel} />
+                    {n.nome}
                   </span>
                   <span className="text-tinta-500">
                     {n.minimo} {n.minimo === 1 ? 'noite' : 'noites'}
