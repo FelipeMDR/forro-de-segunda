@@ -146,3 +146,60 @@ export function agruparPorTurma(
   }
   return secoes
 }
+
+/** Nível de uma dupla no semestre, pelas noites que dançaram juntos. */
+export interface NivelDupla {
+  nivel: number
+  nome: string
+  emoji: string
+  /** Noites juntos a partir das quais a dupla chega neste nível. */
+  minimo: number
+}
+
+/**
+ * A carta evolui com as noites juntos, como medalha de jogo: bronze,
+ * prata e ouro. Os números cabem num semestre de uma aula por semana
+ * (~16 noites): Dupla de ouro é difícil, mas dá.
+ */
+export const NIVEIS_DUPLA: NivelDupla[] = [
+  { nivel: 1, nome: 'Primeira dança', emoji: '👋', minimo: 1 },
+  { nivel: 2, nome: 'Parceria', emoji: '🥉', minimo: 3 },
+  { nivel: 3, nome: 'Dupla afinada', emoji: '🥈', minimo: 6 },
+  { nivel: 4, nome: 'Dupla de ouro', emoji: '🥇', minimo: 10 },
+]
+
+export interface ProgressoDupla {
+  atual: NivelDupla
+  /** null = já está no topo. */
+  proximo: NivelDupla | null
+  /** Noites que faltam para o próximo nível (0 no topo). */
+  faltam: number
+  /** Quanto já andou dentro do nível atual, de 0 a 1 (1 no topo). */
+  fracao: number
+}
+
+/** Nível e progresso de quem dançou `noites` comigo. null = nunca dançou. */
+export function nivelDupla(noites: number): ProgressoDupla | null {
+  let i = NIVEIS_DUPLA.length - 1
+  while (i >= 0 && noites < NIVEIS_DUPLA[i].minimo) i--
+  if (i === -1) return null
+  const atual = NIVEIS_DUPLA[i]
+  const proximo = NIVEIS_DUPLA[i + 1] ?? null
+  if (!proximo) return { atual, proximo, faltam: 0, fracao: 1 }
+  return {
+    atual,
+    proximo,
+    faltam: proximo.minimo - noites,
+    fracao: (noites - atual.minimo) / (proximo.minimo - atual.minimo),
+  }
+}
+
+/** Quantas duplas em cada nível, na ordem de `NIVEIS_DUPLA`. */
+export function contarPorNivel(descobertos: { noites: number }[]): number[] {
+  const contagem = NIVEIS_DUPLA.map(() => 0)
+  for (const c of descobertos) {
+    const p = nivelDupla(c.noites)
+    if (p) contagem[p.atual.nivel - 1]++
+  }
+  return contagem
+}

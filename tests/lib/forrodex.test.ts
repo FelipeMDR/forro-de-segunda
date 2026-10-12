@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   agruparPorTurma,
+  contarPorNivel,
   montarForrodex,
+  nivelDupla,
   ordenarTurmas,
   turmasDe,
 } from '../../src/lib/forrodex'
@@ -195,6 +197,49 @@ describe('agruparPorTurma', () => {
     const s = agruparPorTurma([perfil('x', ['Antiga'])], [], 'eu', ['Inter'])
     expect(s.map((x) => [x.turma, x.faltam.map((c) => c.user_id)])).toEqual([
       [null, ['x']],
+    ])
+  })
+})
+
+describe('nivelDupla', () => {
+  it('sem noite juntos não há nível', () => {
+    expect(nivelDupla(0)).toBeNull()
+  })
+
+  it('cada nível começa no seu mínimo de noites', () => {
+    expect(
+      [1, 2, 3, 5, 6, 9, 10, 25].map((n) => nivelDupla(n)?.atual.nome),
+    ).toEqual([
+      'Primeira dança',
+      'Primeira dança',
+      'Parceria',
+      'Parceria',
+      'Dupla afinada',
+      'Dupla afinada',
+      'Dupla de ouro',
+      'Dupla de ouro',
+    ])
+  })
+
+  it('diz quanto falta e quanto já andou até o próximo nível', () => {
+    expect(nivelDupla(4)).toMatchObject({
+      atual: { nivel: 2 },
+      proximo: { nivel: 3, nome: 'Dupla afinada' },
+      faltam: 2,
+    })
+    // Parceria vai de 3 a 6: com 4 noites, andou 1 de 3
+    expect(nivelDupla(4)?.fracao).toBeCloseTo(1 / 3)
+  })
+
+  it('dupla de ouro é o topo: sem próximo, barra cheia', () => {
+    expect(nivelDupla(12)).toMatchObject({ proximo: null, faltam: 0, fracao: 1 })
+  })
+})
+
+describe('contarPorNivel', () => {
+  it('quantas duplas em cada nível, na ordem dos níveis', () => {
+    expect(contarPorNivel([par('a', 1), par('b', 2), par('c', 3), par('d', 10), par('e', 11)])).toEqual([
+      2, 1, 0, 2,
     ])
   })
 })
