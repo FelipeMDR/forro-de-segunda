@@ -548,6 +548,7 @@ export const CARGOS_PADRAO = [
   'Membro de RH',
   'Membro de Comunicação',
   'Membro de Recursos',
+  'DJ',
 ] as const
 
 /** Peso hierárquico do cargo (menor = mais alto). Usado para destacar. */
@@ -590,6 +591,7 @@ export function emojiCargo(nome: string): string {
   if (n.includes('comunica')) return '📣'
   if (n.includes('recurso')) return '💰'
   if (n.includes('rh') || n.includes('humanos')) return '🤝'
+  if (n.split(/[^a-z]+/).includes('dj')) return '💿'
   return '🎖️'
 }
 
@@ -665,6 +667,13 @@ export interface ConexaoDJ {
   conectado: boolean
   spotify_nome: string | null
   plano: string | null
+}
+
+/** Quem tem o cargo de DJ 💿 (migração 033). */
+export interface PessoaDJ {
+  id: string
+  nome: string
+  avatar_url: string | null
 }
 
 export type ResultadoConexao = 'ok' | 'sem_premium' | 'nao_liberado'

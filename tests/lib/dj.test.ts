@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CARGO_DJ,
   ESCOPOS_SPOTIFY,
+  LIMITE_DJS,
   novoStateSpotify,
   podeSerDJ,
   redirectSpotify,
@@ -9,15 +11,24 @@ import {
 } from '../../src/lib/dj'
 
 describe('podeSerDJ', () => {
-  it('professor, diretor de ensino e organizador podem', () => {
-    expect(podeSerDJ(['Professor(a)'], 'aluno')).toBe(true)
-    expect(podeSerDJ(['Monitor(a)', 'Diretor(a) de Ensino'], 'aluno')).toBe(true)
-    expect(podeSerDJ([], 'organizador')).toBe(true)
+  it('com vaga, professor, diretor de ensino e organizador podem', () => {
+    expect(podeSerDJ(['Professor(a)'], 'aluno', 0)).toBe(true)
+    expect(podeSerDJ(['Monitor(a)', 'Diretor(a) de Ensino'], 'aluno', 4)).toBe(true)
+    expect(podeSerDJ([], 'organizador', 4)).toBe(true)
   })
 
   it('aluno, monitor e outros cargos não', () => {
-    expect(podeSerDJ([], 'aluno')).toBe(false)
-    expect(podeSerDJ(['Monitor(a)', 'Diretor(a) de RH'], 'aluno')).toBe(false)
+    expect(podeSerDJ([], 'aluno', 0)).toBe(false)
+    expect(podeSerDJ(['Monitor(a)', 'Diretor(a) de RH'], 'aluno', 0)).toBe(false)
+  })
+
+  it('com 5 DJs, nenhum professor novo entra — nem o organizador', () => {
+    expect(podeSerDJ(['Professor(a)'], 'aluno', LIMITE_DJS)).toBe(false)
+    expect(podeSerDJ([], 'organizador', LIMITE_DJS)).toBe(false)
+  })
+
+  it('quem tem o cargo de DJ pode sempre, mesmo sem ser professor', () => {
+    expect(podeSerDJ([CARGO_DJ], 'aluno', LIMITE_DJS)).toBe(true)
   })
 })
 

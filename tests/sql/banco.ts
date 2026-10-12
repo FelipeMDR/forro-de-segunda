@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 const MIGRACOES = [
   '029-pedidos-de-musica.sql',
   '030-dj-loop-autorizado.sql',
+  '033-cargo-dj.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
@@ -25,6 +26,10 @@ create table public.profiles (
 );
 create table public.roles (
   user_id uuid primary key references public.profiles(id), papel text not null
+);
+create table public.cargos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique, ordem int not null default 99
 );
 create table public.profile_cargos (
   user_id uuid references public.profiles(id), cargo text not null,

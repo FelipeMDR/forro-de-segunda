@@ -151,6 +151,10 @@ from (values
       where pubname = 'supabase_realtime' and schemaname = 'public'
         and tablename = 'dj_sessoes'
     )
+  ),
+  (
+    '033 — cargo de DJ com teto de 5',
+    exists (select 1 from pg_proc where proname = 'conceder_cargo_dj')
   )
 ) as t(migracao, aplicada)
 order by migracao;

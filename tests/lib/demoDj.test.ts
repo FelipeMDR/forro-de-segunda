@@ -105,8 +105,35 @@ describe('DemoApi — pedidos de música', () => {
     const { DemoApi } = await import('../../src/lib/demoApi')
     const api = new DemoApi()
     await api.signInTelefone('11 98888-0001', 'forro123')
-    await expect(api.conectarSpotify('demo', '')).rejects.toThrow('Só professores podem ser DJ')
+    await expect(api.conectarSpotify('demo', '')).rejects.toThrow('vagas de DJ')
     await expect(api.ligarModoDJ(false)).rejects.toThrow('Só professores podem ligar o Modo DJ')
+  })
+
+  it('quem conecta ganha o cargo de DJ; com 5, ninguém mais entra', async () => {
+    const { DemoApi } = await import('../../src/lib/demoApi')
+    const api = new DemoApi()
+    const banco = api as unknown as {
+      db: { profiles: Array<{ id: string; cargos: string[] }> }
+    }
+    // Ana é organizadora
+    await api.signInTelefone('11 98888-0003', 'forro123')
+    const ana = (await api.getSessionUserId())!
+    expect(await api.conectarSpotify('demo', '')).toBe('ok')
+    expect((await api.listDJs()).map((d) => d.id)).toContain(ana)
+
+    // O seed tem só 4 pessoas: as outras 3 viram DJ pelo painel e uma
+    // pessoa extra completa as 5 vagas; mais uma é recusada
+    const outros = banco.db.profiles.filter((p) => p.id !== ana)
+    for (const p of outros) await api.addCargoAluno(p.id, 'DJ')
+    const extra = (n: string) => ({ ...banco.db.profiles[0], id: n, nome: n, cargos: [] })
+    banco.db.profiles.push(extra('quinta'), extra('sexta'))
+    await api.addCargoAluno('quinta', 'DJ')
+    expect(await api.listDJs()).toHaveLength(5)
+    await expect(api.addCargoAluno('sexta', 'DJ')).rejects.toThrow('Já há 5 DJs')
+
+    // Ana segue DJ; tirar o cargo dela a desconecta do Spotify
+    await api.removeCargoAluno(ana, 'DJ')
+    expect((await api.minhaConexaoDJ()).conectado).toBe(false)
   })
 
   it('sem Modo DJ ligado não há fila, e pedir é recusado', async () => {

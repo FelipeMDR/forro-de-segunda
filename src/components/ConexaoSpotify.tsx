@@ -4,23 +4,25 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import {
   CHAVE_STATE_SPOTIFY,
+  LIMITE_DJS,
   novoStateSpotify,
-  podeSerDJ,
   redirectSpotify,
   urlAutorizacaoSpotify,
 } from '../lib/dj'
 import type { ConexaoDJ } from '../lib/types'
+import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 
 /**
  * Conexão do Spotify de quem pode ser DJ. Para os outros, nada aparece:
- * a conta do aluno não ganha um botão que ele não pode usar.
+ * a conta do aluno não ganha um botão que ele não pode usar — nem a do
+ * professor, depois que as 5 vagas de DJ foram preenchidas.
  */
 export function ConexaoSpotify() {
-  const { api, profile, papel } = useAuth()
+  const { api } = useAuth()
   const toast = useToast()
   const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
   const [ocupado, setOcupado] = useState(false)
-  const pode = profile ? podeSerDJ(profile.cargos, papel) : false
+  const pode = usePodeSerDJ() === true
 
   useEffect(() => {
     if (!pode) return
@@ -107,7 +109,8 @@ export function ConexaoSpotify() {
         <>
           <p className="text-xs text-tinta-600">
             Sua conta Spotify precisa estar liberada pela organização no painel
-            do Spotify (até 5 professores).
+            do Spotify. Quem conecta ganha o cargo de 💿 DJ — são só{' '}
+            {LIMITE_DJS} vagas.
           </p>
           <button
             className="btn-primary w-full"

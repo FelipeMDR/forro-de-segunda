@@ -34,6 +34,7 @@ import type {
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
+  PessoaDJ,
   Profile,
   RankingEntry,
   Report,
@@ -470,6 +471,8 @@ export interface ForroApi {
   /** Dá um cargo a um aluno (organizador). */
   addCargoAluno(userId: string, cargo: string): Promise<void>
   removeCargoAluno(userId: string, cargo: string): Promise<void>
+  /** Quem tem o cargo de DJ 💿 (no máximo 5, migração 033). */
+  listDJs(): Promise<PessoaDJ[]>
 
   // ---- Distintivos personalizados ----
   /** Catálogo de distintivos que a organização pode conceder. */

@@ -37,7 +37,9 @@ Deno.serve(async (req) => {
   }
 
   const { data: pode } = await admin.rpc('pode_ser_dj', { p_uid: user.id })
-  if (!pode) return json({ erro: 'Só professores podem ser DJ' }, 403)
+  if (!pode) {
+    return json({ erro: 'As vagas de DJ estão preenchidas (ou você não é professor)' }, 403)
+  }
 
   try {
     const tokens = mesclarToken(
@@ -67,6 +69,17 @@ Deno.serve(async (req) => {
       conectado_em: new Date().toISOString(),
     })
     if (error) throw new Error(error.message)
+
+    // Aceito pelo Spotify: ganha o cargo de DJ 💿 (migração 033). Se a
+    // 5ª vaga foi tomada enquanto o Spotify respondia, desfaz a conexão.
+    const { data: virouDJ, error: erroCargo } = await admin.rpc('conceder_cargo_dj', {
+      p_uid: user.id,
+    })
+    if (erroCargo) throw new Error(erroCargo.message)
+    if (!virouDJ) {
+      await admin.from('dj_conexoes').delete().eq('user_id', user.id)
+      return json({ erro: 'As vagas de DJ acabaram. Fale com a organização.' }, 403)
+    }
 
     return json({ resultado: eu.product === 'premium' ? 'ok' : 'sem_premium' })
   } catch (e) {

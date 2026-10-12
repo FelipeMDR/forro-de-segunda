@@ -14,6 +14,7 @@ import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
 import { NOME_PADRAO } from './nome'
+import { CARGO_DJ } from './dj'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
 import type {
   AberturaAntecipada,
@@ -48,6 +49,7 @@ import type {
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
+  PessoaDJ,
   Profile,
   RankingEntry,
   Report,
@@ -2461,6 +2463,19 @@ export class SupabaseApi implements ForroApi {
 
   async deleteCargo(id: string) {
     ok(await this.sb.from('cargos').delete().eq('id', id))
+  }
+
+  async listDJs(): Promise<PessoaDJ[]> {
+    const data = ok(
+      await this.sb
+        .from('profile_cargos')
+        .select('perfil:profiles!user_id(id, nome, avatar_url)')
+        .eq('cargo', CARGO_DJ),
+    ) as unknown as Array<{ perfil: PessoaDJ | null }>
+    return data
+      .map((r) => r.perfil)
+      .filter((p): p is PessoaDJ => p !== null)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }
 
   async addCargoAluno(userId: string, cargo: string) {

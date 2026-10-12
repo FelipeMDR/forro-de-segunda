@@ -12,7 +12,23 @@ export const SPOTIFY_CLIENT_ID = 'b50dd222d8e9498faf4744ed49a799dd'
 /** Os mesmos cargos de `pode_ser_dj` no banco (migração 029). */
 export const CARGOS_DJ: readonly string[] = ['Professor(a)', 'Diretor(a) de Ensino']
 
-export function podeSerDJ(cargos: readonly string[], papel: Papel): boolean {
+/** Cargo ganho ao conectar o Spotify (migração 033). */
+export const CARGO_DJ = 'DJ'
+
+/** O app do Spotify em modo de desenvolvimento aceita só 5 contas. */
+export const LIMITE_DJS = 5
+
+/**
+ * A mesma regra de `pode_ser_dj` (migração 033): quem já é DJ, sempre;
+ * professor, diretor de ensino e organizador, só enquanto houver vaga.
+ */
+export function podeSerDJ(
+  cargos: readonly string[],
+  papel: Papel,
+  totalDJs: number,
+): boolean {
+  if (cargos.includes(CARGO_DJ)) return true
+  if (totalDJs >= LIMITE_DJS) return false
   return papel === 'organizador' || cargos.some((c) => CARGOS_DJ.includes(c))
 }
 

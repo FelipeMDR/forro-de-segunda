@@ -13,12 +13,12 @@ type Estado =
 const MENSAGENS: Record<ResultadoConexao, { titulo: string; texto: string }> = {
   ok: {
     titulo: 'Spotify conectado! 🎧',
-    texto: 'Agora é só ligar o Modo DJ no Espaço Livre.',
+    texto: 'Você ganhou o cargo de 💿 DJ. Agora é só ligar o Modo DJ no Espaço Livre.',
   },
   sem_premium: {
     titulo: 'Conectado, mas falta o Premium',
     texto:
-      'O Modo DJ precisa de Spotify Premium: sem ele, o Spotify não deixa o app colocar músicas na fila.',
+      'Você ganhou o cargo de 💿 DJ, mas o Modo DJ precisa de Spotify Premium: sem ele, o Spotify não deixa o app colocar músicas na fila.',
   },
   nao_liberado: {
     titulo: 'Sua conta ainda não foi liberada',

@@ -10,7 +10,7 @@ import {
   toISODate,
 } from './dates'
 import { CATALOGO_DEMO, DURACAO_DEMO_MS, PLAYLIST_DEMO } from './catalogoDemo'
-import { podeSerDJ } from './dj'
+import { CARGO_DJ, LIMITE_DJS, podeSerDJ } from './dj'
 import { distanciaMetros, type Coordenada } from './geo'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
@@ -60,6 +60,7 @@ import type {
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
+  PessoaDJ,
   Profile,
   RankingEntry,
   Report,
@@ -1951,7 +1952,12 @@ export class DemoApi implements ForroApi {
   async addCargoAluno(userId: string, cargo: string) {
     const p = this.db.profiles.find((x) => x.id === userId)
     if (!p) throw new Error('Aluno não encontrado')
-    if (!p.cargos.includes(cargo)) p.cargos = [...p.cargos, cargo]
+    if (p.cargos.includes(cargo)) return
+    // O mesmo teto do gatilho `cargo_dj_no_limite` (migração 033)
+    if (cargo === CARGO_DJ && this.totalDJs() >= LIMITE_DJS) {
+      throw new Error(`Já há ${LIMITE_DJS} DJs. Tire o cargo de alguém antes.`)
+    }
+    p.cargos = [...p.cargos, cargo]
     this.persist()
     this.notifyFeed()
   }
@@ -1960,8 +1966,35 @@ export class DemoApi implements ForroApi {
     const p = this.db.profiles.find((x) => x.id === userId)
     if (!p) throw new Error('Aluno não encontrado')
     p.cargos = p.cargos.filter((c) => c !== cargo)
+    // Sem o cargo de DJ, sem Spotify (gatilho `cargo_dj_removido`)
+    if (cargo === CARGO_DJ) {
+      const s = this.sessaoAberta()
+      if (s?.dj_user_id === userId) {
+        s.fechada_em = new Date().toISOString()
+        s.motivo_fechamento = 'desligou'
+      }
+      if (this.db.djConexoes) delete this.db.djConexoes[userId]
+    }
     this.persist()
     this.notifyFeed()
+  }
+
+  async listDJs(): Promise<PessoaDJ[]> {
+    return this.db.profiles
+      .filter((p) => p.cargos.includes(CARGO_DJ))
+      .map((p) => ({ id: p.id, nome: p.nome, avatar_url: p.avatar_url }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+
+  private totalDJs(): number {
+    return this.db.profiles.filter((p) => p.cargos.includes(CARGO_DJ)).length
+  }
+
+  private podeSerDJ(uid: string): boolean {
+    const perfil = this.db.profiles.find((p) => p.id === uid)
+    return Boolean(
+      perfil && podeSerDJ(perfil.cargos, this.db.roles[uid] ?? 'aluno', this.totalDJs()),
+    )
   }
 
   // ---- Distintivos personalizados ----
@@ -2161,10 +2194,12 @@ export class DemoApi implements ForroApi {
   async conectarSpotify(_code: string, _redirectUri: string): Promise<ResultadoConexao> {
     const uid = this.uid()
     const perfil = this.db.profiles.find((p) => p.id === uid)
-    if (!perfil || !podeSerDJ(perfil.cargos, this.db.roles[uid] ?? 'aluno')) {
-      throw new Error('Só professores podem ser DJ')
+    if (!perfil || !this.podeSerDJ(uid)) {
+      throw new Error('As vagas de DJ estão preenchidas (ou você não é professor)')
     }
-    // No demo não há Spotify: a conexão só fica marcada como feita
+    // No demo não há Spotify: a conexão só fica marcada como feita, e
+    // quem conecta ganha o cargo de DJ 💿, como na Edge Function
+    if (!perfil.cargos.includes(CARGO_DJ)) perfil.cargos = [...perfil.cargos, CARGO_DJ]
     this.db.djConexoes = {
       ...(this.db.djConexoes ?? {}),
       [uid]: { spotify_nome: perfil.nome, plano: 'premium' },
@@ -2216,8 +2251,7 @@ export class DemoApi implements ForroApi {
 
   async ligarModoDJ(assumir: boolean): Promise<ResultadoLigarDJ> {
     const uid = this.uid()
-    const perfil = this.db.profiles.find((p) => p.id === uid)
-    if (!perfil || !podeSerDJ(perfil.cargos, this.db.roles[uid] ?? 'aluno')) {
+    if (!this.podeSerDJ(uid)) {
       throw new Error('Só professores podem ligar o Modo DJ')
     }
     if (!this.db.djConexoes?.[uid]) {

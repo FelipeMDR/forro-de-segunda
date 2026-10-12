@@ -4,10 +4,10 @@ import { LinhaPedido } from '../components/LinhaPedido'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { podeSerDJ } from '../lib/dj'
 import { proximasNaTela } from '../lib/filaMusica'
 import type { ConexaoDJ, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
+import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 import { useSessaoDJAoVivo } from '../lib/useSessaoDJAoVivo'
 
 const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
@@ -23,14 +23,14 @@ const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
  * minuto. Ela serve para ver e cancelar.
  */
 export function DJPage() {
-  const { api, userId, profile, papel } = useAuth()
+  const { api, userId } = useAuth()
   const toast = useToast()
   const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
   const [sessao, setSessao] = useState<SessaoDJ | null>(null)
   const [fila, setFila] = useState<PedidoNaFila[]>([])
   const [pedidos, setPedidos] = useState<PedidoMusica[]>([])
   const [ocupado, setOcupado] = useState(false)
-  const pode = profile ? podeSerDJ(profile.cargos, papel) : false
+  const pode = usePodeSerDJ()
 
   const carregar = useCallback(async () => {
     if (!pode) return
@@ -95,10 +95,11 @@ export function DJPage() {
     }
   }
 
+  if (pode === null) return <Spinner texto="Carregando o Modo DJ…" />
   if (!pode) {
     return (
       <div className="card p-5 text-sm text-tinta-700">
-        O Modo DJ é para professores. Para pedir uma música, use{' '}
+        O Modo DJ é para quem tem o cargo de 💿 DJ. Para pedir uma música, use{' '}
         <Link to="/musica" className="font-bold underline">
           Pedir música
         </Link>

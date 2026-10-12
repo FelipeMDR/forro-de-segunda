@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { combinaBusca } from '../lib/busca'
 import { downloadCSV } from '../lib/csv'
+import { CARGO_DJ, LIMITE_DJS } from '../lib/dj'
 import { parseAlunosCSV, type ResultadoParse } from '../lib/csvImport'
 import {
   agruparChamada,
@@ -52,6 +53,7 @@ import {
   type FeriadoInput,
   type Modalidade,
   type PapelDanca,
+  type PessoaDJ,
   type Profile,
   type Report,
   type Turma,
@@ -744,13 +746,16 @@ function SecaoCargos({
             className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/15 px-3 py-1.5 text-xs font-bold text-brasa-700"
           >
             {emojiCargo(c.nome)} {c.nome}
-            <button
-              onClick={() => void remover(c.id)}
-              className="text-brasa-700/60 hover:text-red-600"
-              aria-label={`Remover cargo ${c.nome}`}
-            >
-              ✕
-            </button>
+            {/* O cargo de DJ é do sistema: o Spotify o concede */}
+            {c.nome !== CARGO_DJ && (
+              <button
+                onClick={() => void remover(c.id)}
+                className="text-brasa-700/60 hover:text-red-600"
+                aria-label={`Remover cargo ${c.nome}`}
+              >
+                ✕
+              </button>
+            )}
           </span>
         ))}
       </div>
@@ -764,6 +769,134 @@ function SecaoCargos({
         />
         <button className="btn-ghost shrink-0">+ Criar</button>
       </form>
+    </section>
+  )
+}
+
+/**
+ * Quem tem o cargo de DJ 💿. O cargo vem sozinho quando o professor
+ * conecta o Spotify; aqui a organização troca as pessoas. O teto é o
+ * do app do Spotify em modo de desenvolvimento (5 contas).
+ */
+function SecaoDJs() {
+  const { api } = useAuth()
+  const toast = useToast()
+  const [djs, setDjs] = useState<PessoaDJ[] | null>(null)
+  const [perfis, setPerfis] = useState<Profile[]>([])
+  const [busca, setBusca] = useState('')
+
+  const carregar = useCallback(async () => {
+    setDjs(await api.listDJs())
+  }, [api])
+
+  useEffect(() => {
+    void carregar().catch(() => setDjs([]))
+    void api.listProfiles().then(setPerfis)
+  }, [api, carregar])
+
+  const tirar = async (dj: PessoaDJ) => {
+    if (
+      !window.confirm(
+        `Tirar o cargo de DJ de ${dj.nome}? O Spotify dessa pessoa é desconectado do app.`,
+      )
+    ) {
+      return
+    }
+    try {
+      await api.removeCargoAluno(dj.id, CARGO_DJ)
+      await carregar()
+      toast(`${dj.nome} não é mais DJ`)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const dar = async (p: Profile) => {
+    try {
+      await api.addCargoAluno(p.id, CARGO_DJ)
+      setBusca('')
+      await carregar()
+      toast(`${p.nome} agora é DJ 💿`)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    }
+  }
+
+  const lotado = (djs?.length ?? 0) >= LIMITE_DJS
+  const candidatos = busca.trim()
+    ? perfis
+        .filter((p) => !djs?.some((d) => d.id === p.id))
+        .filter((p) => combinaBusca(busca, [p.nome]))
+        .slice(0, 5)
+    : []
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-tinta-500">
+        💿 DJs{' '}
+        {djs && (
+          <span className="font-normal text-tinta-400">
+            ({djs.length}/{LIMITE_DJS})
+          </span>
+        )}
+      </h2>
+      <p className="text-xs text-tinta-500">
+        Quem conecta o Spotify e é aceito vira DJ sozinho. Com {LIMITE_DJS} DJs,
+        nenhum outro professor consegue mais conectar. Ao trocar alguém aqui,
+        troque também na lista do painel do Spotify (User Management).
+      </p>
+
+      {djs === null ? (
+        <Spinner />
+      ) : djs.length === 0 ? (
+        <p className="text-sm text-tinta-500">Ninguém é DJ ainda.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {djs.map((d) => (
+            <span
+              key={d.id}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brasa-500/15 px-3 py-1.5 text-xs font-bold text-brasa-700"
+            >
+              💿 {d.nome}
+              <button
+                onClick={() => void tirar(d)}
+                className="text-brasa-700/60 hover:text-red-600"
+                aria-label={`Tirar o cargo de DJ de ${d.nome}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {djs !== null &&
+        (lotado ? (
+          <p className="rounded-xl bg-preto/5 px-3 py-2 text-xs text-tinta-600">
+            Vagas preenchidas. Para pôr outra pessoa, tire alguém antes.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <input
+              type="search"
+              className="input"
+              placeholder="🔎 Dar o cargo de DJ a…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+            {candidatos.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => void dar(p)}
+                className="flex w-full items-center justify-between rounded-xl bg-fundo px-3 py-2 text-left text-sm hover:bg-preto/5"
+              >
+                <span className="truncate font-bold">{p.nome}</span>
+                <span className="shrink-0 text-xs text-brasa-700">+ DJ</span>
+              </button>
+            ))}
+          </div>
+        ))}
     </section>
   )
 }
@@ -2622,6 +2755,7 @@ export function AdminPage() {
       {aba === 'pessoas' && (
         <>
           <SecaoCargos cargos={cargos} onChanged={() => void carregarCargos()} />
+          <SecaoDJs />
           <SecaoTurmas
             turmas={turmas}
             cargos={cargos}
