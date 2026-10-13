@@ -210,7 +210,7 @@ export function HojePage() {
           </Link>
 
           <Link
-            to={posicao ? `/desafios/${posicao.desafio.id}` : '/desafios'}
+            to="/desafios"
             className="flex min-h-[132px] flex-col gap-2.5 rounded-[22px] border border-linha bg-sf p-4 text-ink"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-preto bg-verde-500 text-[17px] font-extrabold text-preto">

@@ -209,6 +209,37 @@ export function ChallengeDetailPage() {
       </div>
 
       <div className="flex flex-col gap-3.5 px-4">
+        {/* No topo: entrar ou sair é a decisão da tela. Entrada restrita:
+            quem entra é a organização, então nem o botão de entrar nem o
+            de sair fazem sentido para o aluno */}
+        {desafio.entrada_restrita ? (
+          <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
+            {desafio.sou_membro
+              ? 'Você está na lista deste desafio restrito. A organização é quem gerencia quem participa.'
+              : 'Este desafio é restrito — só a organização adiciona participantes. Acha que deveria estar aqui? Fale com a organização.'}
+          </p>
+        ) : (
+          fase !== 'encerrado' && (
+            <>
+              <BotaoAcao
+                cor={desafio.sou_membro ? 'claro' : 'brasa'}
+                tamanho="g"
+                bloco
+                disabled={ocupado}
+                onClick={() =>
+                  desafio.sou_membro ? setConfirmandoSaida(true) : void entrarOuSair()
+                }
+              >
+                {desafio.sou_membro ? 'Sair do desafio' : 'Entrar no desafio'}
+              </BotaoAcao>
+              <span className="text-center text-[13px] leading-snug text-ink3">
+                Entrar é opcional e não zera o passado: check-ins já feitos no período
+                contam.
+              </span>
+            </>
+          )
+        )}
+
         <div className="flex flex-col gap-3 rounded-[20px] border border-linha bg-sf p-4">
           <span className="text-[15px] leading-relaxed text-ink2 [text-wrap:pretty]">
             {desafio.descricao ||
@@ -304,36 +335,6 @@ export function ChallengeDetailPage() {
               )
             })}
           </ol>
-        )}
-
-        {/* Entrada restrita: quem entra é a organização, então nem o
-            botão de entrar nem o de sair fazem sentido para o aluno */}
-        {desafio.entrada_restrita ? (
-          <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
-            {desafio.sou_membro
-              ? 'Você está na lista deste desafio restrito. A organização é quem gerencia quem participa.'
-              : 'Este desafio é restrito — só a organização adiciona participantes. Acha que deveria estar aqui? Fale com a organização.'}
-          </p>
-        ) : (
-          fase !== 'encerrado' && (
-            <>
-              <BotaoAcao
-                cor={desafio.sou_membro ? 'claro' : 'brasa'}
-                tamanho="g"
-                bloco
-                disabled={ocupado}
-                onClick={() =>
-                  desafio.sou_membro ? setConfirmandoSaida(true) : void entrarOuSair()
-                }
-              >
-                {desafio.sou_membro ? 'Sair do desafio' : 'Entrar no desafio'}
-              </BotaoAcao>
-              <span className="text-center text-[13px] leading-snug text-ink3">
-                Entrar é opcional e não zera o passado: check-ins já feitos no período
-                contam.
-              </span>
-            </>
-          )
         )}
 
         {papel === 'organizador' && desafio.entrada_restrita && (
