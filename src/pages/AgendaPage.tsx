@@ -5,16 +5,8 @@ import { Spinner } from '../components/Spinner'
 import { Cabecalho } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import {
-  addDays,
-  ocorrenciasEvento,
-  toISODate,
-  type OcorrenciaAgenda,
-} from '../lib/dates'
+import { ocorrenciasEvento, toISODate, type OcorrenciaAgenda } from '../lib/dates'
 import type { AgendaEvent, ConfirmacaoPresenca, Feriado } from '../lib/types'
-
-/** Quantos dias para a frente a agenda mostra. */
-const HORIZONTE_DIAS = 14
 
 interface Item extends OcorrenciaAgenda {
   /** Quando a aula volta, se esta ocorrência foi cancelada. */
@@ -30,9 +22,19 @@ function rotuloDia(d: Date): string {
   return s[0].toUpperCase() + s.slice(1)
 }
 
+/** "Hoje", "Amanhã", "Faltam 12 dias" — conta dias de calendário. */
+function contagem(d: Date, agora: Date): string {
+  const meiaNoite = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dias = Math.round((meiaNoite(d) - meiaNoite(agora)) / 86_400_000)
+  if (dias <= 0) return 'Hoje'
+  if (dias === 1) return 'Amanhã'
+  return `Faltam ${dias} dias`
+}
+
 /**
- * Próximos compromissos da pessoa: as aulas das turmas dela (as que
- * estuda e as que ensina) e os eventos de todo mundo. Aula cancelada
+ * Próximos compromissos da pessoa: a próxima aula de cada turma dela (as
+ * que estuda e as que ensina) e todos os eventos futuros, com contagem
+ * regressiva. Aula cancelada
  * aparece riscada, com o motivo e quando volta — sumir sem explicação
  * faria a pessoa achar que a agenda está errada.
  */
@@ -75,18 +77,18 @@ export function AgendaPage() {
   const itens = useMemo<Item[]>(() => {
     if (!eventos) return []
     const agora = new Date()
-    const limite = addDays(agora, HORIZONTE_DIAS)
     const lista: Item[] = []
     for (const e of eventos) {
       if (e.turma && !minhasTurmas.has(e.turma)) continue
-      const ocs = ocorrenciasEvento(e, feriados, agora, 4)
-      ocs.forEach((o, i) => {
-        if (o.quando > limite) return
-        const volta = o.cancelada
-          ? (ocs.slice(i + 1).find((x) => !x.cancelada)?.quando ?? null)
-          : null
-        lista.push({ ...o, volta })
-      })
+      // Só a próxima ocorrência: aula semanal repetida quatro vezes era
+      // ruído. Evento de data única aparece não importa quão longe esteja.
+      const ocs = ocorrenciasEvento(e, feriados, agora, 8)
+      const [o] = ocs
+      if (!o) continue
+      const volta = o.cancelada
+        ? (ocs.find((x) => !x.cancelada)?.quando ?? null)
+        : null
+      lista.push({ ...o, volta })
     }
     return lista.sort((a, b) => a.quando.getTime() - b.quando.getTime())
   }, [eventos, feriados, minhasTurmas])
@@ -133,7 +135,8 @@ export function AgendaPage() {
     return [...porDia.entries()]
   }, [itens])
 
-  const hoje = toISODate(new Date())
+  const agora = new Date()
+  const hoje = toISODate(agora)
 
   return (
     <div className="anima-tela">
@@ -146,7 +149,7 @@ export function AgendaPage() {
         <Spinner />
       ) : grupos.length === 0 ? (
         <p className="px-5 py-10 text-center text-[15px] text-ink3">
-          Nada marcado para as próximas duas semanas.
+          Nada marcado por enquanto.
         </p>
       ) : (
         <div className="flex flex-col gap-[22px] px-4 pt-1">
@@ -204,6 +207,11 @@ export function AgendaPage() {
                             <span className="text-sm leading-snug text-ink3">{sub}</span>
                           )}
                         </div>
+                        {o.evento.data && !o.cancelada && !ehHoje && (
+                          <span className="shrink-0 rounded-lg border-[1.5px] border-preto bg-verde-500 px-2 py-[3px] text-xs font-extrabold text-preto">
+                            {contagem(o.quando, agora)}
+                          </span>
+                        )}
                       </div>
                       {o.cancelada ? (
                         <div className="rounded-xl bg-chip px-3 py-2.5 text-sm font-bold text-or-t">
