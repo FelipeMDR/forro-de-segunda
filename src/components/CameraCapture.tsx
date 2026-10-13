@@ -109,6 +109,7 @@ export function CameraCapture({
   permitirFotoTeste = false,
   onResolvida,
   abrirDireto = false,
+  onPrecisaToque,
 }: {
   onCapture: (foto: Blob) => void
   /** Sair da câmera sem tirar foto. */
@@ -131,6 +132,12 @@ export function CameraCapture({
    * o toque já aconteceu, então não há por que pedir outro.
    */
   abrirDireto?: boolean
+  /**
+   * A permissão ainda não foi dada e a câmera precisa de um toque para
+   * pedi-la. Quem chama volta para o cartaz, cujo botão "Abrir câmera"
+   * é esse toque.
+   */
+  onPrecisaToque: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -222,6 +229,7 @@ export function CameraCapture({
         (await estadoDaPermissao('camera')) === 'liberada'
       if (cancelado) return
       setAguardandoToque(!jaPode)
+      if (!jaPode) onPrecisaToque()
     })()
     return () => {
       cancelado = true
@@ -327,40 +335,10 @@ export function CameraCapture({
   )
 
   // Esperando o toque: nenhum pedido de permissão saiu ainda, e é esse
-  // o ponto — entrar na tela não pode disparar diálogo do sistema.
-  if (!erro && aguardandoToque) {
-    return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col bg-preto text-branco"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
-        {faixaDeCima}
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-branco/10">
-            <Icone nome="camera" tamanho={36} traco={2} />
-          </span>
-          <p className="text-[15px] text-branco/75">
-            Toque para abrir a câmera e registrar sua presença.
-          </p>
-          <BotaoAcao tamanho="m" sombra={false} onClick={() => setAguardandoToque(false)}>
-            Abrir a câmera
-          </BotaoAcao>
-          <div className="w-full max-w-sm" data-theme="dark">
-            <DicaInstalarParaPermissao />
-          </div>
-          {permitirFotoTeste && (
-            <button
-              type="button"
-              className="text-sm font-bold text-branco/70 underline underline-offset-4"
-              onClick={() => void gerarFotoTeste()}
-            >
-              Usar foto de teste (demo)
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
+  // o ponto — entrar na tela não pode disparar diálogo do sistema. Quem
+  // pede o toque é o cartaz do check-in (a situação da noite), não uma
+  // tela genérica de câmera.
+  if (!erro && aguardandoToque) return null
 
   if (erro) {
     return (

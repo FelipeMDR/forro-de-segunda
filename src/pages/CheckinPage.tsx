@@ -463,6 +463,7 @@ export function CheckinPage() {
           onCapture={(b) => void aoCapturar(b)}
           onResolvida={() => setCameraResolvida(true)}
           onFechar={() => setEtapa('status')}
+          onPrecisaToque={() => setEtapa('status')}
           abrirDireto={tocouAbrir}
           permitirFotoTeste={api.mode === 'demo'}
           topo={
