@@ -5,6 +5,8 @@ import {
   montarForrodex,
   nivelDupla,
   ordenarTurmas,
+  pontosDaCarta,
+  pontosDeParcerias,
   turmasDe,
 } from '../../src/lib/forrodex'
 import type { ParceiroDanca, PerfilPublico } from '../../src/lib/types'
@@ -281,5 +283,54 @@ describe('contarPorNivel', () => {
     expect(contarPorNivel([par('a', 1), par('b', 2), par('c', 3), par('d', 10), par('e', 11)])).toEqual([
       2, 1, 0, 2,
     ])
+  })
+})
+
+describe('pontosDaCarta', () => {
+  it('vale o nível da carta: 1, 2, 3 e 4 pontos', () => {
+    expect([0, 1, 2, 3, 5, 6, 9, 10, 25].map(pontosDaCarta)).toEqual([
+      0, 1, 1, 2, 2, 3, 3, 4, 4,
+    ])
+  })
+})
+
+describe('pontosDeParcerias', () => {
+  const dupla = (de: string, para: string, data: string) => ({
+    de_user: de,
+    para_user: para,
+    data,
+  })
+  const noites = (n: number) =>
+    Array.from({ length: n }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`)
+
+  it('soma o valor de cada carta', () => {
+    // 1 noite com a (1 pt) + 3 com b (2 pts) + 10 com c (4 pts)
+    const datas = noites(10)
+    const rows = [
+      dupla('eu', 'a', datas[0]),
+      ...datas.slice(0, 3).map((d) => dupla('eu', 'b', d)),
+      ...datas.map((d) => dupla('eu', 'c', d)),
+    ]
+    const pontos = pontosDeParcerias(rows, new Map([['eu', new Set(datas)]]))
+    expect(pontos.get('eu')).toBe(7)
+  })
+
+  it('a mesma noite marcada duas vezes conta uma', () => {
+    const rows = [dupla('eu', 'a', '2026-10-01'), dupla('eu', 'a', '2026-10-01')]
+    const pontos = pontosDeParcerias(rows, new Map([['eu', new Set(['2026-10-01'])]]))
+    expect(pontos.get('eu')).toBe(1)
+  })
+
+  it('noite que não valeu para a pessoa não conta', () => {
+    const datas = noites(3)
+    const rows = datas.map((d) => dupla('eu', 'a', d))
+    // Só duas das três noites valeram: a carta fica em 1 ponto, não 2
+    const pontos = pontosDeParcerias(rows, new Map([['eu', new Set(datas.slice(0, 2))]]))
+    expect(pontos.get('eu')).toBe(1)
+  })
+
+  it('quem não tem noite válida fica sem ponto', () => {
+    const pontos = pontosDeParcerias([dupla('eu', 'a', '2026-10-01')], new Map())
+    expect(pontos.get('eu')).toBeUndefined()
   })
 })

@@ -1,5 +1,5 @@
 import { decidirPassada, LIMITE_BUSCA } from '../../supabase/functions/_shared/djPuro'
-import { mensagemForrodexOcupada } from './forrodex'
+import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { ForroApi } from './api'
 import {
   addDays,
@@ -350,7 +350,7 @@ function seed(): DB {
     id: uuid(),
     titulo: 'Copa do mês — quem dança mais?',
     descricao:
-      'Duas disputas ao mesmo tempo: presença (cada check-in na janela vale 1 ponto) e rodízio (quantas pessoas diferentes você tirou para dançar). Quem lidera cada uma leva o destaque no Instagram! 🏆',
+      'Duas disputas ao mesmo tempo: presença (cada check-in na janela vale 1 ponto) e parcerias (cada pessoa com quem você dança vira uma carta que vale mais quanto mais noites vocês dançam juntos). Quem lidera cada uma leva o destaque no Instagram! 🏆',
     data_inicio: inicio,
     data_fim: fim,
     // Janela ampla em todos os dias no demo, pra facilitar o teste em
@@ -1393,7 +1393,7 @@ export class DemoApi implements ForroApi {
     const c = this.db.challenges.find((x) => x.id === challengeId)
     if (!c) return []
     const validas = this.noitesValidas(this.toChallenge(c), userId)
-    // Mesmo filtro do rodízio: só noite que valeu. O nome e a foto
+    // Mesmo filtro das Parcerias: só noite que valeu. O nome e a foto
     // vêm de `parceirosDe`, que já agrupa por pessoa.
     const duplas = (this.db.duplas ?? []).filter(
       (d) =>
@@ -1427,22 +1427,20 @@ export class DemoApi implements ForroApi {
         // As noites que valeram para esta pessoa neste desafio — base
         // das duas modalidades (espelha `janelasValidasPorMembro`).
         const janelas = this.noitesValidas(challenge, uid)
-        // Rodízio conta PESSOAS DIFERENTES, e só em noite que valeu —
-        // mesma regra da produção (ver `pontosDeRodizio`).
+        // Parcerias: carta por parceiro, valendo pelo nível — mesma
+        // regra da produção (ver `pontosDeParcerias`)
         const pontos =
           modalidade === 'duplas'
-            ? new Set(
-                (this.db.duplas ?? [])
-                  .filter(
-                    (d) =>
-                      d.confirmada &&
-                      d.de_user === uid &&
-                      d.data >= challenge.data_inicio &&
-                      d.data <= challenge.data_fim &&
-                      janelas.has(d.data),
-                  )
-                  .map((d) => d.para_user),
-              ).size
+            ? (pontosDeParcerias(
+                (this.db.duplas ?? []).filter(
+                  (d) =>
+                    d.confirmada &&
+                    d.de_user === uid &&
+                    d.data >= challenge.data_inicio &&
+                    d.data <= challenge.data_fim,
+                ),
+                new Map([[uid, janelas]]),
+              ).get(uid) ?? 0)
             : janelas.size
         return {
           user_id: uid,

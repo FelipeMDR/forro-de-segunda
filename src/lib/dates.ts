@@ -230,7 +230,7 @@ export function desafiosQueContam(
  * NOITES que valeram para a pessoa ali dentro.
  *
  * É um Set porque duas fotos na mesma janela são a mesma noite, e
- * porque o ranking de rodízio precisa perguntar "esta dupla foi numa
+ * porque o ranking de Parcerias precisa perguntar "esta dupla foi numa
  * noite que valeu neste desafio?" — sem isso, dava para somar parceiro
  * marcando dupla numa noite fora do horário ou fora do local.
  */

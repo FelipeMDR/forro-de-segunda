@@ -246,7 +246,7 @@ export function NotificacoesPage() {
       await carregar()
       toast(
         aceitar
-          ? `Dupla confirmada com ${n.autor.nome.split(' ')[0]}. Conta no Rodízio e na Forródex.`
+          ? `Dupla confirmada com ${n.autor.nome.split(' ')[0]}. Conta nas Parcerias e na Forródex.`
           : 'Marcação recusada',
       )
     } catch (e) {

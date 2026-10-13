@@ -271,7 +271,7 @@ export interface ForroApi {
   recorteForrodex(): Promise<RecorteForrodex | null>
   /**
    * Parceiros de alguém dentro de um desafio, com a MESMA regra do
-   * ranking de rodízio: dupla confirmada numa noite que valeu para a
+   * ranking de Parcerias: dupla confirmada numa noite que valeu para a
    * pessoa no desafio, com o parceiro inscrito ou não. `noites` conta
    * só essas noites. É o que a Forródex presa ao desafio mostra, para
    * os dois números baterem.

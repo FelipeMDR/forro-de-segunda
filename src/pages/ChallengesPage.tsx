@@ -9,7 +9,7 @@ import { challengePhase, daysLeft } from '../lib/dates'
 import { faixasDeHorario, periodoCurto } from '../lib/horarios'
 import { defModalidade, type Challenge } from '../lib/types'
 
-/** "Presença e Rodízio" */
+/** "Presença e Parcerias" */
 export function nomesModalidades(c: Challenge): string {
   const nomes = c.modalidades.map((m) => defModalidade(m).nome)
   return nomes.length > 1

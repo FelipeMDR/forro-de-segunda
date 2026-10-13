@@ -169,7 +169,7 @@ export const RAIO_LOCAL_PADRAO_M = 200
  * Tipo de disputa dentro de um desafio.
  *
  * Um desafio pode rodar mais de uma ao mesmo tempo: o "Espaço Livre
- * 2026.2" tem o rank de presença E o rank de rodízio, e a pessoa
+ * 2026.2" tem o rank de presença E o de parcerias, e a pessoa
  * compete nos dois sem fazer nada a mais — os dois saem dos mesmos
  * check-ins e das mesmas marcações de dupla que já existiam.
  */
@@ -198,10 +198,13 @@ export const MODALIDADES: DefinicaoModalidade[] = [
   {
     id: 'duplas',
     emoji: '🤝',
-    nome: 'Rodízio',
-    unidade: ['parceiro', 'parceiros'],
+    // O id continua 'duplas' (é o que está gravado nos desafios); o
+    // nome e a regra mudaram — antes era o Rodízio, que contava só
+    // pessoas diferentes. Ver `pontosDeParcerias`.
+    nome: 'Parcerias',
+    unidade: ['ponto', 'pontos'],
     regra:
-      'Conta pessoas diferentes com quem você dançou (dupla confirmada dos dois lados) durante TODO o desafio — dançar com a mesma pessoa em várias noites conta 1.',
+      'Cada pessoa com quem você dançou (dupla confirmada dos dois lados) vira uma carta que vale pelo nível: 1 noite juntos vale 1 ponto, 3 noites 2, 6 noites 3 e 10 noites 4. Voltar a dançar com quem já dançou também rende.',
   },
 ]
 

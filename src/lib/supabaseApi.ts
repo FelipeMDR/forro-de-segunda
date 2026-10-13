@@ -6,7 +6,7 @@ import {
   limitesDaNoite,
   mapaAberturas,
 } from './dates'
-import { mensagemForrodexOcupada } from './forrodex'
+import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
@@ -1508,7 +1508,7 @@ export class SupabaseApi implements ForroApi {
       challenge.data_inicio,
       challenge.data_fim,
     )
-    // Mesmo filtro de `pontosDeRodizio`: só noite que valeu
+    // Mesmo filtro de `pontosDeParcerias`: só noite que valeu
     return agruparParceiros(rows.filter((r) => validas.has(r.data)))
   }
 
@@ -1561,7 +1561,7 @@ export class SupabaseApi implements ForroApi {
 
     const pontos =
       modalidade === 'duplas'
-        ? await this.pontosDeRodizio(challenge, ids, janelasPor)
+        ? await this.pontosDeParcerias(challenge, ids, janelasPor)
         : new Map([...janelasPor].map(([uid, js]) => [uid, js.size]))
 
     return membros
@@ -1670,20 +1670,11 @@ export class SupabaseApi implements ForroApi {
   }
 
   /**
-   * Rodízio: quantas PESSOAS DIFERENTES cada membro tirou para dançar
-   * dentro do desafio.
-   *
-   * Pessoas diferentes, e não quantidade de duplas, pela mesma razão
-   * que o distintivo de rodízio já usava: contar volume premiaria
-   * dançar a noite toda com o mesmo par, e dois amigos se marcando
-   * todas as semanas subiriam sozinhos no ranking. Contar variedade
-   * empurra o rodízio, que é a cultura do forró.
-   *
-   * Só entram duplas CONFIRMADAS pelos dois lados, e só em noites que
-   * valeram para a pessoa neste desafio — senão daria para somar
-   * parceiro marcando dupla numa foto tirada em casa.
+   * Parcerias: cada parceiro vira uma carta que vale pelo nível
+   * alcançado no desafio — a regra está em `pontosDeParcerias`. Aqui
+   * só busca as duplas confirmadas do período.
    */
-  private async pontosDeRodizio(
+  private async pontosDeParcerias(
     challenge: Challenge,
     ids: string[],
     janelasPor: Map<string, Set<string>>,
@@ -1717,14 +1708,7 @@ export class SupabaseApi implements ForroApi {
       )
     }
 
-    const parceirosPor = new Map<string, Set<string>>()
-    for (const r of rows) {
-      if (!janelasPor.get(r.de_user)?.has(r.data)) continue
-      const set = parceirosPor.get(r.de_user) ?? new Set<string>()
-      set.add(r.para_user)
-      parceirosPor.set(r.de_user, set)
-    }
-    return new Map([...parceirosPor].map(([uid, set]) => [uid, set.size]))
+    return pontosDeParcerias(rows, janelasPor)
   }
 
   // ---- Agenda ----

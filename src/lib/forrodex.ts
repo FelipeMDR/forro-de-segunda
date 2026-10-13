@@ -39,7 +39,7 @@ export function turmasDe(
  * Com `universo` (Forródex presa a um desafio, ver `carregarParceiros`),
  * as cartas que faltam são só de quem está nele — com turma ou não, já
  * que convidado de evento também participa. Quem já dançou comigo entra
- * mesmo sem estar inscrito: é a regra do ranking de rodízio, e os dois
+ * mesmo sem estar inscrito: é a regra do ranking de Parcerias, e os
  * números precisam bater.
  */
 export function montarForrodex(
@@ -177,7 +177,7 @@ export interface ParceirosForrodex {
  * do perfil, noites juntos, etiqueta do salão).
  *
  * Se a organização prendeu a Forródex a um desafio, os parceiros saem
- * com a regra do ranking de rodízio (ver `parceirosNoDesafio`) e as
+ * com a regra do ranking de Parcerias (ver `parceirosNoDesafio`) e as
  * cartas que faltam são dos participantes; senão, desde o último "Encerrar
  * semestre" (ou `semEncerramento`, quando nunca houve um). Quem usa
  * não diferencia os dois casos — o vínculo não aparece para os alunos.
@@ -244,6 +244,55 @@ export function nivelDupla(noites: number): ProgressoDupla | null {
     faltam: proximo.minimo - noites,
     fracao: (noites - atual.minimo) / (proximo.minimo - atual.minimo),
   }
+}
+
+/**
+ * Quanto uma carta vale na disputa de Parcerias: o número do nível
+ * (Primeira dança 1, Parceria 2, Dupla afinada 3, Dupla de ouro 4).
+ * Sai da mesma tabela das cartas, para o ranking nunca descolar do que
+ * a Forródex mostra.
+ */
+export function pontosDaCarta(noites: number): number {
+  return nivelDupla(noites)?.atual.nivel ?? 0
+}
+
+/**
+ * Parcerias: cada pessoa com quem dancei vira uma carta, e a carta vale
+ * pelo nível que alcançou dentro do desafio. Soma de todas as cartas.
+ *
+ * Contar só pessoas diferentes (o antigo Rodízio) premiava chamar
+ * alguém uma vez e nunca mais. Valendo por nível, voltar a dançar com
+ * quem já dançou também rende — sem deixar de premiar a variedade, já
+ * que a primeira dança com alguém novo é o ponto mais barato de pegar.
+ *
+ * `rows` são as duplas CONFIRMADAS do período, do lado de quem marcou
+ * (`de_user`); só contam noites que valeram para a pessoa no desafio
+ * (`noitesValidas`) — senão daria para somar marcando dupla numa foto
+ * tirada em casa.
+ */
+export function pontosDeParcerias(
+  rows: { de_user: string; para_user: string; data: string }[],
+  noitesValidas: Map<string, Set<string>>,
+): Map<string, number> {
+  // de_user → para_user → noites juntos
+  const noitesPor = new Map<string, Map<string, Set<string>>>()
+  for (const r of rows) {
+    if (!noitesValidas.get(r.de_user)?.has(r.data)) continue
+    let porParceiro = noitesPor.get(r.de_user)
+    if (!porParceiro) {
+      porParceiro = new Map()
+      noitesPor.set(r.de_user, porParceiro)
+    }
+    const dias = porParceiro.get(r.para_user) ?? new Set<string>()
+    dias.add(r.data)
+    porParceiro.set(r.para_user, dias)
+  }
+  return new Map(
+    [...noitesPor].map(([uid, porParceiro]) => [
+      uid,
+      [...porParceiro.values()].reduce((soma, dias) => soma + pontosDaCarta(dias.size), 0),
+    ]),
+  )
 }
 
 /** Quantas duplas em cada nível, na ordem de `NIVEIS_DUPLA`. */

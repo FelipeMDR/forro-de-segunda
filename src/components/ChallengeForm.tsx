@@ -297,7 +297,7 @@ export function ChallengeForm({
           })}
           <p className="text-[11px] text-tinta-500">
             Cada disputa vira uma aba de ranking na página do desafio.
-            Ligar o rodízio num desafio que já começou não zera nada — as
+            Ligar as parcerias num desafio que já começou não zera nada — as
             duplas já marcadas no período entram junto.
           </p>
         </div>
