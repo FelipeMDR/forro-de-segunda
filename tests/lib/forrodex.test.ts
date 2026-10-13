@@ -101,6 +101,45 @@ describe('montarForrodex', () => {
   })
 })
 
+describe('montarForrodex presa a um desafio', () => {
+  it('só entra quem participa, com turma ou não', () => {
+    const d = montarForrodex(
+      [perfil('eu'), perfil('a'), perfil('fora'), perfil('convidado', [])],
+      [],
+      'eu',
+      null,
+      new Set(['eu', 'a', 'convidado']),
+    )
+    expect(d.faltam.map((c) => c.user_id)).toEqual(['a', 'convidado'])
+  })
+
+  it('dupla com quem não participa não vira carta', () => {
+    const d = montarForrodex(
+      [perfil('a'), perfil('fora')],
+      [par('a', 1), par('fora', 4)],
+      'eu',
+      null,
+      new Set(['a']),
+    )
+    expect(d.descobertos.map((c) => c.user_id)).toEqual(['a'])
+    expect(d.total).toBe(1)
+  })
+
+  it('a visão por turma respeita o mesmo universo', () => {
+    const secoes = agruparPorTurma(
+      [perfil('a', ['Inter']), perfil('b', ['Inter']), perfil('convidado', [])],
+      [],
+      'eu',
+      ['Inter'],
+      new Set(['a', 'convidado']),
+    )
+    expect(secoes.map((s) => [s.turma, s.faltam.map((c) => c.user_id)])).toEqual([
+      ['Inter', ['a']],
+      [null, ['convidado']],
+    ])
+  })
+})
+
 describe('turmasDe', () => {
   it('junta onde estudo e onde dou aula, sem repetir', () => {
     expect(turmasDe(perfil('eu', ['Inter', 'AV'], ['AV', 'Iniciante 01']))).toEqual([

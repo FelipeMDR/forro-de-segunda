@@ -56,6 +56,7 @@ import type {
   Papel,
   PapelDanca,
   ParceiroDanca,
+  RecorteForrodex,
   ParceiroPossivel,
   PresenteNoite,
   PedidoMusica,
@@ -103,6 +104,8 @@ interface ChallengeRow {
   entrada_restrita?: boolean
   /** Opcional: banco demo anterior às modalidades não tem o campo. */
   modalidades?: Modalidade[]
+  /** Opcional: banco demo anterior à Forródex presa a desafio. */
+  forrodex?: boolean
   criado_por: string | null
 }
 
@@ -1140,6 +1143,7 @@ export class DemoApi implements ForroApi {
       // Banco demo gravado antes das modalidades existirem: só presença,
       // que é como o desafio funcionava.
       modalidades: c.modalidades?.length ? c.modalidades : ['checkin'],
+      forrodex: c.forrodex === true,
       participantes: this.db.members.filter((m) => m.challenge_id === c.id)
         .length,
       sou_membro: this.db.members.some(
@@ -1202,6 +1206,23 @@ export class DemoApi implements ForroApi {
     this.db.challenges = this.db.challenges.filter((c) => c.id !== id)
     this.db.members = this.db.members.filter((m) => m.challenge_id !== id)
     this.persist()
+  }
+
+  async definirDesafioForrodex(id: string | null) {
+    for (const c of this.db.challenges) c.forrodex = c.id === id
+    this.persist()
+  }
+
+  async recorteForrodex(): Promise<RecorteForrodex | null> {
+    const c = this.db.challenges.find((x) => x.forrodex)
+    if (!c) return null
+    return {
+      data_inicio: c.data_inicio,
+      data_fim: c.data_fim,
+      participantes: this.db.members
+        .filter((m) => m.challenge_id === c.id)
+        .map((m) => m.user_id),
+    }
   }
 
   private exigeConvite(id: string) {
@@ -1578,14 +1599,20 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
-  async parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]> {
+  async parceirosDe(
+    userId: string,
+    desde?: string,
+    ate?: string,
+  ): Promise<ParceiroDanca[]> {
     // Mesmo corte de dia que o Supabase: `desde` é ISO datetime,
     // `d.data` é só "AAAA-MM-DD".
     const desdeData = desde?.slice(0, 10)
+    const ateData = ate?.slice(0, 10)
     const porPessoa = new Map<string, { nome: string; avatar: string | null; dias: Set<string> }>()
     for (const d of this.db.duplas ?? []) {
       if (d.de_user !== userId || !d.confirmada) continue
       if (desdeData && d.data < desdeData) continue
+      if (ateData && d.data > ateData) continue
       const p = this.db.profiles.find((x) => x.id === d.para_user)
       const atual = porPessoa.get(d.para_user) ?? {
         nome: p?.nome ?? 'Alguém',

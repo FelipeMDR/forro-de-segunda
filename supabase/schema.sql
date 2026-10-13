@@ -60,6 +60,9 @@ create table if not exists public.challenges (
   -- Disputas que rodam neste desafio ao mesmo tempo: presença e/ou
   -- rodízio. As duas saem dos dados que já existem — ver migração 024.
   modalidades text[] not null default array['checkin']::text[],
+  -- A Forródex de todo mundo segue este desafio (participantes e
+  -- período). No máximo um — ver migração 035.
+  forrodex boolean not null default false,
   criado_por uuid references public.profiles(id) on delete set null,
   criado_em timestamptz not null default now(),
   check (data_fim >= data_inicio),
@@ -68,6 +71,10 @@ create table if not exists public.challenges (
     and modalidades <@ array['checkin', 'duplas']::text[]
   )
 );
+
+create unique index if not exists challenges_um_forrodex
+  on public.challenges (forrodex)
+  where forrodex;
 
 -- Janela de check-in por dia da semana: cada espaço tem seu próprio
 -- horário de aula, então cada dia do desafio pode ter uma janela

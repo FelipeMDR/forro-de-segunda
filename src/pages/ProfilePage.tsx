@@ -13,6 +13,7 @@ import { BotaoSuave, Confirmar, Contador, Interruptor } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeBadges } from '../lib/badges'
+import { carregarParceiros } from '../lib/forrodex'
 import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { useTema } from '../lib/tema'
@@ -78,11 +79,8 @@ export function ProfilePage() {
       .then(setSemestreEncerrado)
       .catch(() => setSemestreEncerrado(false))
     // Forródex do semestre: pessoas com dupla confirmada desde o corte
-    void api
-      .inicioSemestreAtual()
-      .catch(() => null)
-      .then((desde) => api.parceirosDe(userId, desde ?? profile.criado_em ?? undefined))
-      .then((ps) => setDexSemestre(ps.length))
+    void carregarParceiros(api, userId, profile.criado_em ?? undefined)
+      .then(({ parceiros }) => setDexSemestre(parceiros.length))
       .catch(() => setDexSemestre(null))
   }, [api, userId, profile])
 

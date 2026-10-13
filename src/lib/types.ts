@@ -241,6 +241,12 @@ export interface Challenge {
    * existir vem só com `['checkin']`, que é como sempre funcionou.
    */
   modalidades: Modalidade[]
+  /**
+   * A Forródex está presa a este desafio: mostra só quem participa e as
+   * duplas do período dele. No máximo um por vez, e só o organizador
+   * enxerga — para os alunos é só a Forródex de sempre.
+   */
+  forrodex: boolean
   criado_por: string | null
   participantes: number
   sou_membro: boolean
@@ -344,6 +350,13 @@ export interface ParceiroDanca {
   avatar_url: string | null
   /** Quantas noites vocês dançaram juntos. */
   noites: number
+}
+
+/** O desafio a que a Forródex está presa: período e quem participa. */
+export interface RecorteForrodex {
+  data_inicio: string // "YYYY-MM-DD"
+  data_fim: string // "YYYY-MM-DD"
+  participantes: string[]
 }
 
 /** Check-in com a contagem de reações — base da retrospectiva. */

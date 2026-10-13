@@ -6,6 +6,7 @@ import { Spinner } from '../components/Spinner'
 import { Cabecalho, LinhaPessoa } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { horaCurta, useNoite } from '../context/NoiteContext'
+import { carregarParceiros } from '../lib/forrodex'
 import type { PresenteNoite } from '../lib/types'
 
 /**
@@ -19,6 +20,8 @@ export function SalaoPage() {
   const navigate = useNavigate()
   const [presentes, setPresentes] = useState<PresenteNoite[] | null>(null)
   const [jaDancei, setJaDancei] = useState<Set<string>>(new Set())
+  // Quem entra na Forródex: fora dela, a etiqueta não faz sentido
+  const [universo, setUniverso] = useState<Set<string> | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
@@ -30,11 +33,12 @@ export function SalaoPage() {
       .catch((e) => vivo && setErro((e as Error).message))
     // A etiqueta é um extra: se falhar, a lista aparece sem ela
     if (userId) {
-      void api
-        .inicioSemestreAtual()
-        .catch(() => null)
-        .then((desde) => api.parceirosDe(userId, desde ?? undefined))
-        .then((ps) => vivo && setJaDancei(new Set(ps.map((p) => p.user_id))))
+      void carregarParceiros(api, userId)
+        .then(({ parceiros, universo }) => {
+          if (!vivo) return
+          setJaDancei(new Set(parceiros.map((p) => p.user_id)))
+          setUniverso(universo)
+        })
         .catch(() => {})
     }
     return () => {
@@ -71,7 +75,7 @@ export function SalaoPage() {
                 sub={[p.cargos[0], p.turma].filter(Boolean).join(' · ') || undefined}
                 direita={
                   <>
-                    {!jaDancei.has(p.user_id) && (
+                    {!jaDancei.has(p.user_id) && (!universo || universo.has(p.user_id)) && (
                       <span className="shrink-0 rounded-full border-[1.5px] border-preto bg-brasa-300 px-2 py-[3px] text-[11px] font-extrabold text-preto">
                         falta dançar
                       </span>

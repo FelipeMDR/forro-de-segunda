@@ -30,6 +30,7 @@ import type {
   Papel,
   PapelDanca,
   ParceiroDanca,
+  RecorteForrodex,
   ParceiroPossivel,
   PresenteNoite,
   PedidoMusica,
@@ -254,6 +255,16 @@ export interface ForroApi {
   getChallenge(id: string): Promise<Challenge | null>
   saveChallenge(data: ChallengeInput): Promise<void>
   deleteChallenge(id: string): Promise<void>
+  /**
+   * Prende a Forródex a um desafio (organizador). Solta o que estava
+   * preso antes; `null` volta para a Forródex do semestre.
+   */
+  definirDesafioForrodex(id: string | null): Promise<void>
+  /**
+   * Período e participantes do desafio a que a Forródex está presa.
+   * null = Forródex do semestre (nenhum preso, ou migração 035 não rodou).
+   */
+  recorteForrodex(): Promise<RecorteForrodex | null>
   joinChallenge(id: string): Promise<void>
   leaveChallenge(id: string): Promise<void>
   /**
@@ -342,9 +353,10 @@ export interface ForroApi {
    * perfil e o distintivo de rodízio, que são conquistas que não
    * fazem sentido zerar a cada semestre. Com `desde` (ISO): só as
    * noites dentro do período — é o que a retrospectiva usa, para não
-   * herdar duplas de semestres já encerrados.
+   * herdar duplas de semestres já encerrados. `ate` (data ou ISO)
+   * fecha o período no fim — é o recorte da Forródex presa a um desafio.
    */
-  parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]>
+  parceirosDe(userId: string, desde?: string, ate?: string): Promise<ParceiroDanca[]>
 
   // ---- Notificações ----
   /**

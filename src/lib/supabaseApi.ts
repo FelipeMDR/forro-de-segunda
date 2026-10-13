@@ -45,6 +45,7 @@ import type {
   Papel,
   PapelDanca,
   ParceiroDanca,
+  RecorteForrodex,
   ParceiroPossivel,
   PresenteNoite,
   PedidoMusica,
@@ -1291,6 +1292,8 @@ export class SupabaseApi implements ForroApi {
       // Sem a migração 024 a coluna não existe: cai em só presença, que
       // é como o desafio funcionava antes de existir modalidade.
       modalidades: modalidadesValidas(c.modalidades),
+      // Sem a migração 035 a coluna não existe: Forródex do semestre
+      forrodex: c.forrodex === true,
       // Ausente enquanto a migração 008 não roda — sem trava de local
       local:
         c.local_lat != null && c.local_lng != null
@@ -1406,6 +1409,44 @@ export class SupabaseApi implements ForroApi {
 
   async deleteChallenge(id: string) {
     ok(await this.sb.from('challenges').delete().eq('id', id))
+  }
+
+  async definirDesafioForrodex(id: string | null) {
+    // Solta o anterior ANTES de prender o novo: o índice único da
+    // migração 035 recusa dois marcados ao mesmo tempo.
+    let soltar = this.sb
+      .from('challenges')
+      .update({ forrodex: false })
+      .eq('forrodex', true)
+    if (id) soltar = soltar.neq('id', id)
+    ok(await soltar)
+    if (id) {
+      ok(await this.sb.from('challenges').update({ forrodex: true }).eq('id', id))
+    }
+  }
+
+  async recorteForrodex(): Promise<RecorteForrodex | null> {
+    const { data, error } = await this.sb
+      .from('challenges')
+      .select('id, data_inicio, data_fim')
+      .eq('forrodex', true)
+      .maybeSingle()
+    // Sem a migração 035 a coluna não existe — Forródex do semestre
+    if (error || !data) return null
+    const desafio = data as { id: string; data_inicio: string; data_fim: string }
+    const membros = await todasAsLinhas<{ user_id: string }>((de, ate) =>
+      this.sb
+        .from('challenge_members')
+        .select('user_id')
+        .eq('challenge_id', desafio.id)
+        .order('user_id')
+        .range(de, ate),
+    )
+    return {
+      data_inicio: desafio.data_inicio,
+      data_fim: desafio.data_fim,
+      participantes: membros.map((m) => m.user_id),
+    }
   }
 
   async joinChallenge(id: string) {
@@ -2042,7 +2083,11 @@ export class SupabaseApi implements ForroApi {
     )
   }
 
-  async parceirosDe(userId: string, desde?: string): Promise<ParceiroDanca[]> {
+  async parceirosDe(
+    userId: string,
+    desde?: string,
+    ate?: string,
+  ): Promise<ParceiroDanca[]> {
     // Só confirmadas contam. Como a dupla confirmada tem as duas
     // linhas, olhar por de_user já cobre tudo sem duplicar. Paginado:
     // quem roda muito o salão passa de 1000 noites-pessoa no histórico.
@@ -2050,7 +2095,7 @@ export class SupabaseApi implements ForroApi {
       data: string
       para_user: string
       perfil: { nome: string; avatar_url: string | null } | null
-    }>((de, ate) => {
+    }>((inicio, fim) => {
       let consulta = this.sb
         .from('duplas')
         .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
@@ -2059,7 +2104,8 @@ export class SupabaseApi implements ForroApi {
       // `desde` é ISO datetime, `duplas.data` é só a data — corta na
       // parte do dia para não excluir a própria noite do encerramento.
       if (desde) consulta = consulta.gte('data', desde.slice(0, 10))
-      return consulta.order('id').range(de, ate)
+      if (ate) consulta = consulta.lte('data', ate.slice(0, 10))
+      return consulta.order('id').range(inicio, fim)
     })
 
     const porPessoa = new Map<string, ParceiroDanca & { dias: Set<string> }>()

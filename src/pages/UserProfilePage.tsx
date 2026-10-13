@@ -8,7 +8,7 @@ import { BotaoIcone, BotaoSuave, useVoltar } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { diaDaNoite } from '../lib/dates'
-import { nivelDupla } from '../lib/forrodex'
+import { carregarParceiros, nivelDupla } from '../lib/forrodex'
 import { useEstiloNivel } from '../lib/metais'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import type { Badge, CheckinFavorito, ParceiroPossivel, Profile } from '../lib/types'
@@ -167,12 +167,9 @@ export function UserProfilePage() {
     })()
     // Noites juntos neste semestre (mesmo corte da Forródex)
     if (userId) {
-      void api
-        .inicioSemestreAtual()
-        .catch(() => null)
-        .then((desde) => api.parceirosDe(userId, desde ?? eu?.criado_em ?? undefined))
-        .then((ps) => {
-          if (!cancelado) setNoitesJuntos(ps.find((x) => x.user_id === id)?.noites ?? 0)
+      void carregarParceiros(api, userId, eu?.criado_em ?? undefined)
+        .then(({ parceiros }) => {
+          if (!cancelado) setNoitesJuntos(parceiros.find((x) => x.user_id === id)?.noites ?? 0)
         })
         .catch(() => !cancelado && setNoitesJuntos(0))
     }

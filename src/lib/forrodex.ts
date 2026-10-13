@@ -1,3 +1,4 @@
+import type { ForroApi } from './api'
 import type { ParceiroDanca, PerfilPublico } from './types'
 
 /** Uma carta da coleção. `noites` 0 = ainda não dançaram no semestre. */
@@ -34,12 +35,17 @@ export function turmasDe(
  *
  * `parceiros` já vem cortado no início do semestre (ver `parceirosDe`)
  * e só com duplas confirmadas dos dois lados.
+ *
+ * Com `universo` (Forródex presa a um desafio, ver `carregarParceiros`),
+ * só entra quem está nele — com turma ou não, já que convidado de
+ * evento também participa.
  */
 export function montarForrodex(
   perfis: PerfilPublico[],
   parceiros: ParceiroDanca[],
   meuId: string,
   turma?: string | null,
+  universo?: Set<string> | null,
 ): Forrodex {
   const porId = new Map(perfis.map((p) => [p.id, p]))
   const naTurma = (id: string) => {
@@ -47,9 +53,10 @@ export function montarForrodex(
     const p = porId.get(id)
     return !!p && turmasDe(p).includes(turma)
   }
+  const noUniverso = (id: string) => !universo || universo.has(id)
 
   const descobertos = parceiros
-    .filter((p) => p.user_id !== meuId && naTurma(p.user_id))
+    .filter((p) => p.user_id !== meuId && noUniverso(p.user_id) && naTurma(p.user_id))
     .map((p) => ({ ...p }))
     .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome, 'pt-BR'))
 
@@ -59,7 +66,7 @@ export function montarForrodex(
       (p) =>
         p.id !== meuId &&
         !jaDancei.has(p.id) &&
-        turmasDe(p).length > 0 &&
+        (universo ? universo.has(p.id) : turmasDe(p).length > 0) &&
         naTurma(p.id),
     )
     .map((p) => ({
@@ -125,15 +132,19 @@ export function agruparPorTurma(
   parceiros: ParceiroDanca[],
   meuId: string,
   turmas: string[],
+  universo?: Set<string> | null,
 ): SecaoForrodex[] {
   const secoes: SecaoForrodex[] = turmas
-    .map((turma) => ({ turma, ...montarForrodex(perfis, parceiros, meuId, turma) }))
+    .map((turma) => ({
+      turma,
+      ...montarForrodex(perfis, parceiros, meuId, turma, universo),
+    }))
     .filter((s) => s.total > 0)
 
   const jaApareceu = new Set(
     secoes.flatMap((s) => [...s.descobertos, ...s.faltam].map((c) => c.user_id)),
   )
-  const todos = montarForrodex(perfis, parceiros, meuId)
+  const todos = montarForrodex(perfis, parceiros, meuId, null, universo)
   const descobertos = todos.descobertos.filter((c) => !jaApareceu.has(c.user_id))
   const faltam = todos.faltam.filter((c) => !jaApareceu.has(c.user_id))
   if (descobertos.length + faltam.length > 0) {
@@ -145,6 +156,41 @@ export function agruparPorTurma(
     })
   }
   return secoes
+}
+
+/** O que alimenta a Forródex: com quem dancei e quem entra na coleção. */
+export interface ParceirosForrodex {
+  parceiros: ParceiroDanca[]
+  /** null = todo mundo com turma no semestre (sem desafio preso). */
+  universo: Set<string> | null
+}
+
+/**
+ * Busca os parceiros no mesmo recorte da Forródex, para a tela dela e
+ * para tudo que fala "neste semestre" com os mesmos números (contador
+ * do perfil, noites juntos, etiqueta do salão).
+ *
+ * Se a organização prendeu a Forródex a um desafio, o recorte é o
+ * período e os participantes dele; senão, desde o último "Encerrar
+ * semestre" (ou `semEncerramento`, quando nunca houve um). Quem usa
+ * não diferencia os dois casos — o vínculo não aparece para os alunos.
+ */
+export async function carregarParceiros(
+  api: ForroApi,
+  userId: string,
+  semEncerramento?: string,
+): Promise<ParceirosForrodex> {
+  const recorte = await api.recorteForrodex().catch(() => null)
+  if (recorte) {
+    const universo = new Set(recorte.participantes)
+    const parceiros = await api.parceirosDe(userId, recorte.data_inicio, recorte.data_fim)
+    return { parceiros: parceiros.filter((p) => universo.has(p.user_id)), universo }
+  }
+  const desde = await api.inicioSemestreAtual().catch(() => null)
+  return {
+    parceiros: await api.parceirosDe(userId, desde ?? semEncerramento),
+    universo: null,
+  }
 }
 
 /** Nível de uma dupla no semestre, pelas noites que dançaram juntos. */
