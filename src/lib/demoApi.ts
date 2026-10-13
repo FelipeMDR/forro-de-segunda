@@ -1232,6 +1232,7 @@ export class DemoApi implements ForroApi {
     const c = this.db.challenges.find((x) => x.forrodex)
     if (!c) return null
     return {
+      challenge_id: c.id,
       data_inicio: c.data_inicio,
       data_fim: c.data_fim,
       participantes: this.db.members
@@ -1358,6 +1359,61 @@ export class DemoApi implements ForroApi {
     return { adicionados, pendentes, jaEstavam }
   }
 
+  /** Noites em que `uid` valeu no desafio (espelha `janelasValidasPorMembro`). */
+  private noitesValidas(challenge: Challenge, uid: string): Set<string> {
+    // Aula cancelada = sem janela naquele dia, ninguém pontua. Espaço
+    // aberto mais cedo é o oposto: a janela adianta naquele dia.
+    const suspensos = diasSuspensos(this.db.feriados)
+    const aberturas = mapaAberturas(this.db.aberturas ?? [])
+    return janelasNoDesafio(
+      this.db.checkins
+        .filter(
+          (c) =>
+            c.user_id === uid &&
+            // Revisão da organização vence tudo (mig. 026)
+            c.presenca_anulada !== true &&
+            // Com trava de local, valem só os que têm veredito —
+            // menos os anteriores à trava, que continuam valendo
+            (!challenge.local ||
+              (challenge.local.desde !== null &&
+                c.criado_em < challenge.local.desde) ||
+              (c.locais ?? []).includes(challenge.id)),
+        )
+        .map((c) => new Date(c.criado_em)),
+      challenge,
+      suspensos,
+      aberturas,
+    )
+  }
+
+  async parceirosNoDesafio(
+    challengeId: string,
+    userId: string,
+  ): Promise<ParceiroDanca[]> {
+    const c = this.db.challenges.find((x) => x.id === challengeId)
+    if (!c) return []
+    const validas = this.noitesValidas(this.toChallenge(c), userId)
+    // Mesmo filtro do rodízio: só noite que valeu. O nome e a foto
+    // vêm de `parceirosDe`, que já agrupa por pessoa.
+    const duplas = (this.db.duplas ?? []).filter(
+      (d) =>
+        d.confirmada &&
+        d.de_user === userId &&
+        d.data >= c.data_inicio &&
+        d.data <= c.data_fim &&
+        validas.has(d.data),
+    )
+    return (await this.parceirosDe(userId, c.data_inicio, c.data_fim))
+      .map((p) => ({
+        ...p,
+        noites: new Set(
+          duplas.filter((d) => d.para_user === p.user_id).map((d) => d.data),
+        ).size,
+      }))
+      .filter((p) => p.noites > 0)
+      .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
+  }
+
   async getRanking(
     challenge: Challenge,
     modalidade: Modalidade = 'checkin',
@@ -1365,34 +1421,12 @@ export class DemoApi implements ForroApi {
     const memberIds = this.db.members
       .filter((m) => m.challenge_id === challenge.id)
       .map((m) => m.user_id)
-    // Aula cancelada = sem janela naquele dia, ninguém pontua. Espaço
-    // aberto mais cedo é o oposto: a janela adianta naquele dia.
-    const suspensos = diasSuspensos(this.db.feriados)
-    const aberturas = mapaAberturas(this.db.aberturas ?? [])
     return memberIds
       .map((uid) => {
         const p = this.db.profiles.find((x) => x.id === uid)
         // As noites que valeram para esta pessoa neste desafio — base
         // das duas modalidades (espelha `janelasValidasPorMembro`).
-        const janelas = janelasNoDesafio(
-          this.db.checkins
-            .filter(
-              (c) =>
-                c.user_id === uid &&
-                // Revisão da organização vence tudo (mig. 026)
-                c.presenca_anulada !== true &&
-                // Com trava de local, valem só os que têm veredito —
-                // menos os anteriores à trava, que continuam valendo
-                (!challenge.local ||
-                  (challenge.local.desde !== null &&
-                    c.criado_em < challenge.local.desde) ||
-                  (c.locais ?? []).includes(challenge.id)),
-            )
-            .map((c) => new Date(c.criado_em)),
-          challenge,
-          suspensos,
-          aberturas,
-        )
+        const janelas = this.noitesValidas(challenge, uid)
         // Rodízio conta PESSOAS DIFERENTES, e só em noite que valeu —
         // mesma regra da produção (ver `pontosDeRodizio`).
         const pontos =

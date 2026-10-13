@@ -37,8 +37,10 @@ export function turmasDe(
  * e só com duplas confirmadas dos dois lados.
  *
  * Com `universo` (Forródex presa a um desafio, ver `carregarParceiros`),
- * só entra quem está nele — com turma ou não, já que convidado de
- * evento também participa.
+ * as cartas que faltam são só de quem está nele — com turma ou não, já
+ * que convidado de evento também participa. Quem já dançou comigo entra
+ * mesmo sem estar inscrito: é a regra do ranking de rodízio, e os dois
+ * números precisam bater.
  */
 export function montarForrodex(
   perfis: PerfilPublico[],
@@ -53,10 +55,9 @@ export function montarForrodex(
     const p = porId.get(id)
     return !!p && turmasDe(p).includes(turma)
   }
-  const noUniverso = (id: string) => !universo || universo.has(id)
 
   const descobertos = parceiros
-    .filter((p) => p.user_id !== meuId && noUniverso(p.user_id) && naTurma(p.user_id))
+    .filter((p) => p.user_id !== meuId && naTurma(p.user_id))
     .map((p) => ({ ...p }))
     .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome, 'pt-BR'))
 
@@ -175,8 +176,9 @@ export interface ParceirosForrodex {
  * para tudo que fala "neste semestre" com os mesmos números (contador
  * do perfil, noites juntos, etiqueta do salão).
  *
- * Se a organização prendeu a Forródex a um desafio, o recorte é o
- * período e os participantes dele; senão, desde o último "Encerrar
+ * Se a organização prendeu a Forródex a um desafio, os parceiros saem
+ * com a regra do ranking de rodízio (ver `parceirosNoDesafio`) e as
+ * cartas que faltam são dos participantes; senão, desde o último "Encerrar
  * semestre" (ou `semEncerramento`, quando nunca houve um). Quem usa
  * não diferencia os dois casos — o vínculo não aparece para os alunos.
  */
@@ -187,9 +189,10 @@ export async function carregarParceiros(
 ): Promise<ParceirosForrodex> {
   const recorte = await api.recorteForrodex().catch(() => null)
   if (recorte) {
-    const universo = new Set(recorte.participantes)
-    const parceiros = await api.parceirosDe(userId, recorte.data_inicio, recorte.data_fim)
-    return { parceiros: parceiros.filter((p) => universo.has(p.user_id)), universo }
+    return {
+      parceiros: await api.parceirosNoDesafio(recorte.challenge_id, userId),
+      universo: new Set(recorte.participantes),
+    }
   }
   const desde = await api.inicioSemestreAtual().catch(() => null)
   return {

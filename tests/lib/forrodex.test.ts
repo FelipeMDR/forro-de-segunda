@@ -113,16 +113,17 @@ describe('montarForrodex presa a um desafio', () => {
     expect(d.faltam.map((c) => c.user_id)).toEqual(['a', 'convidado'])
   })
 
-  it('dupla com quem não participa não vira carta', () => {
+  it('quem dançou comigo conta mesmo fora do desafio, como no ranking', () => {
     const d = montarForrodex(
-      [perfil('a'), perfil('fora')],
+      [perfil('a'), perfil('fora'), perfil('b')],
       [par('a', 1), par('fora', 4)],
       'eu',
       null,
-      new Set(['a']),
+      new Set(['a', 'b']),
     )
-    expect(d.descobertos.map((c) => c.user_id)).toEqual(['a'])
-    expect(d.total).toBe(1)
+    expect(d.descobertos.map((c) => c.user_id)).toEqual(['fora', 'a'])
+    expect(d.faltam.map((c) => c.user_id)).toEqual(['b'])
+    expect(d.total).toBe(3)
   })
 
   it('a visão por turma respeita o mesmo universo', () => {

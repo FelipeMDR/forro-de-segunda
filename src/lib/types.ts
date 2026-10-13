@@ -354,6 +354,7 @@ export interface ParceiroDanca {
 
 /** O desafio a que a Forródex está presa: período e quem participa. */
 export interface RecorteForrodex {
+  challenge_id: string
   data_inicio: string // "YYYY-MM-DD"
   data_fim: string // "YYYY-MM-DD"
   participantes: string[]

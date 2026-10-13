@@ -246,6 +246,35 @@ interface DuplaNotif {
   perfil: PerfilNotif
 }
 
+/** Uma linha de `duplas` do meu lado, com o perfil do parceiro. */
+interface LinhaParceiro {
+  data: string
+  para_user: string
+  perfil: { nome: string; avatar_url: string | null } | null
+}
+
+/** Uma entrada por parceiro, com quantas noites diferentes dançamos. */
+function agruparParceiros(rows: LinhaParceiro[]): ParceiroDanca[] {
+  const porPessoa = new Map<string, ParceiroDanca & { dias: Set<string> }>()
+  for (const r of rows) {
+    let p = porPessoa.get(r.para_user)
+    if (!p) {
+      p = {
+        user_id: r.para_user,
+        nome: r.perfil?.nome ?? 'Alguém',
+        avatar_url: r.perfil?.avatar_url ?? null,
+        noites: 0,
+        dias: new Set(),
+      }
+      porPessoa.set(r.para_user, p)
+    }
+    p.dias.add(r.data)
+  }
+  return [...porPessoa.values()]
+    .map(({ dias, ...p }) => ({ ...p, noites: dias.size }))
+    .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
+}
+
 export class SupabaseApi implements ForroApi {
   readonly mode = 'supabase' as const
   private sb: SupabaseClient
@@ -1457,10 +1486,30 @@ export class SupabaseApi implements ForroApi {
         .range(de, ate),
     )
     return {
+      challenge_id: desafio.id,
       data_inicio: desafio.data_inicio,
       data_fim: desafio.data_fim,
       participantes: membros.map((m) => m.user_id),
     }
+  }
+
+  async parceirosNoDesafio(
+    challengeId: string,
+    userId: string,
+  ): Promise<ParceiroDanca[]> {
+    const challenge = await this.getChallenge(challengeId)
+    if (!challenge) return []
+    const validas =
+      (await this.janelasValidasPorMembro(challenge, [userId])).get(userId) ??
+      new Set<string>()
+    if (validas.size === 0) return []
+    const rows = await this.duplasConfirmadasDe(
+      userId,
+      challenge.data_inicio,
+      challenge.data_fim,
+    )
+    // Mesmo filtro de `pontosDeRodizio`: só noite que valeu
+    return agruparParceiros(rows.filter((r) => validas.has(r.data)))
   }
 
   async joinChallenge(id: string) {
@@ -2102,14 +2151,18 @@ export class SupabaseApi implements ForroApi {
     desde?: string,
     ate?: string,
   ): Promise<ParceiroDanca[]> {
+    return agruparParceiros(await this.duplasConfirmadasDe(userId, desde, ate))
+  }
+
+  private async duplasConfirmadasDe(
+    userId: string,
+    desde?: string,
+    ate?: string,
+  ): Promise<LinhaParceiro[]> {
     // Só confirmadas contam. Como a dupla confirmada tem as duas
     // linhas, olhar por de_user já cobre tudo sem duplicar. Paginado:
     // quem roda muito o salão passa de 1000 noites-pessoa no histórico.
-    const rows = await todasAsLinhas<{
-      data: string
-      para_user: string
-      perfil: { nome: string; avatar_url: string | null } | null
-    }>((inicio, fim) => {
+    return todasAsLinhas<LinhaParceiro>((inicio, fim) => {
       let consulta = this.sb
         .from('duplas')
         .select('data, para_user, perfil:profiles!para_user(nome, avatar_url)')
@@ -2121,25 +2174,6 @@ export class SupabaseApi implements ForroApi {
       if (ate) consulta = consulta.lte('data', ate.slice(0, 10))
       return consulta.order('id').range(inicio, fim)
     })
-
-    const porPessoa = new Map<string, ParceiroDanca & { dias: Set<string> }>()
-    for (const r of rows) {
-      let p = porPessoa.get(r.para_user)
-      if (!p) {
-        p = {
-          user_id: r.para_user,
-          nome: r.perfil?.nome ?? 'Alguém',
-          avatar_url: r.perfil?.avatar_url ?? null,
-          noites: 0,
-          dias: new Set(),
-        }
-        porPessoa.set(r.para_user, p)
-      }
-      p.dias.add(r.data)
-    }
-    return [...porPessoa.values()]
-      .map(({ dias, ...p }) => ({ ...p, noites: dias.size }))
-      .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
   }
 
   async confirmarPresenca(eventoId: string, data: string, vai: boolean) {

@@ -269,6 +269,14 @@ export interface ForroApi {
    * null = Forródex do semestre (nenhum preso, ou migração 035 não rodou).
    */
   recorteForrodex(): Promise<RecorteForrodex | null>
+  /**
+   * Parceiros de alguém dentro de um desafio, com a MESMA regra do
+   * ranking de rodízio: dupla confirmada numa noite que valeu para a
+   * pessoa no desafio, com o parceiro inscrito ou não. `noites` conta
+   * só essas noites. É o que a Forródex presa ao desafio mostra, para
+   * os dois números baterem.
+   */
+  parceirosNoDesafio(challengeId: string, userId: string): Promise<ParceiroDanca[]>
   joinChallenge(id: string): Promise<void>
   leaveChallenge(id: string): Promise<void>
   /**
