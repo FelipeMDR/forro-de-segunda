@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { getApi, type ForroApi } from '../lib/api'
 import type { Papel, Profile } from '../lib/types'
+import { esquecerTelas } from '../lib/memoriaTelas'
 
 interface AuthState {
   api: ForroApi
@@ -65,6 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    // Outra pessoa (ou ninguém) na sessão: o que as telas guardaram era
+    // da conta anterior
+    esquecerTelas()
     if (!api) return
     if (!userId) {
       setProfile(null)

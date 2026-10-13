@@ -12,6 +12,7 @@ import type { FaixaSpotify, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 import { useSessaoDJAoVivo } from '../lib/useSessaoDJAoVivo'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /** "toca daqui a ~N músicas" a partir da posição na lista de próximas. */
 function quando(posicao: number, naFilaDoSpotify: boolean): string {
@@ -65,10 +66,13 @@ export function MusicaPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const podeSerDJ = usePodeSerDJ() === true
-  const [sessao, setSessao] = useState<SessaoDJ | null | undefined>(undefined)
-  const [fila, setFila] = useState<PedidoNaFila[]>([])
-  const [pedidos, setPedidos] = useState<PedidoMusica[]>([])
-  const [temCheckin, setTemCheckin] = useState(false)
+  const [sessao, setSessao] = useLembrado<SessaoDJ | null | undefined>(
+    'dj:sessao',
+    undefined,
+  )
+  const [fila, setFila] = useLembrado<PedidoNaFila[]>('dj:fila', [])
+  const [pedidos, setPedidos] = useLembrado<PedidoMusica[]>('dj:pedidos', [])
+  const [temCheckin, setTemCheckin] = useLembrado('musica:temCheckin', false)
   const [termo, setTermo] = useState('')
   const [resultados, setResultados] = useState<FaixaSpotify[] | null>(null)
   const [buscando, setBuscando] = useState(false)

@@ -26,6 +26,7 @@ import {
   type Modalidade,
 } from '../../lib/types'
 import { Campo, Dica, usePainel } from './contexto'
+import { useLembrado } from '../../lib/memoriaTelas'
 
 /**
  * Catálogo dos distintivos personalizados. Os de presença, rodízio, DJ,
@@ -36,7 +37,7 @@ export function DistintivosPage() {
   const { api } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const [lista, setLista] = useState<DistintivoDef[] | null>(null)
+  const [lista, setLista] = useLembrado<DistintivoDef[] | null>('painel:distintivos', null)
   const [busca, setBusca] = useState('')
   const [entregando, setEntregando] = useState<DistintivoDef | null>(null)
   const [apagando, setApagando] = useState<DistintivoDef | null>(null)
@@ -159,7 +160,10 @@ function FolhaEntrega({
   const toast = useToast()
   const { perfis, turmas, desafios } = usePainel()
   const [modo, setModo] = useState<'pessoa' | 'turma' | 'top'>('pessoa')
-  const [recebedores, setRecebedores] = useState<DistintivoRecebedor[] | null>(null)
+  const [recebedores, setRecebedores] = useLembrado<DistintivoRecebedor[] | null>(
+    `painel:distintivo:${distintivo.id}`,
+    null,
+  )
   const [busca, setBusca] = useState('')
   const [turma, setTurma] = useState<string | null>(null)
   const [desafioId, setDesafioId] = useState<string | null>(null)

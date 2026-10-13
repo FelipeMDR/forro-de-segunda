@@ -25,6 +25,7 @@ import {
   type Report,
   type Turma,
 } from '../../lib/types'
+import { useLembrado } from '../../lib/memoriaTelas'
 
 /**
  * O que as telas do painel compartilham. Carregado uma vez ao entrar no
@@ -63,14 +64,17 @@ export function usePainel(): DadosPainel {
 function Provider({ children }: { children: ReactNode }) {
   const { api } = useAuth()
   const toast = useToast()
-  const [turmas, setTurmas] = useState<Turma[]>([])
-  const [cargos, setCargos] = useState<Cargo[]>([])
-  const [feriados, setFeriados] = useState<Feriado[]>([])
-  const [aberturas, setAberturas] = useState<AberturaAntecipada[]>([])
-  const [desafios, setDesafios] = useState<Challenge[]>([])
-  const [reports, setReports] = useState<Report[]>([])
-  const [perfis, setPerfis] = useState<Profile[]>([])
-  const [alunos, setAlunos] = useState<AlunoCadastrado[] | null>(null)
+  const [turmas, setTurmas] = useLembrado<Turma[]>('painel:turmas', [])
+  const [cargos, setCargos] = useLembrado<Cargo[]>('painel:cargos', [])
+  const [feriados, setFeriados] = useLembrado<Feriado[]>('feriados', [])
+  const [aberturas, setAberturas] = useLembrado<AberturaAntecipada[]>('aberturas', [])
+  const [desafios, setDesafios] = useLembrado<Challenge[]>('desafios', [])
+  const [reports, setReports] = useLembrado<Report[]>('painel:reports', [])
+  const [perfis, setPerfis] = useLembrado<Profile[]>('painel:perfis', [])
+  const [alunos, setAlunos] = useLembrado<AlunoCadastrado[] | null>(
+    'painel:alunos',
+    null,
+  )
 
   const recarregar = useMemo(
     () => ({

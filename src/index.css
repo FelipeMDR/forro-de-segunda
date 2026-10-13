@@ -182,10 +182,11 @@
   }
 }
 
+/* Sem fade: começar de opacity 0 fazia a tela sumir e voltar a cada
+   troca de aba — um piscar mesmo com os dados já prontos. */
 @keyframes tela-entra {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -321,7 +322,7 @@
 }
 
 .anima-tela {
-  animation: tela-entra 0.3s ease;
+  animation: tela-entra 0.22s ease-out;
 }
 .anima-folha {
   animation: folha-sobe 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);

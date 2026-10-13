@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { horaCurta, useNoite } from '../context/NoiteContext'
 import { carregarParceiros } from '../lib/forrodex'
 import type { PresenteNoite } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Quem fez check-in nesta noite, do mais recente para o mais antigo.
@@ -18,10 +19,13 @@ export function SalaoPage() {
   const { api, userId } = useAuth()
   const { noite } = useNoite()
   const navigate = useNavigate()
-  const [presentes, setPresentes] = useState<PresenteNoite[] | null>(null)
-  const [jaDancei, setJaDancei] = useState<Set<string>>(new Set())
+  const [presentes, setPresentes] = useLembrado<PresenteNoite[] | null>(
+    `salao:${noite}`,
+    null,
+  )
+  const [jaDancei, setJaDancei] = useLembrado<Set<string>>('salao:jaDancei', new Set())
   // Quem entra na Forródex: fora dela, a etiqueta não faz sentido
-  const [universo, setUniverso] = useState<Set<string> | null>(null)
+  const [universo, setUniverso] = useLembrado<Set<string> | null>('salao:universo', null)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {

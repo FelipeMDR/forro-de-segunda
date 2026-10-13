@@ -7,6 +7,7 @@ import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import type { FeedItem } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Uma publicação isolada, fora da lista do feed — é para onde uma
@@ -19,7 +20,10 @@ export function PublicacaoPage() {
   const { id } = useParams<{ id: string }>()
   const { api } = useAuth()
   const navigate = useNavigate()
-  const [item, setItem] = useState<FeedItem | null | undefined>()
+  const [item, setItem] = useLembrado<FeedItem | null | undefined>(
+    `publicacao:${id}`,
+    undefined,
+  )
   const [erro, setErro] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {

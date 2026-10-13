@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ocorrenciasEvento, toISODate, type OcorrenciaAgenda } from '../lib/dates'
 import type { AgendaEvent, ConfirmacaoPresenca, Feriado } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 interface Item extends OcorrenciaAgenda {
   /** Quando a aula volta, se esta ocorrência foi cancelada. */
@@ -41,9 +42,12 @@ function contagem(d: Date, agora: Date): string {
 export function AgendaPage() {
   const { api, profile, userId } = useAuth()
   const toast = useToast()
-  const [eventos, setEventos] = useState<AgendaEvent[] | null>(null)
-  const [feriados, setFeriados] = useState<Feriado[]>([])
-  const [confirmacoes, setConfirmacoes] = useState<ConfirmacaoPresenca[]>([])
+  const [eventos, setEventos] = useLembrado<AgendaEvent[] | null>('agenda:eventos', null)
+  const [feriados, setFeriados] = useLembrado<Feriado[]>('feriados', [])
+  const [confirmacoes, setConfirmacoes] = useLembrado<ConfirmacaoPresenca[]>(
+    'agenda:confirmacoes',
+    [],
+  )
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 

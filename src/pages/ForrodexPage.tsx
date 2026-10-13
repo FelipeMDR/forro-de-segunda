@@ -17,6 +17,7 @@ import {
 } from '../lib/forrodex'
 import { useEstiloNivel, type EstiloNivel } from '../lib/metais'
 import type { ParceiroDanca, PerfilPublico } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /** Bolinha com o metal do nível, para a contagem e a explicação. */
 function Metal({ estilo }: { estilo: EstiloNivel }) {
@@ -136,12 +137,12 @@ function GradeCartas({ cartas }: { cartas: CartaForrodex[] }) {
 export function ForrodexPage() {
   const { api, userId, profile } = useAuth()
   const navigate = useNavigate()
-  const [dados, setDados] = useState<{
+  const [dados, setDados] = useLembrado<{
     perfis: PerfilPublico[]
     parceiros: ParceiroDanca[]
     universo: Set<string> | null
     turmas: string[]
-  } | null>(null)
+  } | null>('forrodex', null)
   const [erro, setErro] = useState<string | null>(null)
   const [turma, setTurma] = useState<string | null>(null)
   const [explicacao, setExplicacao] = useState(false)

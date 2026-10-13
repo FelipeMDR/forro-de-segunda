@@ -35,6 +35,7 @@ import {
   type RankingEntry,
 } from '../lib/types'
 import { statusDoDesafio } from './ChallengesPage'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Junta dias seguidos com o mesmo motivo numa faixa só ("05 – 09 out ·
@@ -94,10 +95,15 @@ export function ChallengeDetailPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const voltar = useVoltar('/desafios')
-  const [desafio, setDesafio] = useState<Challenge | null | undefined>()
-  const [ranking, setRanking] = useState<RankingEntry[]>([])
-  const [feriados, setFeriados] = useState<Feriado[]>([])
-  const [aberturasAntecipadas, setAberturasAntecipadas] = useState<AberturaAntecipada[]>([])
+  const [desafio, setDesafio] = useLembrado<Challenge | null | undefined>(
+    `desafio:${id}`,
+    undefined,
+  )
+  const [feriados, setFeriados] = useLembrado<Feriado[]>('feriados', [])
+  const [aberturasAntecipadas, setAberturasAntecipadas] = useLembrado<AberturaAntecipada[]>(
+    'aberturas',
+    [],
+  )
   const [erro, setErro] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -107,7 +113,15 @@ export function ChallengeDetailPage() {
    * Qual disputa está na tela. `null` = ainda não escolhida; assim que
    * o desafio carrega, cai na primeira modalidade dele.
    */
-  const [modalidade, setModalidade] = useState<Modalidade | null>(null)
+  const [modalidade, setModalidade] = useLembrado<Modalidade | null>(
+    `desafio:${id}:modalidade`,
+    null,
+  )
+  // Uma memória por disputa: alternar entre elas não pisca o ranking
+  const [ranking, setRanking] = useLembrado<RankingEntry[]>(
+    `desafio:${id}:ranking:${modalidade}`,
+    [],
+  )
 
   const carregar = useCallback(async () => {
     if (!id) return

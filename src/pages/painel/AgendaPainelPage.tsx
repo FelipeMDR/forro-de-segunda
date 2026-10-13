@@ -35,6 +35,7 @@ import {
 } from '../../lib/types'
 import { nomesModalidades, statusDoDesafio } from '../ChallengesPage'
 import { Campo, Dica, usePainel } from './contexto'
+import { useLembrado } from '../../lib/memoriaTelas'
 
 type Aba = 'prox' | 'eventos' | 'desafios'
 
@@ -97,7 +98,7 @@ export function AgendaPainelPage() {
   const [params, setParams] = useSearchParams()
   const aba = (params.get('aba') as Aba | null) ?? 'prox'
   const { turmas, feriados, aberturas, desafios, recarregar } = usePainel()
-  const [eventos, setEventos] = useState<AgendaEvent[] | null>(null)
+  const [eventos, setEventos] = useLembrado<AgendaEvent[] | null>('agenda:eventos', null)
   /** Cancelar uma aula (ou um dia inteiro, sem ocorrência). */
   const [cancelando, setCancelando] = useState<{ data: string; turma: string | null; titulo: string } | null>(null)
   const [abrindo, setAbrindo] = useState(false)

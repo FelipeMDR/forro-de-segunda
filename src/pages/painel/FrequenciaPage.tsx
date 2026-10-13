@@ -11,6 +11,7 @@ import { diaDaNoite, diasSuspensos, formatDate, mapaAberturas, toISODate } from 
 import { janelaDaPresenca } from '../../lib/presenca'
 import type { AttendanceRow } from '../../lib/types'
 import { Dica, usePainel } from './contexto'
+import { useLembrado } from '../../lib/memoriaTelas'
 
 type Aba = 'resumo' | 'tabela' | 'revisao' | 'exportar'
 
@@ -46,7 +47,10 @@ export function FrequenciaPage() {
   const { desafios, feriados, aberturas } = usePainel()
   const meses = ultimosMeses()
   const [mes, setMes] = useState(meses[meses.length - 1])
-  const [presencas, setPresencas] = useState<AttendanceRow[] | null>(null)
+  const [presencas, setPresencas] = useLembrado<AttendanceRow[] | null>(
+    `painel:frequencia:${mes}`,
+    null,
+  )
   const [busca, setBusca] = useState('')
   const [noite, setNoite] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
@@ -59,7 +63,8 @@ export function FrequenciaPage() {
     [api],
   )
   useEffect(() => {
-    setPresencas(null)
+    // Trocar de mês troca a chave de `presencas`: mostra o que já havia
+    // daquele mês (ou o carregando) sem zerar à mão.
     void carregar(mes).catch((e) => toast((e as Error).message, 'erro'))
   }, [carregar, mes, toast])
 

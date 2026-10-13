@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { aoPublicarCheckin } from '../lib/eventos'
 import { PAGINA_FEED } from '../lib/types'
 import type { FeedItem } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Quanto o feed espera, depois de uma foto nova, antes de recarregar.
@@ -22,11 +23,11 @@ const ESPERA_TEMPO_REAL_MS = 25_000
 export function FeedPage() {
   const { api, profile } = useAuth()
   const navigate = useNavigate()
-  const [feed, setFeed] = useState<FeedItem[] | null>(null)
+  const [feed, setFeed] = useLembrado<FeedItem[] | null>('feed', null)
   const [erro, setErro] = useState<string | null>(null)
-  const [visao, setVisao] = useState<'todos' | 'turma'>('todos')
+  const [visao, setVisao] = useLembrado<'todos' | 'turma'>('feed:visao', 'todos')
   const [carregandoMais, setCarregandoMais] = useState(false)
-  const [temMais, setTemMais] = useState(true)
+  const [temMais, setTemMais] = useLembrado('feed:temMais', true)
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const ultimaCarga = useRef(0)
   /** Número da última recarga disparada — ver `carregar`. */

@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext'
 import { formatDate, formatRelative } from '../lib/dates'
 import { PAGINA_NOTIFICACOES } from '../lib/types'
 import type { Notificacao } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Convite da retrospectiva.
@@ -145,12 +146,15 @@ function Aviso({
 export function NotificacoesPage() {
   const { api } = useAuth()
   const toast = useToast()
-  const [itens, setItens] = useState<Notificacao[] | null>(null)
+  const [itens, setItens] = useLembrado<Notificacao[] | null>('avisos', null)
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [carregandoMais, setCarregandoMais] = useState(false)
-  const [temMais, setTemMais] = useState(true)
-  const [semestreEncerrado, setSemestreEncerrado] = useState(false)
+  const [temMais, setTemMais] = useLembrado('avisos:temMais', true)
+  const [semestreEncerrado, setSemestreEncerrado] = useLembrado(
+    'semestreEncerrado',
+    false,
+  )
   /**
    * Quando o painel tinha sido visto antes desta abertura — é o que diz
    * quais avisos são novos. `undefined` enquanto não se sabe (nada

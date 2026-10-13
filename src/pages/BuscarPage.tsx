@@ -13,6 +13,7 @@ import {
   turmaLabel,
   type PerfilPublico,
 } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /** Grupos da equipe, na ordem em que aparecem sem busca. */
 const GRUPOS: Array<[string, (cargo: string) => boolean]> = [
@@ -43,8 +44,8 @@ export function BuscarPage() {
   const voltar = useVoltar('/')
   const campo = useRef<HTMLInputElement>(null)
 
-  const [perfis, setPerfis] = useState<PerfilPublico[] | null>(null)
-  const [turmas, setTurmas] = useState<string[]>([])
+  const [perfis, setPerfis] = useLembrado<PerfilPublico[] | null>('perfisPublicos', null)
+  const [turmas, setTurmas] = useLembrado<string[]>('buscar:turmas', [])
   const [erro, setErro] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 

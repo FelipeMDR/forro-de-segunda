@@ -13,6 +13,7 @@ import type { ConexaoDJ, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/typ
 import { useAtualizacaoPeriodica } from '../lib/useAtualizacaoPeriodica'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 import { useSessaoDJAoVivo } from '../lib/useSessaoDJAoVivo'
+import { useLembrado } from '../lib/memoriaTelas'
 
 const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
   sem_aparelho:
@@ -38,10 +39,10 @@ export function DJPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
-  const [sessao, setSessao] = useState<SessaoDJ | null>(null)
-  const [fila, setFila] = useState<PedidoNaFila[]>([])
-  const [pedidos, setPedidos] = useState<PedidoMusica[]>([])
+  const [conexao, setConexao] = useLembrado<ConexaoDJ | null>('dj:conexao', null)
+  const [sessao, setSessao] = useLembrado<SessaoDJ | null>('dj:sessao', null)
+  const [fila, setFila] = useLembrado<PedidoNaFila[]>('dj:fila', [])
+  const [pedidos, setPedidos] = useLembrado<PedidoMusica[]>('dj:pedidos', [])
   const [ocupado, setOcupado] = useState(false)
   const [fechamento, setFechamento] = useState<Fechamento>('2')
   const [confirmarDesligar, setConfirmarDesligar] = useState(false)

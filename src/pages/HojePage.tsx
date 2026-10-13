@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AceiteTermos } from '../components/AceiteTermos'
 import { Avatar } from '../components/Avatar'
@@ -24,6 +24,7 @@ import type {
   PresenteNoite,
   SessaoDJ,
 } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * A tela de abertura, pensada para os dois minutos de quem está no
@@ -36,11 +37,15 @@ export function HojePage() {
   const navigate = useNavigate()
   const noite = useNoite()
   const podeSerDJ = usePodeSerDJ()
-  const [sessao, setSessao] = useState<SessaoDJ | null>(null)
-  const [fila, setFila] = useState(0)
-  const [presentes, setPresentes] = useState<PresenteNoite[] | null>(null)
-  const [eventos, setEventos] = useState<AgendaEvent[]>([])
-  const [posicao, setPosicao] = useState<{ desafio: Challenge; pos: number } | null>(
+  const [sessao, setSessao] = useLembrado<SessaoDJ | null>('hoje:sessao', null)
+  const [fila, setFila] = useLembrado('hoje:fila', 0)
+  const [presentes, setPresentes] = useLembrado<PresenteNoite[] | null>(
+    'hoje:presentes',
+    null,
+  )
+  const [eventos, setEventos] = useLembrado<AgendaEvent[]>('agenda:eventos', [])
+  const [posicao, setPosicao] = useLembrado<{ desafio: Challenge; pos: number } | null>(
+    'hoje:posicao',
     null,
   )
 

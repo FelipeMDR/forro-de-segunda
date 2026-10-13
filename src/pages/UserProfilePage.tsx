@@ -12,6 +12,7 @@ import { carregarParceiros, nivelDupla } from '../lib/forrodex'
 import { useEstiloNivel } from '../lib/metais'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import type { Badge, CheckinFavorito, ParceiroPossivel, Profile } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * "Dancei com" no perfil de alguém.
@@ -126,21 +127,27 @@ export function UserProfilePage() {
   const navigate = useNavigate()
   const voltar = useVoltar('/')
 
-  const [perfil, setPerfil] = useState<Profile | null | undefined>()
-  const [stats, setStats] = useState<PerfilStats | null>(null)
-  const [badges, setBadges] = useState<Badge[] | null>(null)
-  const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
-  const [noitesJuntos, setNoitesJuntos] = useState<number | null>(null)
+  const [perfil, setPerfil] = useLembrado<Profile | null | undefined>(
+    `perfil:${id}`,
+    undefined,
+  )
+  const [stats, setStats] = useLembrado<PerfilStats | null>(`perfil:${id}:stats`, null)
+  const [badges, setBadges] = useLembrado<Badge[] | null>(`perfil:${id}:badges`, null)
+  const [favoritos, setFavoritos] = useLembrado<CheckinFavorito[] | null>(
+    `perfil:${id}:favoritos`,
+    null,
+  )
+  const [noitesJuntos, setNoitesJuntos] = useLembrado<number | null>(
+    `perfil:${id}:noitesJuntos`,
+    null,
+  )
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
     let cancelado = false
-    setPerfil(undefined)
-    setStats(null)
-    setBadges(null)
-    setFavoritos(null)
-    setNoitesJuntos(null)
+    // Trocar de pessoa troca a chave dos estados acima: a tela já mostra
+    // o que havia guardado dela (ou o carregando), sem zerar à mão.
     setErro(null)
     void (async () => {
       try {

@@ -19,6 +19,7 @@ import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { useTema } from '../lib/tema'
 import type { Badge, CheckinFavorito } from '../lib/types'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
+import { useLembrado } from '../lib/memoriaTelas'
 
 export function ProfilePage() {
   const { api, userId, profile, papel, refreshProfile } = useAuth()
@@ -28,13 +29,19 @@ export function ProfilePage() {
   const [tema, setTema] = useTema()
   const podeSerDJ = usePodeSerDJ() === true
 
-  const [stats, setStats] = useState<PerfilStats | null>(null)
-  const [badges, setBadges] = useState<Badge[] | null>(null)
-  const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
-  const [semestreEncerrado, setSemestreEncerrado] = useState(false)
-  const [dexSemestre, setDexSemestre] = useState<number | null>(null)
-  const [denuncias, setDenuncias] = useState(0)
-  const [djLigado, setDjLigado] = useState(false)
+  const [stats, setStats] = useLembrado<PerfilStats | null>('perfil:stats', null)
+  const [badges, setBadges] = useLembrado<Badge[] | null>('perfil:badges', null)
+  const [favoritos, setFavoritos] = useLembrado<CheckinFavorito[] | null>(
+    'perfil:favoritos',
+    null,
+  )
+  const [semestreEncerrado, setSemestreEncerrado] = useLembrado(
+    'semestreEncerrado',
+    false,
+  )
+  const [dexSemestre, setDexSemestre] = useLembrado<number | null>('perfil:dex', null)
+  const [denuncias, setDenuncias] = useLembrado('perfil:denuncias', 0)
+  const [djLigado, setDjLigado] = useLembrado('perfil:djLigado', false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const [saindo, setSaindo] = useState(false)
 

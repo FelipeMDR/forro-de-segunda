@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft } from '../lib/dates'
 import { faixasDeHorario, periodoCurto } from '../lib/horarios'
 import { defModalidade, type Challenge } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /** "Presença e Parcerias" */
 export function nomesModalidades(c: Challenge): string {
@@ -76,7 +77,7 @@ function CartaoDesafio({ c }: { c: Challenge }) {
 
 export function ChallengesPage() {
   const { api, papel } = useAuth()
-  const [desafios, setDesafios] = useState<Challenge[] | null>(null)
+  const [desafios, setDesafios] = useLembrado<Challenge[] | null>('desafios', null)
   const [erro, setErro] = useState<string | null>(null)
   const [criando, setCriando] = useState(false)
 

@@ -7,6 +7,7 @@ import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { useAuth } from '../context/AuthContext'
 import type { FeedItem } from '../lib/types'
+import { useLembrado } from '../lib/memoriaTelas'
 
 /**
  * Os favoritos de alguém como um feed — é para onde a galeria do perfil
@@ -20,7 +21,7 @@ export function FavoritosPage() {
   const foto = params.get('foto')
   const { api } = useAuth()
   const navigate = useNavigate()
-  const [itens, setItens] = useState<FeedItem[] | null>(null)
+  const [itens, setItens] = useLembrado<FeedItem[] | null>(`favoritos:${id}`, null)
   const [erro, setErro] = useState<string | null>(null)
   /** Só rola até a foto tocada na primeira carga, não a cada recarga. */
   const posicionou = useRef(false)
@@ -44,9 +45,11 @@ export function FavoritosPage() {
     if (!itens || posicionou.current) return
     posicionou.current = true
     if (!foto) return
-    document
-      .getElementById(`favorito-${foto}`)
-      ?.scrollIntoView({ block: 'start' })
+    // Num quadro seguinte: com os favoritos já guardados de outra visita,
+    // isto rodaria antes do "volta ao topo" da casca, que desfaria a rolagem
+    requestAnimationFrame(() =>
+      document.getElementById(`favorito-${foto}`)?.scrollIntoView({ block: 'start' }),
+    )
   }, [itens, foto])
 
   if (erro) {
