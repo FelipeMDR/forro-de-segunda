@@ -45,6 +45,13 @@ export function faixasDeHorario(janelas: ChallengeJanela[]): string[] {
 }
 
 /** "01 – 31 out" ou "28 set – 04 out". */
+/** "05 out" — um dia só, no mesmo formato de `periodoCurto`. */
+export function diaCurto(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`)
+  const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+  return `${String(d.getDate()).padStart(2, '0')} ${mes}`
+}
+
 export function periodoCurto(inicio: string, fim: string): string {
   const d = (iso: string) => new Date(`${iso}T12:00:00`)
   const mes = (x: Date) =>
