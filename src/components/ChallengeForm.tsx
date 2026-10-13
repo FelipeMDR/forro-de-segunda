@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { toISODate } from '../lib/dates'
+import { mensagemForrodexOcupada } from '../lib/forrodex'
 import { obterPosicao } from '../lib/geo'
 import {
   DIAS_ABREV,
@@ -35,6 +36,10 @@ export function ChallengeForm({
     entrada_restrita: desafio?.entrada_restrita ?? false,
     modalidades: desafio?.modalidades ?? ['checkin'],
   })
+  // Fora do ChallengeInput: só vai ao banco se mudar, então editar um
+  // desafio continua funcionando antes de a migração 035 rodar
+  const [forrodex, setForrodex] = useState(desafio?.forrodex ?? false)
+  const [conferindoForrodex, setConferindoForrodex] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [buscandoLocal, setBuscandoLocal] = useState(false)
   const [precisao, setPrecisao] = useState<number | null>(null)
@@ -126,6 +131,25 @@ export function ChallengeForm({
     }))
   }
 
+  // Ligar confere na hora se outro desafio já está com a Forródex: ela
+  // não muda de desafio sozinha, a organização desliga lá primeiro
+  const mudarForrodex = async (ligar: boolean) => {
+    if (!ligar) {
+      setForrodex(false)
+      return
+    }
+    setConferindoForrodex(true)
+    try {
+      const outro = await api.desafioComForrodex(desafio?.id)
+      if (outro) toast(mensagemForrodexOcupada(outro.titulo), 'erro')
+      else setForrodex(true)
+    } catch (err) {
+      toast((err as Error).message, 'erro')
+    } finally {
+      setConferindoForrodex(false)
+    }
+  }
+
   const submeter = async (e: FormEvent) => {
     e.preventDefault()
     if (form.data_fim < form.data_inicio) {
@@ -149,7 +173,10 @@ export function ChallengeForm({
     }
     setSalvando(true)
     try {
-      await api.saveChallenge(form)
+      const id = await api.saveChallenge(form)
+      if (forrodex !== (desafio?.forrodex ?? false)) {
+        await api.definirForrodex(id, forrodex)
+      }
       toast(desafio ? 'Desafio atualizado!' : 'Desafio criado! 🏆')
       onSaved()
       onClose()
@@ -396,6 +423,27 @@ export function ChallengeForm({
               onChange={(e) =>
                 setForm((f) => ({ ...f, entrada_restrita: e.target.checked }))
               }
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-2xl bg-chip p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">🃏 Forródex segue este desafio</p>
+              <p className="text-[11px] text-tinta-500">
+                A Forródex de todo mundo mostra só quem participa e as
+                duplas do período. Os alunos não veem esse vínculo. Só um
+                desafio por vez.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
+              aria-label="Forródex segue este desafio"
+              checked={forrodex}
+              disabled={conferindoForrodex}
+              onChange={(e) => void mudarForrodex(e.target.checked)}
             />
           </div>
         </div>

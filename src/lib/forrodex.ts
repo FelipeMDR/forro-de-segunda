@@ -158,6 +158,11 @@ export function agruparPorTurma(
   return secoes
 }
 
+/** Recusa de ligar a Forródex quando outro desafio já está com ela. */
+export function mensagemForrodexOcupada(titulo: string): string {
+  return `O desafio "${titulo}" já está usando a Forródex. Desligue lá antes de mover para este.`
+}
+
 /** O que alimenta a Forródex: com quem dancei e quem entra na coleção. */
 export interface ParceirosForrodex {
   parceiros: ParceiroDanca[]

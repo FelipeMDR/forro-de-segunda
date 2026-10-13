@@ -12,7 +12,8 @@
 --   a mostrar só quem participa dele e as duplas do período dele.
 -- - No máximo um desafio marcado por vez (índice único parcial).
 -- - Nada na tela dos alunos fala do vínculo — só o organizador vê a
---   opção, na seção "Organização" do desafio.
+--   opção, no formulário de edição do desafio. Não muda de desafio
+--   sozinha: com outro já marcado, o app recusa e diz qual.
 --
 -- Rode no SQL Editor e depois "Reload schema cache". Pode rodar mais
 -- de uma vez.

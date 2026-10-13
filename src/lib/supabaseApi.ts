@@ -6,6 +6,7 @@ import {
   limitesDaNoite,
   mapaAberturas,
 } from './dates'
+import { mensagemForrodexOcupada } from './forrodex'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
@@ -1405,24 +1406,37 @@ export class SupabaseApi implements ForroApi {
       apagar = apagar.not('dia_semana', 'in', `(${diasNovos.join(',')})`)
     }
     ok(await apagar)
+    return challengeId
   }
 
   async deleteChallenge(id: string) {
     ok(await this.sb.from('challenges').delete().eq('id', id))
   }
 
-  async definirDesafioForrodex(id: string | null) {
-    // Solta o anterior ANTES de prender o novo: o índice único da
-    // migração 035 recusa dois marcados ao mesmo tempo.
-    let soltar = this.sb
+  async desafioComForrodex(excetoId?: string) {
+    let consulta = this.sb
       .from('challenges')
-      .update({ forrodex: false })
+      .select('id, titulo')
       .eq('forrodex', true)
-    if (id) soltar = soltar.neq('id', id)
-    ok(await soltar)
-    if (id) {
-      ok(await this.sb.from('challenges').update({ forrodex: true }).eq('id', id))
+    if (excetoId) consulta = consulta.neq('id', excetoId)
+    const { data, error } = await consulta.maybeSingle()
+    if (error) throw new Error(traduz(error.message))
+    return (data as { id: string; titulo: string } | null) ?? null
+  }
+
+  async definirForrodex(challengeId: string, ligado: boolean) {
+    if (ligado) {
+      const outro = await this.desafioComForrodex(challengeId)
+      if (outro) throw new Error(mensagemForrodexOcupada(outro.titulo))
     }
+    // O índice único da migração 035 segura a corrida de dois
+    // organizadores ligando ao mesmo tempo
+    ok(
+      await this.sb
+        .from('challenges')
+        .update({ forrodex: ligado })
+        .eq('id', challengeId),
+    )
   }
 
   async recorteForrodex(): Promise<RecorteForrodex | null> {

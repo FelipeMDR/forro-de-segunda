@@ -1,4 +1,5 @@
 import { decidirPassada, LIMITE_BUSCA } from '../../supabase/functions/_shared/djPuro'
+import { mensagemForrodexOcupada } from './forrodex'
 import type { ForroApi } from './api'
 import {
   addDays,
@@ -1163,7 +1164,8 @@ export class DemoApi implements ForroApi {
     return c ? this.toChallenge(c) : null
   }
 
-  async saveChallenge(data: ChallengeInput) {
+  async saveChallenge(data: ChallengeInput): Promise<string> {
+    let id = data.id ?? ''
     if (data.id) {
       const c = this.db.challenges.find((x) => x.id === data.id)
       if (!c) throw new Error('Desafio não encontrado')
@@ -1183,8 +1185,9 @@ export class DemoApi implements ForroApi {
         },
       })
     } else {
+      id = uuid()
       this.db.challenges.push({
-        id: uuid(),
+        id,
         titulo: data.titulo,
         descricao: data.descricao || null,
         data_inicio: data.data_inicio,
@@ -1200,6 +1203,7 @@ export class DemoApi implements ForroApi {
       })
     }
     this.persist()
+    return id
   }
 
   async deleteChallenge(id: string) {
@@ -1208,8 +1212,19 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
-  async definirDesafioForrodex(id: string | null) {
-    for (const c of this.db.challenges) c.forrodex = c.id === id
+  async desafioComForrodex(excetoId?: string) {
+    const c = this.db.challenges.find((x) => x.forrodex && x.id !== excetoId)
+    return c ? { id: c.id, titulo: c.titulo } : null
+  }
+
+  async definirForrodex(challengeId: string, ligado: boolean) {
+    if (ligado) {
+      const outro = await this.desafioComForrodex(challengeId)
+      if (outro) throw new Error(mensagemForrodexOcupada(outro.titulo))
+    }
+    const c = this.db.challenges.find((x) => x.id === challengeId)
+    if (!c) throw new Error('Desafio não encontrado')
+    c.forrodex = ligado
     this.persist()
   }
 

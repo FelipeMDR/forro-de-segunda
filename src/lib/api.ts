@@ -253,13 +253,17 @@ export interface ForroApi {
   // ---- Desafios (competição de presença) ----
   listChallenges(): Promise<Challenge[]>
   getChallenge(id: string): Promise<Challenge | null>
-  saveChallenge(data: ChallengeInput): Promise<void>
+  /** Cria ou edita; devolve o id do desafio. */
+  saveChallenge(data: ChallengeInput): Promise<string>
   deleteChallenge(id: string): Promise<void>
   /**
-   * Prende a Forródex a um desafio (organizador). Solta o que estava
-   * preso antes; `null` volta para a Forródex do semestre.
+   * Liga ou desliga a Forródex num desafio (organizador). Não move
+   * sozinha: se outro desafio já está com ela, recusa dizendo qual —
+   * a organização desliga lá primeiro.
    */
-  definirDesafioForrodex(id: string | null): Promise<void>
+  definirForrodex(challengeId: string, ligado: boolean): Promise<void>
+  /** Qual outro desafio já está com a Forródex. null = nenhum. */
+  desafioComForrodex(excetoId?: string): Promise<{ id: string; titulo: string } | null>
   /**
    * Período e participantes do desafio a que a Forródex está presa.
    * null = Forródex do semestre (nenhum preso, ou migração 035 não rodou).

@@ -11,7 +11,6 @@ import {
   BotaoIcone,
   BotaoSuave,
   Confirmar,
-  LinhaInterruptor,
   RotuloSecao,
   Segmentado,
   useVoltar,
@@ -213,20 +212,6 @@ export function ChallengeDetailPage() {
     }
   }
 
-  // Só o organizador vê: para os alunos é a Forródex de sempre
-  const prenderForrodex = async (ligar: boolean) => {
-    setOcupado(true)
-    try {
-      await api.definirDesafioForrodex(ligar ? desafio.id : null)
-      toast(ligar ? 'A Forródex agora segue este desafio' : 'A Forródex voltou a ser do semestre')
-      await carregar()
-    } catch (e) {
-      toast((e as Error).message, 'erro')
-    } finally {
-      setOcupado(false)
-    }
-  }
-
   // Um CSV por disputa: o arquivo e a coluna dizem qual
   const exportarCSV = () => {
     const base = desafio.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')
@@ -421,13 +406,6 @@ export function ChallengeDetailPage() {
                 Excluir
               </BotaoSuave>
             </div>
-            <LinhaInterruptor
-              titulo="Forródex segue este desafio"
-              descricao="A Forródex de todo mundo mostra só quem participa e as duplas do período. Os alunos não veem esse vínculo. Só um desafio por vez."
-              ligado={desafio.forrodex}
-              disabled={ocupado}
-              onChange={(v) => void prenderForrodex(v)}
-            />
           </section>
         )}
       </div>
