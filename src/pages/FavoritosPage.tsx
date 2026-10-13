@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Cabecalho } from '../components/ui'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -48,23 +49,29 @@ export function FavoritosPage() {
       ?.scrollIntoView({ block: 'start' })
   }, [itens, foto])
 
-  if (erro) return <ErrorState erro={erro} onRetry={() => void carregar()} />
+  if (erro) {
+    return (
+      <div className="px-4 pt-14">
+        <ErrorState erro={erro} onRetry={() => void carregar()} />
+      </div>
+    )
+  }
   if (itens === null) return <Spinner texto="Carregando favoritos…" />
 
   return (
-    <div className="space-y-4">
-      <button
-        className="text-sm font-bold text-tinta-600"
-        onClick={() => navigate(-1)}
-      >
-        ← Voltar
-      </button>
+    <div className="anima-tela">
+      <Cabecalho titulo="Favoritos" fallback={`/perfil/${id ?? ''}`} />
       {itens.length === 0 ? (
-        <EmptyState emoji="⭐" titulo="Nenhum favorito por aqui" />
+        <div className="px-4">
+          <EmptyState emoji="⭐" titulo="Nenhum favorito por aqui">
+            <button className="btn-ghost" onClick={() => navigate(-1)}>
+              Voltar
+            </button>
+          </EmptyState>
+        </div>
       ) : (
         itens.map((item) => (
-          // scroll-mt: o cabeçalho fixo do app não cobre o topo do cartão
-          <div key={item.id} id={`favorito-${item.id}`} className="scroll-mt-20">
+          <div key={item.id} id={`favorito-${item.id}`} className="scroll-mt-4">
             <CheckinCard item={item} onChanged={() => void carregar()} />
           </div>
         ))

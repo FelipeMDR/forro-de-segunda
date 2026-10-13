@@ -2,43 +2,49 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { Avatar } from './Avatar'
+import { Icone } from './Icone'
+import { BotaoAcao, BotaoSuave, CampoBusca, RotuloSecao } from './ui'
 import { combinaBusca } from '../lib/busca'
 import type { ParceiroPossivel } from '../lib/types'
 
 /**
- * Quantos rostos aparecem antes de "ver todos" — três linhas de quatro.
+ * "Com quem você dançou hoje?" — tela cheia, logo depois da foto.
  *
- * Numa noite cheia de espaço livre são 50 pessoas: a grade inteira
- * passaria de 900px e empurraria a câmera, o aviso e o botão de publicar
- * para fora da tela. Quem dança com 5 pessoas não precisa das outras 45
- * na cara; quem precisa, busca pelo nome.
+ * A lista é só de quem também fez check-in na noite: é isso que
+ * transforma "achar 10 pessoas entre 300" em "tocar em 5 nomes que já
+ * estão na tela", e de quebra impede marcar quem nem apareceu.
+ *
+ * As marcações são escolhidas aqui e enviadas juntas no fim, e não a
+ * cada toque: assim dá para errar e desfazer sem a outra pessoa receber
+ * e perder um aviso. Quem já estava marcado começa marcado; desmarcar
+ * e enviar retira a marcação. A dupla só se confirma quando a outra
+ * pessoa marca de volta.
  */
-const LIMITE_ROSTOS = 12
-
-/**
- * Grade de rostos de quem também fez check-in na noite, para marcar
- * com quem se dançou.
- *
- * A lista é só de quem esteve lá — é isso que transforma "achar 10
- * pessoas entre 300" em "tocar em 5 rostos que já estão na tela". E de
- * quebra impede marcar quem nem apareceu.
- *
- * Marcação de mão única já aparece; quando os dois se marcam, a dupla
- * se confirma sozinha e passa a contar para distintivo.
- */
-export function MarcarDuplas({ data }: { data: string }) {
+export function TelaDuplas({
+  data,
+  etiqueta,
+  onSair,
+}: {
+  /** Dia da noite (ISO). */
+  data: string
+  /** "Presença registrada · 21:52" — o comprovante, em cima do título. */
+  etiqueta: string | null
+  onSair: () => void
+}) {
   const { api } = useAuth()
   const toast = useToast()
   const [pessoas, setPessoas] = useState<ParceiroPossivel[] | null>(null)
-  const [ocupado, setOcupado] = useState<string | null>(null)
+  const [escolhidos, setEscolhidos] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
-  const [verTodos, setVerTodos] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
   const carregar = useCallback(async () => {
     try {
-      setPessoas(await api.parceirosPossiveis(data))
+      const ps = await api.parceirosPossiveis(data)
+      setPessoas(ps)
+      setEscolhidos(new Set(ps.filter((p) => p.marcado).map((p) => p.user_id)))
     } catch (e) {
-      // Sem a migração 016 a tabela não existe — some sem quebrar a tela
+      // Sem a migração 016 a tabela não existe — a tela fica vazia
       console.error('[duplas] falha ao carregar', e)
       setPessoas([])
     }
@@ -48,120 +54,172 @@ export function MarcarDuplas({ data }: { data: string }) {
     void carregar()
   }, [carregar])
 
-  /**
-   * Marcados na frente: são a resposta que a pessoa acabou de dar, e no
-   * meio de 50 rostos eles sumiriam — inclusive para desmarcar.
-   */
   const ordenadas = useMemo(
-    () =>
-      [...(pessoas ?? [])].sort(
-        (a, b) =>
-          Number(b.marcado) - Number(a.marcado) || a.nome.localeCompare(b.nome),
-      ),
+    () => [...(pessoas ?? [])].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
     [pessoas],
   )
-
   const encontradas = useMemo(
-    () => ordenadas.filter((p) => combinaBusca(busca, [p.nome])),
+    () => ordenadas.filter((p) => combinaBusca(busca, [p.nome, p.turma ?? ''])),
     [ordenadas, busca],
   )
+  const marcadas = ordenadas.filter((p) => escolhidos.has(p.user_id))
 
-  if (!pessoas || pessoas.length === 0) return null
+  const novas = ordenadas.filter((p) => escolhidos.has(p.user_id) && !p.marcado)
+  const retiradas = ordenadas.filter((p) => !escolhidos.has(p.user_id) && p.marcado)
+  const mudancas = novas.length + retiradas.length
 
-  // Buscar já é pedir para ver o que casa — não faz sentido cortar aí
-  const mostrarTodas = verTodos || busca.trim() !== ''
-  const visiveis = mostrarTodas
-    ? encontradas
-    : encontradas.slice(0, LIMITE_ROSTOS)
-  const escondidas = encontradas.length - visiveis.length
+  const alternar = (id: string) =>
+    setEscolhidos((atual) => {
+      const n = new Set(atual)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
 
-  const alternar = async (p: ParceiroPossivel) => {
-    setOcupado(p.user_id)
+  const enviar = async () => {
+    if (mudancas === 0) {
+      onSair()
+      return
+    }
+    setEnviando(true)
     try {
-      if (p.marcado) await api.desmarcarDupla(p.user_id, data)
-      else await api.marcarDupla(p.user_id, data)
-      await carregar()
+      for (const p of novas) await api.marcarDupla(p.user_id, data)
+      for (const p of retiradas) await api.desmarcarDupla(p.user_id, data)
+      toast(
+        novas.length > 0
+          ? `${novas.length === 1 ? 'Marcação enviada' : `${novas.length} marcações enviadas`}. A dupla vale quando a outra pessoa confirmar.`
+          : 'Marcação retirada.',
+      )
+      onSair()
     } catch (e) {
       toast((e as Error).message, 'erro')
+      // Parte pode ter ido: recarrega para a tela mostrar a verdade
+      await carregar()
     } finally {
-      setOcupado(null)
+      setEnviando(false)
     }
   }
 
-  const marcados = pessoas.filter((p) => p.marcado).length
+  const rotuloEnviar = enviando
+    ? 'Enviando…'
+    : novas.length > 0
+      ? `Enviar ${novas.length} ${novas.length === 1 ? 'marcação' : 'marcações'}`
+      : retiradas.length > 0
+        ? 'Salvar'
+        : 'Enviar marcações'
 
   return (
-    <div className="card space-y-3 p-4">
-      <div>
-        <h2 className="text-sm font-bold">Com quem você dançou hoje? 💃</h2>
-        <p className="mt-0.5 text-xs text-tinta-500">
-          Quem também deu check-in hoje. Toque nos rostos — é opcional, e
-          quando a pessoa marcar você de volta a dupla se confirma.
-        </p>
+    <div
+      className="anima-tela fixed inset-0 z-40 mx-auto flex max-w-md flex-col bg-fundo"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
+    >
+      <div className="flex flex-col gap-1.5 px-5 pb-3 pt-1">
+        {etiqueta && (
+          <span className="self-start rounded-full border-[1.5px] border-preto bg-verde-500 px-2.5 py-1 text-[13px] font-extrabold text-preto">
+            {etiqueta}
+          </span>
+        )}
+        <h1 className="m-0 text-[30px] font-extrabold leading-[1.05] tracking-[-.03em]">
+          Com quem você dançou hoje?
+        </h1>
+        <span className="text-sm leading-snug text-ink3">
+          {pessoas === null
+            ? 'Carregando quem está no salão…'
+            : `${pessoas.length + 1} ${pessoas.length === 0 ? 'pessoa fez' : 'pessoas fizeram'} check-in hoje. A dupla só vale quando a outra pessoa confirma.`}
+        </span>
       </div>
 
-      {/* A busca só aparece quando a grade não cabe inteira: numa noite
-          de 8 pessoas ela seria um campo a mais sem ter o que filtrar. */}
-      {pessoas.length > LIMITE_ROSTOS && (
-        <input
-          type="search"
-          className="input"
-          placeholder={`Buscar entre ${pessoas.length} pessoas…`}
-          aria-label="Buscar quem deu check-in hoje"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
+      {pessoas && pessoas.length > 0 && (
+        <div className="px-4 pb-2.5">
+          <CampoBusca
+            placeholder="Buscar entre os presentes"
+            aria-label="Buscar entre os presentes"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+        </div>
       )}
 
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-        {visiveis.map((p) => (
-          <button
-            key={p.user_id}
-            onClick={() => void alternar(p)}
-            disabled={ocupado === p.user_id}
-            aria-pressed={p.marcado}
-            className={`flex flex-col items-center gap-1 rounded-xl p-2 transition disabled:opacity-50 ${
-              p.marcado ? 'bg-verde-500/15' : 'hover:bg-preto/5'
-            }`}
-          >
-            <span className="relative">
-              <Avatar nome={p.nome} url={p.avatar_url} tamanho={44} />
-              {p.marcado && (
-                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-verde-700 text-[10px] text-white ring-2 ring-papel">
-                  ✓
+      {marcadas.length > 0 && (
+        <div className="flex flex-col gap-2 px-4 pb-2.5">
+          <RotuloSecao className="px-0 tracking-[.06em]">
+            Marcados · {marcadas.length}
+          </RotuloSecao>
+          <div className="flex flex-wrap gap-1.5">
+            {marcadas.map((p) => (
+              <button
+                key={p.user_id}
+                type="button"
+                onClick={() => alternar(p.user_id)}
+                aria-label={`Desmarcar ${p.nome}`}
+                className="flex h-9 items-center gap-1.5 rounded-full border-2 border-preto bg-brasa-300 pl-1 pr-1.5 text-sm font-extrabold text-preto"
+              >
+                <Avatar nome={p.nome} url={p.avatar_url} tamanho={26} borda={false} />
+                {p.nome.split(/\s+/)[0]}
+                <Icone nome="fechar" tamanho={14} traco={3} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="sem-barra min-h-0 flex-1 overflow-y-auto border-t border-linha px-3">
+        {pessoas !== null && pessoas.length === 0 && (
+          <p className="px-2 py-8 text-center text-[15px] leading-snug text-ink3">
+            Ninguém mais fez check-in nesta noite ainda. Volte aqui depois —
+            dá para marcar até o fim da noite.
+          </p>
+        )}
+        {encontradas.map((p) => {
+          const on = escolhidos.has(p.user_id)
+          return (
+            <button
+              key={p.user_id}
+              type="button"
+              onClick={() => alternar(p.user_id)}
+              aria-pressed={on}
+              className="flex min-h-14 w-full items-center gap-3 border-b border-linha bg-transparent p-2 text-left text-ink"
+            >
+              <Avatar nome={p.nome} url={p.avatar_url} tamanho={40} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-base font-bold">{p.nome}</span>
+                <span className="truncate text-[13px] text-ink3">
+                  {p.confirmada ? 'Dupla confirmada' : p.turma}
                 </span>
-              )}
-            </span>
-            <span className="w-full truncate text-center text-[11px] font-bold text-tinta-700">
-              {p.nome.split(/\s+/)[0]}
-            </span>
-          </button>
-        ))}
+              </span>
+              <span
+                className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-2 text-preto ${
+                  on ? 'border-preto bg-brasa-500' : 'border-linha bg-transparent'
+                }`}
+              >
+                {on && <Icone nome="check" tamanho={16} traco={3.4} />}
+              </span>
+            </button>
+          )
+        })}
+        {busca.trim() !== '' && encontradas.length === 0 && (
+          <p className="px-2 py-6 text-center text-[15px] text-ink3">
+            Ninguém com esse nome fez check-in hoje.
+          </p>
+        )}
       </div>
 
-      {busca.trim() !== '' && encontradas.length === 0 && (
-        <p className="text-xs text-tinta-500">
-          Ninguém com esse nome deu check-in hoje. Só dá para marcar quem
-          esteve lá.
-        </p>
-      )}
-
-      {escondidas > 0 && (
-        <button
-          type="button"
-          className="w-full text-center text-xs font-bold text-tinta-600 underline"
-          onClick={() => setVerTodos(true)}
+      <div
+        className="flex gap-2.5 border-t border-linha bg-fundo px-4 pt-3"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
+      >
+        <BotaoSuave tamanho="g" className="flex-1" onClick={onSair} disabled={enviando}>
+          Agora não
+        </BotaoSuave>
+        <BotaoAcao
+          tamanho="g"
+          className="flex-[1.6]"
+          disabled={enviando || mudancas === 0}
+          onClick={() => void enviar()}
         >
-          Ver todos ({encontradas.length})
-        </button>
-      )}
-
-      {marcados > 0 && (
-        <p className="text-xs text-tinta-500">
-          {marcados} {marcados === 1 ? 'pessoa marcada' : 'pessoas marcadas'}.
-          Só conta para os distintivos quando a outra pessoa confirmar.
-        </p>
-      )}
+          {rotuloEnviar}
+        </BotaoAcao>
+      </div>
     </div>
   )
 }

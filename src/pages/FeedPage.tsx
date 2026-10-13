@@ -1,162 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AceiteTermos } from '../components/AceiteTermos'
-import { PedidosAbertos } from '../components/PedidosAbertos'
-import { PedirNome } from '../components/PedirNome'
+import { useNavigate } from 'react-router-dom'
 import { CheckinCard } from '../components/CheckinCard'
-import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
-import { InstallPrompt } from '../components/InstallPrompt'
 import { Spinner } from '../components/Spinner'
+import { BotaoAcao, BotaoSuave, Segmentado, TituloRaiz } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { aoPublicarCheckin } from '../lib/eventos'
-import {
-  formatDateLong,
-  proximasOcorrenciasAgenda,
-  toISODate,
-  type OcorrenciaAgenda,
-} from '../lib/dates'
-import { Avatar } from '../components/Avatar'
 import { PAGINA_FEED } from '../lib/types'
-import type {
-  AgendaEvent,
-  ConfirmacaoPresenca,
-  Feriado,
-  FeedItem,
-} from '../lib/types'
-
-/**
- * "Eu vou" de uma ocorrência: quem confirmou e o botão de entrar na
- * lista. Em dança social, saber que tem gente indo é o que faz alguém
- * sair de casa — por isso as caras aparecem, e não só a contagem.
- */
-function EuVou({
-  confirmados,
-  souEu,
-  ocupado,
-  onToggle,
-}: {
-  confirmados: ConfirmacaoPresenca[]
-  souEu: boolean
-  ocupado: boolean
-  onToggle: () => void
-}) {
-  const mostrar = confirmados.slice(0, 4)
-  const resto = confirmados.length - mostrar.length
-  return (
-    <div className="mt-1.5 flex items-center gap-2">
-      <button
-        /* verde-700 e não 600: o texto branco sobre o 600 dá 3,09:1,
-           abaixo do mínimo de 4,5:1 para texto pequeno. */
-        className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
-          souEu
-            ? 'bg-verde-700 text-white'
-            : 'bg-preto/5 text-tinta-700 hover:bg-preto/10'
-        }`}
-        disabled={ocupado}
-        onClick={onToggle}
-      >
-        {souEu ? '✓ Eu vou' : 'Eu vou'}
-      </button>
-      {confirmados.length > 0 && (
-        <div className="flex min-w-0 items-center gap-1.5">
-          <div className="flex -space-x-2">
-            {mostrar.map((c) => (
-              <div key={c.user_id} className="ring-2 ring-papel rounded-full">
-                <Avatar nome={c.nome} url={c.avatar_url} tamanho={22} />
-              </div>
-            ))}
-          </div>
-          <span className="truncate text-xs text-tinta-500">
-            {confirmados.length}{' '}
-            {confirmados.length === 1 ? 'confirmado' : 'confirmados'}
-            {resto > 0 && ''}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AgendaCard({
-  ocorrencias,
-  confirmacoes,
-  userId,
-  ocupado,
-  onConfirmar,
-}: {
-  ocorrencias: OcorrenciaAgenda[]
-  confirmacoes: ConfirmacaoPresenca[]
-  userId: string | null
-  ocupado: string | null
-  onConfirmar: (eventoId: string, data: string, vai: boolean) => void
-}) {
-  if (ocorrencias.length === 0) return null
-  const hoje = toISODate(new Date())
-  return (
-    <div className="card space-y-2.5 p-4">
-      <h2 className="text-xs font-bold uppercase tracking-wide text-tinta-500">
-        📅 Agenda
-      </h2>
-      {ocorrencias.map(({ evento, quando, cancelada, motivoCancelamento }, i) => {
-        const dia = toISODate(quando)
-        const ehHoje = dia === hoje
-        const confirmados = confirmacoes.filter(
-          (c) => c.evento_id === evento.id && c.data === dia,
-        )
-        const souEu = confirmados.some((c) => c.user_id === userId)
-        const chave = `${evento.id}|${dia}`
-        return (
-          <div key={`${evento.id}-${i}`} className="flex items-center gap-3">
-            <span className="text-xl">
-              {cancelada ? '🚫' : evento.data ? '🎉' : '🎓'}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p
-                className={`truncate text-sm font-bold ${
-                  cancelada ? 'text-tinta-500 line-through' : ''
-                }`}
-              >
-                {evento.titulo}
-                {evento.turma && (
-                  <span className="ml-1.5 rounded-full bg-preto/5 px-2 py-0.5 text-[10px] font-bold text-tinta-600 no-underline">
-                    {evento.turma}
-                  </span>
-                )}
-              </p>
-              {cancelada ? (
-                <p className="text-xs text-red-600">
-                  Cancelada{motivoCancelamento ? ` — ${motivoCancelamento}` : ''}
-                  {' · seria '}
-                  {ehHoje ? 'hoje' : formatDateLong(quando)}
-                </p>
-              ) : (
-                <p className="text-xs text-tinta-500">
-                  {ehHoje ? (
-                    <strong className="text-brasa-700">Hoje</strong>
-                  ) : (
-                    formatDateLong(quando)
-                  )}
-                  {evento.hora && ` · ${evento.hora}`}
-                  {evento.descricao && ` — ${evento.descricao}`}
-                </p>
-              )}
-              {/* Aula cancelada não tem para onde ir */}
-              {!cancelada && (
-                <EuVou
-                  confirmados={confirmados}
-                  souEu={souEu}
-                  ocupado={ocupado === chave}
-                  onToggle={() => onConfirmar(evento.id, dia, !souEu)}
-                />
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+import type { FeedItem } from '../lib/types'
 
 /**
  * Quanto o feed espera, depois de uma foto nova, antes de recarregar.
@@ -169,12 +20,9 @@ function AgendaCard({
 const ESPERA_TEMPO_REAL_MS = 25_000
 
 export function FeedPage() {
-  const { api, profile, userId } = useAuth()
+  const { api, profile } = useAuth()
+  const navigate = useNavigate()
   const [feed, setFeed] = useState<FeedItem[] | null>(null)
-  const [eventos, setEventos] = useState<AgendaEvent[]>([])
-  const [feriados, setFeriados] = useState<Feriado[]>([])
-  const [confirmacoes, setConfirmacoes] = useState<ConfirmacaoPresenca[]>([])
-  const [confirmando, setConfirmando] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [visao, setVisao] = useState<'todos' | 'turma'>('todos')
   const [carregandoMais, setCarregandoMais] = useState(false)
@@ -243,28 +91,6 @@ export function FeedPage() {
       setCarregandoMais(false)
     }
   }, [api, feed, carregandoMais])
-
-  // Agenda e cancelamentos mudam raramente — uma busca por sessão
-  // basta, e não a cada recarga do feed. Recarregar os três juntos
-  // triplicava o custo de cada evento de tempo real, que é o que
-  // acontece com mais frequência no app inteiro.
-  //
-  // Carregados em separado do feed de propósito: se a agenda falhar, o
-  // feed ainda aparece (antes um erro derrubava a tela inteira).
-  useEffect(() => {
-    let cancelado = false
-    void Promise.all([
-      api.listEvents().catch(() => [] as AgendaEvent[]),
-      api.listFeriados().catch(() => [] as Feriado[]),
-    ]).then(([e, fer]) => {
-      if (cancelado) return
-      setEventos(e)
-      setFeriados(fer)
-    })
-    return () => {
-      cancelado = true
-    }
-  }, [api])
 
   useEffect(() => {
     void carregar()
@@ -353,55 +179,6 @@ export function FeedPage() {
     return [...new Set([...doPerfil, ...deEnsino])]
   }, [profile])
 
-  // Próximos compromissos relevantes pra mim (qualquer turma minha, ou
-  // todos), já considerando feriados/cancelamentos: se a próxima aula
-  // cair num feriado, mostra "Cancelada" + quando é a próxima válida.
-  //
-  // Vale o mesmo conjunto do feed, incluindo o que eu ensino: a aula que
-  // eu dou é compromisso meu tanto quanto a que eu assisto.
-  const agenda = useMemo<OcorrenciaAgenda[]>(() => {
-    const agora = new Date()
-    const doInteresse = new Set(minhasTurmas)
-    const relevantes = eventos.filter(
-      (e) => !e.turma || doInteresse.has(e.turma),
-    )
-    return proximasOcorrenciasAgenda(relevantes, feriados, agora).slice(0, 4)
-  }, [eventos, feriados, minhasTurmas])
-
-  // As confirmações só interessam para as datas que estão na tela
-  const datasDaAgenda = useMemo(
-    () => [...new Set(agenda.map((o) => toISODate(o.quando)))],
-    [agenda],
-  )
-
-  const carregarConfirmacoes = useCallback(async () => {
-    if (datasDaAgenda.length === 0) return
-    try {
-      setConfirmacoes(await api.confirmacoesDe(datasDaAgenda))
-    } catch (e) {
-      // Sem a migração 015 a tabela não existe — o resto do feed vale
-      console.error('[feed] falha ao carregar confirmações', e)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, datasDaAgenda.join('|')])
-
-  useEffect(() => {
-    void carregarConfirmacoes()
-  }, [carregarConfirmacoes])
-
-  const confirmar = async (eventoId: string, data: string, vai: boolean) => {
-    const chave = `${eventoId}|${data}`
-    setConfirmando(chave)
-    try {
-      await api.confirmarPresenca(eventoId, data, vai)
-      await carregarConfirmacoes()
-    } catch (e) {
-      console.error('[feed] falha ao confirmar presença', e)
-    } finally {
-      setConfirmando(null)
-    }
-  }
-
   // Filtra por turma em comum, não por turma exata: quem faz duas turmas
   // vê as duas, e continua vendo quem divide qualquer uma delas.
   const feedVisivel = useMemo(() => {
@@ -412,61 +189,43 @@ export function FeedPage() {
   }, [feed, visao, minhasTurmas])
 
   return (
-    <div className="space-y-4">
-      {/* Antes de tudo: quem ainda não consentiu precisa ser perguntado
-          na primeira tela que abre, não escondido no perfil. */}
-      <AceiteTermos />
-      {/* Quem ficou com o nome de preenchimento também é perguntado
-          aqui: é a única tela que todo mundo abre. */}
-      <PedirNome />
-      <PedidosAbertos />
-      <InstallPrompt />
-      <AgendaCard
-        ocorrencias={agenda}
-        confirmacoes={confirmacoes}
-        userId={userId}
-        ocupado={confirmando}
-        onConfirmar={(e, d, vai) => void confirmar(e, d, vai)}
-      />
-
-      {/* Sem turma no semestre (veterano) não há o que filtrar — o
-          seletor só apareceria para levar a uma lista vazia. */}
-      {minhasTurmas.length > 0 && (
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-preto/5 p-1">
-          {(
-            [
-              ['todos', 'Todo mundo'],
-              ['turma', minhasTurmas.length > 1 ? 'Minhas turmas' : 'Minha turma'],
-            ] as const
-          ).map(([v, rotulo]) => (
-            <button
-              key={v}
-              onClick={() => setVisao(v)}
-              aria-pressed={visao === v}
-              className={`rounded-lg py-2 text-sm font-bold transition ${
-                visao === v
-                  ? 'bg-papel text-tinta-900 shadow-sm'
-                  : 'text-tinta-500'
-              }`}
-            >
-              {rotulo}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="anima-tela">
+      <TituloRaiz
+        acao={
+          // Sem turma no semestre (veterano) não há o que filtrar — o
+          // seletor só apareceria para levar a uma lista vazia.
+          minhasTurmas.length > 0 && (
+            <Segmentado
+              forma="pilula"
+              valor={visao}
+              onChange={setVisao}
+              opcoes={[
+                { valor: 'todos', rotulo: 'Todo mundo' },
+                {
+                  valor: 'turma',
+                  rotulo: minhasTurmas.length > 1 ? 'Minhas turmas' : 'Minha turma',
+                },
+              ]}
+            />
+          )
+        }
+      >
+        Feed
+      </TituloRaiz>
 
       {erro ? (
-        <ErrorState
-          titulo="Não consegui carregar o feed"
-          erro={erro}
-          onRetry={() => void carregar()}
-        />
+        <div className="px-4">
+          <ErrorState
+            titulo="Não consegui carregar o feed"
+            erro={erro}
+            onRetry={() => void carregar()}
+          />
+        </div>
       ) : feedVisivel === null ? (
         <Spinner texto="Carregando o feed…" />
       ) : feedVisivel.length === 0 ? (
         visao === 'turma' ? (
-          <EmptyState
-            emoji="🫂"
+          <Vazio
             titulo="Nada da sua turma por aqui"
             texto={
               // O filtro roda sobre o que já foi carregado. Dizer que
@@ -477,48 +236,58 @@ export function FeedPage() {
             }
           >
             {temMais && (
-              <button
-                className="btn-primary"
+              <BotaoAcao
+                tamanho="m"
+                sombra={false}
                 disabled={carregandoMais}
                 onClick={() => void carregarMais()}
               >
                 {carregandoMais ? 'Carregando…' : 'Procurar mais atrás'}
-              </button>
+              </BotaoAcao>
             )}
-            <button className="btn-ghost" onClick={() => setVisao('todos')}>
-              Ver todo mundo
-            </button>
-          </EmptyState>
+            <BotaoSuave onClick={() => setVisao('todos')}>Ver todo mundo</BotaoSuave>
+          </Vazio>
         ) : (
-          <EmptyState
-            emoji="💃"
+          <Vazio
             titulo="Ainda não tem check-in por aqui"
             texto="Seja a primeira pessoa a postar uma foto da aula!"
           >
-            <Link to="/checkin" className="btn-primary">
-              Fazer check-in 📸
-            </Link>
-          </EmptyState>
+            <BotaoAcao tamanho="m" sombra={false} onClick={() => navigate('/checkin')}>
+              Fazer check-in
+            </BotaoAcao>
+          </Vazio>
         )
       ) : (
         <>
           {feedVisivel.map((item) => (
-            <CheckinCard
-              key={item.id}
-              item={item}
-              onChanged={() => void carregar()}
-            />
+            <CheckinCard key={item.id} item={item} onChanged={() => void carregar()} />
           ))}
 
           {temMais && (
-            <div ref={sentinela} className="flex justify-center py-4">
-              {carregandoMais && (
-                <p className="text-xs text-tinta-500">Carregando mais…</p>
-              )}
+            <div ref={sentinela} className="px-4 pt-2 text-center text-[13px] text-ink3">
+              {carregandoMais ? `Carregando mais ${PAGINA_FEED} publicações…` : ' '}
             </div>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function Vazio({
+  titulo,
+  texto,
+  children,
+}: {
+  titulo: string
+  texto: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="mx-4 flex flex-col items-center gap-2 rounded-[22px] border border-linha bg-sf px-6 py-10 text-center">
+      <h2 className="text-lg font-extrabold">{titulo}</h2>
+      <p className="max-w-xs text-[15px] leading-snug text-ink3">{texto}</p>
+      <div className="mt-3 flex flex-wrap justify-center gap-2">{children}</div>
     </div>
   )
 }

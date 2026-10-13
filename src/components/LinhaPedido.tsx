@@ -3,7 +3,8 @@ import { Avatar } from './Avatar'
 
 /**
  * Capa do álbum. Sem capa (o demo, uma faixa sem arte no Spotify), um
- * quadrado com a nota — do mesmo tamanho, para a lista não desalinhar.
+ * quadrado listrado com a nota — do mesmo tamanho, para a lista não
+ * desalinhar.
  */
 export function CapaAlbum({ url, tamanho = 48 }: { url: string | null; tamanho?: number }) {
   const style = { width: tamanho, height: tamanho }
@@ -12,12 +13,12 @@ export function CapaAlbum({ url, tamanho = 48 }: { url: string | null; tamanho?:
       src={url}
       alt=""
       style={style}
-      className="shrink-0 rounded-lg border border-preto/10 object-cover shadow-sm"
+      className="shrink-0 rounded-[10px] border-[1.5px] border-preto object-cover"
     />
   ) : (
     <span
-      style={style}
-      className="flex shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brasa-500/20 to-azul-500/20 text-lg"
+      style={{ ...style, fontSize: tamanho * 0.38 }}
+      className="listras flex shrink-0 items-center justify-center rounded-[10px] border-[1.5px] border-preto bg-marinho-500"
     >
       🎵
     </span>
@@ -25,10 +26,8 @@ export function CapaAlbum({ url, tamanho = 48 }: { url: string | null; tamanho?:
 }
 
 /**
- * Capa com a foto de quem pediu sobreposta no canto. Na linha de texto
- * a foto ficava com 18 px e não dava para reconhecer ninguém; aqui ela
- * cobre o quarto de baixo à direita da capa (60% do lado, passando um
- * pouco da borda), com borda branca para destacar do álbum.
+ * Capa com a foto de quem pediu sobreposta no canto de baixo: na linha
+ * de texto a foto ficava pequena demais para reconhecer alguém.
  */
 function CapaComPessoa({
   capaUrl,
@@ -42,13 +41,10 @@ function CapaComPessoa({
   const foto = Math.round(tamanho * 0.6)
   const sobra = Math.round(tamanho * 0.12)
   return (
-    <span
-      className="relative shrink-0"
-      style={{ width: tamanho + sobra, height: tamanho + sobra }}
-    >
+    <span className="relative shrink-0" style={{ width: tamanho + sobra, height: tamanho + sobra }}>
       <CapaAlbum url={capaUrl} tamanho={tamanho} />
-      <span className="absolute bottom-0 right-0 rounded-full ring-2 ring-white">
-        <Avatar nome={pessoa.nome} url={pessoa.avatarUrl} tamanho={foto} />
+      <span className="absolute bottom-0 right-0 rounded-full shadow-[0_0_0_2.5px_var(--sf)]">
+        <Avatar nome={pessoa.nome} url={pessoa.avatarUrl} tamanho={foto} borda={false} />
       </span>
     </span>
   )
@@ -69,22 +65,24 @@ export function LinhaPedido({
   detalhe,
   tamanhoCapa = 52,
   acao,
+  className = '',
 }: {
   titulo: string
   artista: string
   capaUrl: string | null
-  /** Quem pediu. Sem isto, a linha não mostra pessoa (ex.: "Meus pedidos"). */
+  /** Quem pediu. Sem isto, a linha não mostra pessoa. */
   pessoa?: { nome: string; avatarUrl: string | null } | null
   posicao?: number
   /** Uma informação extra em destaque (ex.: "é a próxima!"). */
   detalhe?: string
   tamanhoCapa?: number
   acao?: ReactNode
+  className?: string
 }) {
   return (
-    <div className="flex items-center gap-3 p-3">
+    <div className={`flex items-center gap-3 ${className}`}>
       {posicao !== undefined && (
-        <span className="w-5 shrink-0 text-center text-sm font-bold text-tinta-500">
+        <span className="w-5 shrink-0 text-center text-sm font-extrabold text-ink3">
           {posicao}
         </span>
       )}
@@ -93,13 +91,11 @@ export function LinhaPedido({
       ) : (
         <CapaAlbum url={capaUrl} tamanho={tamanhoCapa} />
       )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold">{titulo}</p>
-        <p className="truncate text-xs text-tinta-500">{artista}</p>
-        {pessoa && (
-          <p className="mt-0.5 truncate text-xs text-tinta-600">pedida por {pessoa.nome}</p>
-        )}
-        {detalhe && <p className="mt-0.5 text-xs font-semibold text-brasa-700">{detalhe}</p>}
+      <div className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="truncate text-base font-extrabold">{titulo}</span>
+        <span className="truncate text-[13px] text-ink3">{artista}</span>
+        {pessoa && <span className="truncate text-[13px] text-ink2">pedida por {pessoa.nome}</span>}
+        {detalhe && <span className="text-[13px] font-extrabold text-or-t">{detalhe}</span>}
       </div>
       {acao}
     </div>

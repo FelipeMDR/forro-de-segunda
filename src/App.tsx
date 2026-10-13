@@ -4,7 +4,6 @@ import { Layout } from './components/Layout'
 import { Spinner } from './components/Spinner'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
-import { AdminPage } from './pages/AdminPage'
 import { BuscarPage } from './pages/BuscarPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
@@ -13,7 +12,10 @@ import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
 import { FavoritosPage } from './pages/FavoritosPage'
+import { AgendaPage } from './pages/AgendaPage'
 import { FeedPage } from './pages/FeedPage'
+import { HojePage } from './pages/HojePage'
+import { SalaoPage } from './pages/SalaoPage'
 import { ForrodexPage } from './pages/ForrodexPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificacoesPage } from './pages/NotificacoesPage'
@@ -25,6 +27,15 @@ import { PublicacaoPage } from './pages/PublicacaoPage'
 import { RetrospectivaPage } from './pages/RetrospectivaPage'
 import { SpotifyConectadoPage } from './pages/SpotifyConectadoPage'
 import { UserProfilePage } from './pages/UserProfilePage'
+import { AgendaPainelPage, NovoEventoPage } from './pages/painel/AgendaPainelPage'
+import { AlunoPage, AlunosPage, NovoAlunoPage } from './pages/painel/AlunosPage'
+import { PainelLayout } from './pages/painel/contexto'
+import { DenunciasPage } from './pages/painel/DenunciasPage'
+import { DistintivosPage, NovoDistintivoPage } from './pages/painel/DistintivosPage'
+import { FrequenciaPage } from './pages/painel/FrequenciaPage'
+import { PainelHome, PessoasHub } from './pages/painel/HubPage'
+import { ImportarPage } from './pages/painel/ImportarPage'
+import { CargosPage, SemestrePage, TurmasPage } from './pages/painel/TurmasCargosPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { userId, carregando } = useAuth()
@@ -61,7 +72,10 @@ export default function App() {
                 </RequireAuth>
               }
             >
-              <Route path="/" element={<FeedPage />} />
+              <Route path="/" element={<HojePage />} />
+              <Route path="/feed" element={<FeedPage />} />
+              <Route path="/agenda" element={<AgendaPage />} />
+              <Route path="/salao" element={<SalaoPage />} />
               <Route path="/checkin" element={<CheckinPage />} />
               <Route path="/desafios" element={<ChallengesPage />} />
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
@@ -75,7 +89,23 @@ export default function App() {
               <Route path="/perfil/duplas" element={<ForrodexPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/perfil/:id/favoritos" element={<FavoritosPage />} />
-              <Route path="/organizador" element={<AdminPage />} />
+              <Route path="/organizador" element={<PainelLayout />}>
+                <Route index element={<PainelHome />} />
+                <Route path="pessoas" element={<PessoasHub />} />
+                <Route path="alunos" element={<AlunosPage />} />
+                <Route path="alunos/novo" element={<NovoAlunoPage />} />
+                <Route path="alunos/:id" element={<AlunoPage />} />
+                <Route path="importar" element={<ImportarPage />} />
+                <Route path="turmas" element={<TurmasPage />} />
+                <Route path="cargos" element={<CargosPage />} />
+                <Route path="semestre" element={<SemestrePage />} />
+                <Route path="agenda" element={<AgendaPainelPage />} />
+                <Route path="agenda/evento" element={<NovoEventoPage />} />
+                <Route path="distintivos" element={<DistintivosPage />} />
+                <Route path="distintivos/novo" element={<NovoDistintivoPage />} />
+                <Route path="frequencia" element={<FrequenciaPage />} />
+                <Route path="denuncias" element={<DenunciasPage />} />
+              </Route>
               <Route path="/dj" element={<DJPage />} />
               <Route path="/musica" element={<MusicaPage />} />
               <Route path="/spotify/conectado" element={<SpotifyConectadoPage />} />

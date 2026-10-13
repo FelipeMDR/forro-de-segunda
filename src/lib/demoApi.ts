@@ -57,6 +57,7 @@ import type {
   PapelDanca,
   ParceiroDanca,
   ParceiroPossivel,
+  PresenteNoite,
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
@@ -180,6 +181,8 @@ interface DB {
     fechada_em: string | null
     motivo_fechamento: string | null
     tocando_pedido_id: string | null
+    /** Migração 034; ausente em bancos demo antigos. */
+    fecha_em?: string | null
   }>
   pedidosMusica?: Array<{
     id: string
@@ -1463,6 +1466,29 @@ export class DemoApi implements ForroApi {
     )
   }
 
+  async presentesDaNoite(data: string): Promise<PresenteNoite[]> {
+    this.uid()
+    const chegada = new Map<string, string>()
+    for (const c of this.db.checkins) {
+      if (diaDaNoite(new Date(c.criado_em)) !== data) continue
+      const antes = chegada.get(c.user_id)
+      if (!antes || c.criado_em < antes) chegada.set(c.user_id, c.criado_em)
+    }
+    return [...chegada.entries()]
+      .map(([id, chegou_em]) => {
+        const p = this.db.profiles.find((x) => x.id === id)
+        return {
+          user_id: id,
+          nome: p?.nome ?? 'Alguém',
+          avatar_url: p?.avatar_url ?? null,
+          turma: p ? turmaLabel(p.turmas) : null,
+          cargos: p?.cargos ?? [],
+          chegou_em,
+        }
+      })
+      .sort((a, b) => b.chegou_em.localeCompare(a.chegou_em))
+  }
+
   async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
     const uid = this.uid()
     // Sem check-in meu no dia, não existe candidato nenhum — mesma regra
@@ -1663,8 +1689,10 @@ export class DemoApi implements ForroApi {
 
   async marcarNotificacoesVistas() {
     this.db.notificacoesVistas = this.db.notificacoesVistas ?? {}
+    const antes = this.db.notificacoesVistas[this.uid()] ?? null
     this.db.notificacoesVistas[this.uid()] = new Date().toISOString()
     this.persist()
+    return antes
   }
 
   async confirmacoesDe(datas: string[]): Promise<ConfirmacaoPresenca[]> {
@@ -2092,7 +2120,15 @@ export class DemoApi implements ForroApi {
   // ---- Modo DJ e pedidos de música (espelha a migração 029) ----
 
   private sessaoAberta() {
-    return (this.db.djSessoes ?? []).find((s) => s.fechada_em === null) ?? null
+    const s = (this.db.djSessoes ?? []).find((x) => x.fechada_em === null) ?? null
+    // Espelha o agendamento da migração 034: a sessão vencida fecha
+    if (s?.fecha_em && new Date(s.fecha_em).getTime() <= Date.now()) {
+      s.fechada_em = s.fecha_em
+      s.motivo_fechamento = 'horario'
+      this.persist()
+      return null
+    }
+    return s
   }
 
   private pedidosDe(noite: string) {
@@ -2235,6 +2271,7 @@ export class DemoApi implements ForroApi {
       noite: s.noite,
       aberta_em: s.aberta_em,
       aviso: null,
+      fecha_em: s.fecha_em ?? null,
       tocando: tocando
         ? {
             titulo: tocando.titulo,
@@ -2295,6 +2332,17 @@ export class DemoApi implements ForroApi {
       s.motivo_fechamento = 'desligou'
       this.persist()
     }
+  }
+
+  async programarFechamentoDJ(fechaEm: string | null) {
+    const uid = this.uid()
+    if (fechaEm && new Date(fechaEm).getTime() <= Date.now()) {
+      throw new Error('Esse horário já passou')
+    }
+    const s = this.sessaoAberta()
+    if (!s || s.dj_user_id !== uid) throw new Error('Seu Modo DJ não está ligado')
+    s.fecha_em = fechaEm
+    this.persist()
   }
 
   async cutucarLoopDJ() {

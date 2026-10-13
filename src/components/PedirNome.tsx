@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { semNome } from '../lib/nome'
+import { BotaoAcao } from './ui'
 
 /**
  * Pede o nome de quem ficou com o de preenchimento.
@@ -43,11 +44,11 @@ export function PedirNome() {
   return (
     <form
       onSubmit={salvar}
-      className="card space-y-3 border-brasa-500/40 p-4"
+      className="flex flex-col gap-3 rounded-[22px] border-[1.5px] border-brasa-500 bg-sf p-4"
     >
-      <div>
-        <p className="text-sm font-extrabold">Como você se chama? 👋</p>
-        <p className="mt-1 text-sm text-tinta-700">
+      <div className="flex flex-col gap-1">
+        <p className="text-[17px] font-extrabold">Como você se chama?</p>
+        <p className="text-[15px] leading-snug text-ink2">
           Sua conta ficou sem nome — é ele que aparece no feed, no ranking e
           na lista de presença. Conta pra gente:
         </p>
@@ -62,12 +63,15 @@ export function PedirNome() {
         onChange={(e) => setNome(e.target.value)}
         required
       />
-      <button
-        className="btn-primary w-full"
+      <BotaoAcao
+        type="submit"
+        tamanho="m"
+        sombra={false}
+        bloco
         disabled={salvando || nome.trim().length < 2}
       >
         {salvando ? 'Salvando…' : 'Salvar meu nome'}
-      </button>
+      </BotaoAcao>
     </form>
   )
 }

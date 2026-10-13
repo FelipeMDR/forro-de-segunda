@@ -1,8 +1,12 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { ConexaoSpotify } from '../components/ConexaoSpotify'
+import { Icone } from '../components/Icone'
 import { LinhaPedido } from '../components/LinhaPedido'
 import { Spinner } from '../components/Spinner'
+import { BotaoSuave, Cabecalho, Confirmar, Segmentado } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import { horaCurta } from '../context/NoiteContext'
 import { useToast } from '../context/ToastContext'
 import { proximasNaTela } from '../lib/filaMusica'
 import type { ConexaoDJ, PedidoMusica, PedidoNaFila, SessaoDJ } from '../lib/types'
@@ -17,25 +21,38 @@ const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
     'O Spotify recusou o controle do player. A conta precisa ser Premium e estar liberada no painel do Spotify.',
 }
 
+/** Em quanto tempo os pedidos fecham sozinhos, escolhido ao ligar. */
+type Fechamento = '2' | '4' | 'nunca'
+const FECHAMENTOS = [
+  { valor: '2', rotulo: '2 h' },
+  { valor: '4', rotulo: '4 h' },
+  { valor: 'nunca', rotulo: 'Até eu desligar' },
+] as const
+
 /**
  * Modo DJ: ligar, ver a fila e cuidar dela. O professor NÃO precisa
  * deixar esta tela aberta — quem manda as músicas é o servidor, a cada
- * minuto. Ela serve para ver e cancelar.
+ * 15 s. Ela serve para ver e cancelar.
  */
 export function DJPage() {
   const { api, userId } = useAuth()
   const toast = useToast()
+  const navigate = useNavigate()
   const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
   const [sessao, setSessao] = useState<SessaoDJ | null>(null)
   const [fila, setFila] = useState<PedidoNaFila[]>([])
   const [pedidos, setPedidos] = useState<PedidoMusica[]>([])
   const [ocupado, setOcupado] = useState(false)
+  const [fechamento, setFechamento] = useState<Fechamento>('2')
+  const [confirmarDesligar, setConfirmarDesligar] = useState(false)
+  const [confirmarAssumir, setConfirmarAssumir] = useState<string | null>(null)
+  const [cancelando, setCancelando] = useState<PedidoMusica | null>(null)
   const pode = usePodeSerDJ()
 
   const carregar = useCallback(async () => {
     if (!pode) return
     const [c, s, f, p] = await Promise.all([
-      api.minhaConexaoDJ(),
+      api.minhaConexaoDJ().catch(() => ({ conectado: false, spotify_nome: null, plano: null })),
       api.sessaoDJAberta(),
       api.filaDaNoite(),
       api.pedidosDaNoite(),
@@ -53,15 +70,25 @@ export function DJPage() {
   const ligar = async (assumir: boolean) => {
     setOcupado(true)
     try {
-      let r = await api.ligarModoDJ(assumir)
+      const r = await api.ligarModoDJ(assumir)
       if (r.tipo === 'ocupado') {
-        if (!window.confirm(`${r.dj_nome} está de DJ agora. Assumir?`)) return
-        r = await api.ligarModoDJ(true)
+        setConfirmarAssumir(r.dj_nome)
+        return
       }
-      // Primeira passada já, sem esperar o minuto do agendamento
+      setConfirmarAssumir(null)
+      if (fechamento !== 'nunca') {
+        const quando = new Date(Date.now() + Number(fechamento) * 3600_000)
+        // Sem a migração 034 não há como programar: segue ligado até
+        // desligar, e a tela mostra isso (fecha_em continua vazio).
+        await api.programarFechamentoDJ(quando.toISOString()).catch((e) => {
+          console.warn('[dj] fechamento automático indisponível', e)
+          toast('Não deu para programar o fechamento: desligue quando a dança acabar.', 'erro')
+        })
+      }
+      // Primeira passada já, sem esperar o agendamento
       await api.cutucarLoopDJ()
       await carregar()
-      toast('Modo DJ ligado 🎧')
+      toast('Modo DJ ligado. Os pedidos estão abertos.')
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -70,12 +97,10 @@ export function DJPage() {
   }
 
   const desligar = async () => {
-    if (!window.confirm('Desligar o Modo DJ? Os pedidos que ainda estão esperando não vão tocar.')) {
-      return
-    }
     setOcupado(true)
     try {
       await api.desligarModoDJ()
+      setConfirmarDesligar(false)
       await carregar()
       toast('Modo DJ desligado')
     } catch (e) {
@@ -88,8 +113,9 @@ export function DJPage() {
   const cancelar = async (p: PedidoMusica) => {
     try {
       await api.cancelarPedido(p.id)
+      setCancelando(null)
       await carregar()
-      toast(`Pedido de ${p.nome} cancelado`)
+      toast(`Pedido de ${p.nome.split(' ')[0]} cancelado`)
     } catch (e) {
       toast((e as Error).message, 'erro')
     }
@@ -98,134 +124,224 @@ export function DJPage() {
   if (pode === null) return <Spinner texto="Carregando o Modo DJ…" />
   if (!pode) {
     return (
-      <div className="card p-5 text-sm text-tinta-700">
-        O Modo DJ é para quem tem o cargo de 💿 DJ. Para pedir uma música, use{' '}
-        <Link to="/musica" className="font-bold underline">
-          Pedir música
-        </Link>
-        .
+      <div className="anima-tela">
+        <Cabecalho titulo="Modo DJ" />
+        <div className="mx-4 flex flex-col items-start gap-3 rounded-[20px] border border-linha bg-sf p-5">
+          <span className="text-[15px] leading-relaxed text-ink2">
+            O Modo DJ é para quem tem o cargo de DJ. Para pedir uma música, use a
+            Música da noite.
+          </span>
+          <BotaoSuave onClick={() => navigate('/musica')}>Música da noite</BotaoSuave>
+        </div>
       </div>
     )
   }
   if (conexao === null) return <Spinner texto="Carregando o Modo DJ…" />
-  if (!conexao.conectado) {
-    return (
-      <div className="card space-y-3 p-5">
-        <h1 className="text-lg font-extrabold">Modo DJ 🎧</h1>
-        <p className="text-sm text-tinta-700">
-          Primeiro conecte seu Spotify em Meus dados e acesso.
-        </p>
-        <Link to="/perfil/conta" className="btn-primary">
-          Conectar meu Spotify
-        </Link>
-      </div>
-    )
-  }
 
   const souEu = sessao?.dj_user_id === userId
 
-  if (!souEu) {
-    return (
-      <div className="card space-y-3 p-5">
-        <h1 className="text-lg font-extrabold">Modo DJ 🎧</h1>
-        <p className="text-sm text-tinta-700">
-          Dê play na sua playlist no Spotify e ligue o Modo DJ. Os pedidos dos
-          alunos entram no meio dela, um de cada pessoa por vez.
-        </p>
-        {sessao && (
-          <p className="rounded-xl bg-preto/5 px-3 py-2 text-sm">
-            <strong>{sessao.dj_nome}</strong> está de DJ agora.
-          </p>
-        )}
-        <button
-          className="btn-primary w-full"
-          disabled={ocupado}
-          onClick={() => void ligar(Boolean(sessao))}
-        >
-          {sessao ? 'Assumir o Modo DJ' : 'Ligar Modo DJ'}
-        </button>
-      </div>
-    )
-  }
-
   // Inclui o pedido que já está na fila do Spotify e ainda não tocou
   const proximas = proximasNaTela(pedidos, fila, sessao?.tocando?.pedido_id ?? null, new Date())
-  const proxima = proximas[0]?.pedido
+  const proxima = proximas[0]
+  const resto = proximas.slice(1)
+  const esperando = proximas.filter((x) => !x.naFilaDoSpotify).length
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold">Modo DJ 🎧</h1>
-        <button className="btn-ghost" disabled={ocupado} onClick={() => void desligar()}>
-          Desligar
-        </button>
-      </div>
-
-      {sessao?.aviso && (
-        <p className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-          {AVISOS[sessao.aviso]}
-        </p>
-      )}
-
-      <div className="card overflow-hidden">
-        <p className="px-4 pt-3 text-xs font-bold uppercase text-tinta-500">Tocando agora</p>
-        {sessao?.tocando ? (
-          <LinhaPedido
-            titulo={sessao.tocando.titulo}
-            artista={sessao.tocando.artista}
-            capaUrl={sessao.tocando.capa_url}
-            tamanhoCapa={64}
-            pessoa={
-              sessao.tocando.pedido_por
-                ? { nome: sessao.tocando.pedido_por, avatarUrl: sessao.tocando.pedido_por_avatar }
-                : null
-            }
-          />
+    <div className="anima-tela">
+      <Cabecalho
+        titulo="Modo DJ"
+        acao={
+          souEu && (
+            <BotaoSuave tamanho="p" disabled={ocupado} onClick={() => setConfirmarDesligar(true)}>
+              Desligar
+            </BotaoSuave>
+          )
+        }
+      />
+      <div className="flex flex-col gap-3.5 px-4 pt-1">
+        {!conexao.conectado ? (
+          <ConexaoSpotify />
+        ) : !souEu ? (
+          <>
+            <div className="flex flex-col gap-3.5 rounded-3xl border-2 border-preto bg-azul-500 p-5 text-preto shadow-[0_5px_0_#000507]">
+              <span className="flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-preto text-azul-300">
+                <Icone nome="fone" tamanho={28} traco={2.3} />
+              </span>
+              <span className="text-[26px] font-extrabold leading-[1.05] tracking-[-.02em]">
+                Abrir os pedidos de música
+              </span>
+              <span className="text-[15px] font-semibold leading-snug">
+                Dê play na sua playlist no Spotify e ligue o Modo DJ. Os pedidos entram no
+                meio dela, um de cada pessoa por vez.
+              </span>
+              <div className="flex items-center gap-2 rounded-[14px] bg-branco/85 px-3 py-2.5 text-sm font-bold">
+                <span className="h-2.5 w-2.5 rounded-full bg-verde-700" />
+                Spotify conectado{conexao.spotify_nome ? ` · ${conexao.spotify_nome}` : ''}
+              </div>
+            </div>
+            {sessao && (
+              <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
+                <b className="text-ink">{sessao.dj_nome}</b> está de DJ agora. Ligando, você
+                assume o som da noite.
+              </p>
+            )}
+            <div className="flex flex-col gap-2">
+              <span className="px-1 text-[15px] font-extrabold">Fechar os pedidos sozinho</span>
+              <Segmentado valor={fechamento} onChange={setFechamento} opcoes={FECHAMENTOS} />
+              <span className="px-1 text-[13px] leading-snug text-ink3">
+                Assim os pedidos não ficam abertos depois que a dança acaba.
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void ligar(Boolean(sessao))}
+              className="flex h-[60px] items-center justify-center gap-2.5 rounded-[18px] border-2 border-preto bg-preto text-lg font-extrabold text-branco disabled:opacity-50"
+            >
+              <Icone nome="fone" tamanho={22} traco={2.3} />
+              {sessao ? 'Assumir o Modo DJ' : 'Ligar Modo DJ'}
+            </button>
+          </>
         ) : (
-          <p className="p-4 text-sm text-tinta-600">Esperando a primeira leitura do Spotify…</p>
+          <>
+            <div className="flex items-center gap-2.5 rounded-2xl border-[1.5px] border-verde-500 bg-verde-500/15 px-3.5 py-3 text-sm font-bold">
+              <span className="pulso-verde h-2.5 w-2.5 shrink-0 rounded-full bg-verde-500" />
+              <span className="flex-1">
+                Pedidos abertos ·{' '}
+                {sessao?.fecha_em
+                  ? `fecham sozinhos às ${horaCurta(new Date(sessao.fecha_em))}`
+                  : 'até você desligar'}
+              </span>
+            </div>
+
+            {sessao?.aviso && (
+              <p className="rounded-2xl border-[1.5px] border-brasa-500 bg-sf px-4 py-3 text-sm leading-snug">
+                {AVISOS[sessao.aviso]}
+              </p>
+            )}
+
+            <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
+              <div className="px-3.5 pt-3 text-xs font-extrabold uppercase tracking-[.06em] text-ink3">
+                Tocando agora
+              </div>
+              {sessao?.tocando ? (
+                <LinhaPedido
+                  className="px-3.5 py-3"
+                  titulo={sessao.tocando.titulo}
+                  artista={sessao.tocando.artista}
+                  capaUrl={sessao.tocando.capa_url}
+                  tamanhoCapa={64}
+                  pessoa={
+                    sessao.tocando.pedido_por
+                      ? { nome: sessao.tocando.pedido_por, avatarUrl: sessao.tocando.pedido_por_avatar }
+                      : null
+                  }
+                />
+              ) : (
+                <p className="px-3.5 py-3 text-sm text-ink3">
+                  Esperando a primeira leitura do Spotify…
+                </p>
+              )}
+            </div>
+
+            {proxima && (
+              <div className="overflow-hidden rounded-[20px] border-[1.5px] border-brasa-500 bg-sf">
+                <div className="px-3.5 pt-3 text-xs font-extrabold uppercase tracking-[.06em] text-or-t">
+                  Próxima do rodízio
+                </div>
+                <LinhaPedido
+                  className="px-3.5 py-3"
+                  titulo={proxima.pedido.titulo}
+                  artista={proxima.pedido.artista}
+                  capaUrl={proxima.pedido.capa_url}
+                  pessoa={{ nome: proxima.pedido.nome, avatarUrl: proxima.pedido.avatar_url }}
+                  detalhe={proxima.naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
+                  acao={
+                    proxima.naFilaDoSpotify ? undefined : (
+                      <BotaoCancelar onClick={() => setCancelando(proxima.pedido)} />
+                    )
+                  }
+                />
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
+              <div className="px-3.5 pb-1 pt-3 text-xs font-extrabold uppercase tracking-[.06em] text-ink3">
+                Fila ({resto.length})
+              </div>
+              {resto.map(({ pedido: p, posicao, naFilaDoSpotify }) => (
+                <LinhaPedido
+                  key={p.id}
+                  className="border-t border-linha px-3 py-2.5"
+                  posicao={posicao}
+                  titulo={p.titulo}
+                  artista={p.artista}
+                  capaUrl={p.capa_url}
+                  tamanhoCapa={48}
+                  pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
+                  detalhe={naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
+                  acao={naFilaDoSpotify ? undefined : <BotaoCancelar onClick={() => setCancelando(p)} />}
+                />
+              ))}
+              {proximas.length === 0 && (
+                <div className="p-3.5 text-sm text-ink3">
+                  Nenhum pedido esperando: a playlist segue.
+                </div>
+              )}
+            </div>
+            <span className="text-center text-[13px] leading-snug text-ink3">
+              Não precisa deixar esta tela aberta: o servidor manda as músicas para o
+              Spotify sozinho.
+            </span>
+          </>
         )}
       </div>
 
-      <div className="card overflow-hidden">
-        <p className="px-4 pt-3 text-xs font-bold uppercase text-tinta-500">Próxima do rodízio</p>
-        {proxima ? (
-          <LinhaPedido
-            titulo={proxima.titulo}
-            artista={proxima.artista}
-            capaUrl={proxima.capa_url}
-            pessoa={{ nome: proxima.nome, avatarUrl: proxima.avatar_url }}
-          />
-        ) : (
-          <p className="p-4 text-sm text-tinta-600">Nenhum pedido esperando: a playlist segue.</p>
-        )}
-      </div>
-
-      <div className="card divide-y divide-preto/10">
-        <p className="p-4 text-xs font-bold uppercase text-tinta-500">
-          Fila ({proximas.length})
-        </p>
-        {proximas.map(({ pedido: p, posicao, naFilaDoSpotify }) => (
-          <LinhaPedido
-            key={p.id}
-            posicao={posicao}
-            titulo={p.titulo}
-            artista={p.artista}
-            capaUrl={p.capa_url}
-            pessoa={{ nome: p.nome, avatarUrl: p.avatar_url }}
-            detalhe={naFilaDoSpotify ? 'já está na fila do Spotify' : undefined}
-            acao={
-              naFilaDoSpotify ? undefined : (
-                <button
-                  className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-tinta-600 hover:bg-preto/5"
-                  onClick={() => void cancelar(p)}
-                >
-                  Cancelar
-                </button>
-              )
-            }
-          />
-        ))}
-      </div>
+      <Confirmar
+        aberto={confirmarDesligar}
+        titulo="Desligar o Modo DJ?"
+        texto={`Os pedidos fecham para todo mundo.${
+          esperando > 0
+            ? ` ${esperando === 1 ? 'O pedido que ainda está esperando não vai tocar' : `Os ${esperando} pedidos que ainda estão esperando não vão tocar`}.`
+            : ''
+        }`}
+        ok="Desligar"
+        voltar="Continuar"
+        ocupado={ocupado}
+        alerta={false}
+        onOk={() => void desligar()}
+        onVoltar={() => setConfirmarDesligar(false)}
+      />
+      <Confirmar
+        aberto={confirmarAssumir !== null}
+        titulo={`${confirmarAssumir ?? ''} está de DJ agora`}
+        texto="Assumindo, a sessão atual fecha e o som da noite passa para o seu Spotify."
+        ok="Assumir"
+        ocupado={ocupado}
+        alerta={false}
+        onOk={() => void ligar(true)}
+        onVoltar={() => setConfirmarAssumir(null)}
+      />
+      <Confirmar
+        aberto={cancelando !== null}
+        titulo={cancelando ? `Cancelar o pedido de ${cancelando.nome.split(' ')[0]}?` : ''}
+        texto={cancelando ? `“${cancelando.titulo}” sai da fila e não vai tocar hoje.` : undefined}
+        ok="Cancelar pedido"
+        onOk={() => cancelando && void cancelar(cancelando)}
+        onVoltar={() => setCancelando(null)}
+      />
     </div>
+  )
+}
+
+function BotaoCancelar({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-10 shrink-0 rounded-xl bg-chip px-2.5 text-[13px] font-extrabold text-ink2"
+    >
+      Cancelar
+    </button>
   )
 }

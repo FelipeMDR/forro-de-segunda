@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { BotaoAcao } from './ui'
 
 /**
  * Pedido de consentimento para quem já tinha conta.
@@ -38,25 +39,30 @@ export function AceiteTermos() {
   }
 
   return (
-    <div className="card space-y-3 border-azul-500/40 p-4">
-      <div>
-        <p className="text-sm font-extrabold">Uma coisa rápida 📄</p>
-        <p className="mt-1 text-sm text-tinta-700">
+    <div className="flex flex-col gap-3 rounded-[22px] border-[1.5px] border-azul-500 bg-sf p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-[17px] font-extrabold">Uma coisa rápida</p>
+        <p className="text-[15px] leading-snug text-ink2">
           Escrevemos um aviso explicando que dados o app guarda, por quanto
           tempo e quem enxerga o quê. Dá uma lida e confirma para a gente?
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Link to="/privacidade" className="btn-ghost">
+      <div className="flex gap-2">
+        <Link
+          to="/privacidade"
+          className="flex h-12 items-center justify-center rounded-2xl border-[1.5px] border-linha bg-sf px-4 text-[15px] font-bold text-ink"
+        >
           Ler o aviso
         </Link>
-        <button
-          className="btn-primary flex-1"
+        <BotaoAcao
+          tamanho="m"
+          sombra={false}
+          className="flex-1"
           disabled={salvando}
           onClick={() => void aceitar()}
         >
           {salvando ? 'Salvando…' : 'Li e aceito'}
-        </button>
+        </BotaoAcao>
       </div>
     </div>
   )

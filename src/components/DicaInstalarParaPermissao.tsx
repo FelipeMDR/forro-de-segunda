@@ -26,9 +26,9 @@ export function DicaInstalarParaPermissao() {
   // ele a pessoa fica liberando a câmera todo santo dia sem entender.
   if (ehNavegadorEmbutido()) {
     return (
-      <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-        <p className="font-bold">Por isso ele pergunta toda vez</p>
-        <p className="mt-0.5 text-xs">
+      <div className="rounded-2xl border border-linha bg-sf px-4 py-3 text-left text-sm text-ink2">
+        <p className="font-extrabold text-ink">Por isso ele pergunta toda vez</p>
+        <p className="mt-1 text-[13px] leading-snug">
           Você abriu o app pelo navegador de dentro de outro aplicativo
           (Instagram, WhatsApp…), e ele esquece tudo ao fechar. Toque nos
           <strong> ··· </strong> aqui em cima, escolha{' '}
@@ -45,16 +45,16 @@ export function DicaInstalarParaPermissao() {
   if (!ios && !temPromptNativo) return null
 
   return (
-    <div className="rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
-      <p className="font-bold">Cansado de liberar toda vez?</p>
-      <p className="mt-0.5 text-xs">
+    <div className="rounded-2xl border border-linha bg-sf px-4 py-3 text-left text-sm text-ink2">
+      <p className="font-extrabold text-ink">Cansado de liberar toda vez?</p>
+      <p className="mt-1 text-[13px] leading-snug">
         Abrindo pelo navegador, o celular esquece a permissão sempre que
         você fecha o app. Com o Forró de Segunda na tela inicial, ele
         pergunta uma vez só.
       </p>
       <div className="mt-2">
         <BotaoInstalar
-          className="btn-primary px-3 py-1.5 text-xs"
+          className="h-10 rounded-xl border-2 border-preto bg-brasa-500 px-3 text-sm font-extrabold text-preto"
           rotulo="Deixar na tela inicial"
         />
       </div>

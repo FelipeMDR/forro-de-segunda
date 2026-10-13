@@ -34,6 +34,22 @@ function marcoAlcancado(marcos: Marco[], valor: number): Marco | undefined {
   return alcancado
 }
 
+/** Quanto falta do marco alcançado até o próximo (sem próximo: nada). */
+function progressoAte(
+  marcos: Marco[],
+  valor: number,
+): Badge['progresso'] | undefined {
+  const proximo = marcos.find((m) => m[0] > valor)
+  if (!proximo) return undefined
+  const anterior = [...marcos].reverse().find((m) => m[0] <= valor)
+  const base = anterior?.[0] ?? 0
+  return {
+    atual: valor - base,
+    meta: proximo[0] - base,
+    rotulo: `faltam ${proximo[0] - valor} para ${proximo[1]} ${proximo[0]}`,
+  }
+}
+
 const MARCOS_PRESENCA: Marco[] = [
   [1, '👣', 'Primeiro check-in'],
   [10, '🥉', '10 presenças'],
@@ -135,6 +151,7 @@ export function computeBadges(input: {
       titulo,
       // Texto neutro: o mesmo distintivo aparece no perfil dos outros
       descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
+      progresso: progressoAte(MARCOS_PRESENCA, total),
     })
   }
 
@@ -150,6 +167,7 @@ export function computeBadges(input: {
       descricao: `${parceiros} ${
         parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
       }`,
+      progresso: progressoAte(MARCOS_RODIZIO, parceiros),
     })
   }
 
@@ -165,6 +183,7 @@ export function computeBadges(input: {
       descricao: `${tocadas} ${
         tocadas === 1 ? 'música tocada' : 'músicas tocadas'
       } no Espaço Livre`,
+      progresso: progressoAte(MARCOS_DJ, tocadas),
     })
   }
 

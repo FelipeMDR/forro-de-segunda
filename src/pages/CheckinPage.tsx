@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CameraCapture } from '../components/CameraCapture'
-import { MarcarDuplas } from '../components/MarcarDuplas'
+import { Icone } from '../components/Icone'
+import { TelaDuplas } from '../components/MarcarDuplas'
 import { Spinner } from '../components/Spinner'
+import { BotaoAcao, BotaoSuave, useVoltar } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import { fimDaJanela, horaCurta, useNoite } from '../context/NoiteContext'
 import { useToast } from '../context/ToastContext'
 import {
   aberturaDoDia,
@@ -24,61 +27,64 @@ import {
   obterPosicao,
   type PosicaoObtida,
 } from '../lib/geo'
-import {
-  esperaLegivel,
-  limiteCheckin,
-  LIMITE_POR_JANELA,
-} from '../lib/limites'
+import { esperaLegivel, limiteCheckin, LIMITE_POR_JANELA } from '../lib/limites'
 import { estadoDaPermissao } from '../lib/permissoes'
-import { DicaInstalarParaPermissao } from '../components/DicaInstalarParaPermissao'
-import type { AberturaAntecipada, Challenge, Feriado } from '../lib/types'
+import type { Challenge } from '../lib/types'
 
 /**
- * O check-in é um caminho de três passos, não uma página só.
+ * O check-in é um caminho de quatro passos, não uma página só.
  *
- * Antes tudo dividia a mesma tela rolável: câmera, legenda, aviso de
- * status e a grade de duplas. Cada pedaço aparecia na hora errada — a
- * legenda pedindo texto antes de existir foto, a grade de duplas
- * disputando espaço com a câmera.
- *
+ *   status  → o cartaz: vale ponto agora? (e o botão de abrir a câmera)
  *   camera  → enquadrar e disparar
  *   revisar → ver a foto, escrever a legenda, publicar
- *   pronto  → confirmação e "com quem você dançou?"
+ *   duplas  → "com quem você dançou hoje?"
  *
- * `pronto` também é o estado de repouso: é onde cai quem fecha a câmera
- * no ✕, quem chega já tendo postado nesta noite, e quem bateu o limite
- * de fotos por janela.
+ * O cartaz vem antes da câmera porque é a resposta da pergunta que traz
+ * a pessoa até aqui ("vale ponto?"), e porque o toque em "Abrir câmera"
+ * é o gesto que o navegador exige para pedir a permissão — entrar na
+ * tela continua sem disparar diálogo nenhum.
  */
-type Etapa = 'camera' | 'revisar' | 'pronto'
+type Etapa = 'status' | 'camera' | 'revisar' | 'duplas'
+
+/** Cor do cartaz e da pílula da câmera. Texto é sempre preto. */
+const FUNDO = {
+  brasa: '#DE5300',
+  verde: '#9BC22D',
+  azul: '#0391D5',
+  pessego: '#FFB98C',
+} as const
+type CorStatus = keyof typeof FUNDO
+
+interface Status {
+  cor: CorStatus
+  /** Título do cartaz ("Valendo ponto agora"). */
+  titulo: string
+  /** Complemento curto, para a pílula da câmera. */
+  curto: string
+  /** Frase completa, para quem abre os detalhes. */
+  texto: string
+}
 
 export function CheckinPage() {
-  const { api, userId } = useAuth()
+  const { api } = useAuth()
   const toast = useToast()
-  const [desafios, setDesafios] = useState<Challenge[]>([])
-  const [feriados, setFeriados] = useState<Feriado[]>([])
-  const [aberturas, setAberturas] = useState<AberturaAntecipada[]>([])
-  const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
+  const navigate = useNavigate()
+  const voltar = useVoltar('/')
+  const [params] = useSearchParams()
+  const noite = useNoite()
+  const { desafios, feriados, aberturas, meusCheckins, carregado } = noite
   const [foto, setFoto] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [legenda, setLegenda] = useState('')
   const [enviando, setEnviando] = useState(false)
-  // null enquanto não dá para decidir qual passo mostrar. Sem isso a
-  // câmera abriria na cara de quem já postou, e fecharia em seguida.
+  // null enquanto não dá para decidir qual passo mostrar
   const [etapa, setEtapa] = useState<Etapa | null>(null)
-  /**
-   * O que aconteceu com a foto que ACABOU de ser publicada.
-   *
-   * Precisa ser guardado no momento do envio: assim que o check-in
-   * entra em `meusCheckins`, ele passa a ser "ponto já contado" e a
-   * mensagem viraria outra. Também distingue "acabei de publicar" de
-   * "cheguei aqui e já tinha postado".
-   */
-  const [resultado, setResultado] = useState<string | null>(null)
-  // Os check-ins de hoje chegam do servidor e decidem se ainda dá para
-  // postar. Abrir a câmera antes disso arriscaria abri-la para quem já
-  // bateu o limite, e fechá-la na cara da pessoa logo em seguida.
-  const [carregado, setCarregado] = useState(false)
+  /** Hora e veredito da foto que ACABOU de ser publicada. */
+  const [publicada, setPublicada] = useState<{ hora: Date; contou: boolean } | null>(null)
   const jaDecidiu = useRef(false)
+  /** O toque em "Abrir câmera" já aconteceu (não precisa de outro). */
+  const [tocouAbrir, setTocouAbrir] = useState(false)
+  const [detalhes, setDetalhes] = useState(false)
   // Muda sozinho com o tempo (o respiro de 5 min vence), então precisa
   // de um tique para a tela destravar sem o aluno recarregar a página.
   const [agora, setAgora] = useState(() => new Date())
@@ -105,21 +111,6 @@ export function CheckinPage() {
   )
 
   useEffect(() => {
-    void api.listChallenges().then(setDesafios).catch(() => setDesafios([]))
-    void api.listFeriados().then(setFeriados).catch(() => setFeriados([]))
-    void api.listAberturas().then(setAberturas).catch(() => setAberturas([]))
-    if (userId) {
-      void api
-        .checkinsDe(userId)
-        .then((cs) => setMeusCheckins(cs.map((c) => new Date(c.criado_em))))
-        .catch(() => setMeusCheckins([]))
-        .finally(() => setCarregado(true))
-    } else {
-      setCarregado(true)
-    }
-  }, [api, userId])
-
-  useEffect(() => {
     return () => {
       if (preview) URL.revokeObjectURL(preview)
     }
@@ -132,10 +123,7 @@ export function CheckinPage() {
     () => desafios.filter((c) => challengePhase(c) === 'ativo'),
     [desafios],
   )
-  const meusAtivos = useMemo(
-    () => ativos.filter((c) => c.sou_membro),
-    [ativos],
-  )
+  const meusAtivos = useMemo(() => ativos.filter((c) => c.sou_membro), [ativos])
 
   // Todos com janela aberta agora, inclusive os que não participo:
   // entrar no desafio é escolher competir, e quem entra depois leva as
@@ -143,8 +131,8 @@ export function CheckinPage() {
   // agora — em desafio com local, o veredito não tem como ser feito
   // depois, já que a coordenada não é guardada (migração 014).
   const abertosAgora = useMemo(
-    () => desafiosQueContam(new Date(), ativos, suspensos, aberturasMapa),
-    [ativos, suspensos, aberturasMapa],
+    () => desafiosQueContam(agora, ativos, suspensos, aberturasMapa),
+    [agora, ativos, suspensos, aberturasMapa],
   )
   const valendoAgora = useMemo(
     () => abertosAgora.filter((c) => c.sou_membro),
@@ -157,24 +145,21 @@ export function CheckinPage() {
   )
 
   // Hoje a janela existiria, mas a aula foi cancelada. Sem isso o aluno
-  // veria só "nenhum desafio com janela aberta" e acharia que é bug —
-  // ele está no lugar certo, na hora certa, e não tem forró.
+  // veria só "nenhum desafio com janela aberta" e acharia que é bug.
   const suspensaoAgora = useMemo(() => {
     if (valendoAgora.length > 0) return null
-    const agora = new Date()
     for (const c of desafiosQueContam(agora, meusAtivos)) {
       const dia = janelaDoCheckin(agora, c)
       if (dia && suspensos.has(dia)) return suspensaoDoDia(dia, feriados)
     }
     return null
-  }, [valendoAgora, meusAtivos, suspensos, feriados])
+  }, [agora, valendoAgora, meusAtivos, suspensos, feriados])
 
   // Cada janela vale 1 ponto por desafio: separa os que ainda vão pontuar
   // agora dos que já pontuaram nesta janela. Usa a janela (não a data do
   // calendário) para não se perder em desafios que cruzam a meia-noite
   // (ex.: 21:00–02:00) — check-in às 23h e outro à 01h são a MESMA janela.
   const { aindaPontuam, jaPontuaram } = useMemo(() => {
-    const agora = new Date()
     const aindaPontuam: Challenge[] = []
     const jaPontuaram: Challenge[] = []
     for (const c of valendoAgora) {
@@ -188,15 +173,12 @@ export function CheckinPage() {
       else aindaPontuam.push(c)
     }
     return { aindaPontuam, jaPontuaram }
-  }, [valendoAgora, meusCheckins, suspensos, aberturasMapa])
+  }, [agora, valendoAgora, meusCheckins, suspensos, aberturasMapa])
 
   // Desafios abertos agora que exigem estar no local — inclusive os que
   // não participo, senão a foto não seria avaliada e entrar depois não
   // recuperaria nada.
-  const comLocal = useMemo(
-    () => abertosAgora.filter((c) => c.local),
-    [abertosAgora],
-  )
+  const comLocal = useMemo(() => abertosAgora.filter((c) => c.local), [abertosAgora])
   /** Só os meus, que é o que a tela detalha com distância. */
   const meusComLocal = useMemo(
     () => valendoAgora.filter((c) => c.local),
@@ -206,12 +188,11 @@ export function CheckinPage() {
   /**
    * Tem desafio com local rolando e o GPS ainda não disse nem sim nem
    * não. Enquanto isso for verdade, publicar é uma corrida: a câmera é
-   * rápida (3 toques: tirar, revisar, publicar) e o GPS pode não ter
-   * respondido ainda, principalmente num salão fechado, onde o sinal de
-   * satélite demora ou nunca fecha. Sem travar o botão nesse meio-tempo,
-   * a foto sai sem coordenada nenhuma — e como ela nunca é reavaliada
-   * depois (a coordenada não fica guardada, só o veredito), o ponto se
-   * perde pra sempre, em silêncio, sem aviso nenhum na tela de revisão.
+   * rápida e o GPS pode não ter respondido ainda, principalmente num
+   * salão fechado. Sem travar o botão nesse meio-tempo, a foto sai sem
+   * coordenada nenhuma — e como ela nunca é reavaliada depois (a
+   * coordenada não fica guardada, só o veredito), o ponto se perde pra
+   * sempre, em silêncio.
    */
   const aguardandoLocal = comLocal.length > 0 && !posicao && !erroLocal
 
@@ -236,23 +217,12 @@ export function CheckinPage() {
     }
   }
 
-  /**
-   * O GPS espera a câmera — e espera de propósito.
-   *
-   * `cameraResolvida` só vira true depois que a pessoa tocou em "Abrir a
-   * câmera" e o navegador respondeu. Amarrar o GPS a isso resolve duas
-   * coisas de uma vez: nunca há dois diálogos do sistema empilhados, e
-   * simplesmente ENTRAR na tela não dispara pedido nenhum — nem de
-   * câmera, nem de localização.
-   *
-   * Não perde nada: só dá para publicar depois de tirar a foto, então
-   * quando a localização vai fazer falta a câmera já passou por aqui.
-   */
-  const podePedirLocal = cameraResolvida
-
+  // O GPS espera a câmera (ver `cameraResolvida`): nunca há dois
+  // diálogos do sistema empilhados, e simplesmente ENTRAR na tela não
+  // dispara pedido nenhum.
   useEffect(() => {
     if (
-      podePedirLocal &&
+      cameraResolvida &&
       comLocal.length > 0 &&
       !posicao &&
       !erroLocal &&
@@ -261,7 +231,7 @@ export function CheckinPage() {
       void buscarLocal()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comLocal.length, podePedirLocal])
+  }, [comLocal.length, cameraResolvida])
 
   /** Situação de cada desafio com local: dentro do raio ou não. */
   const situacaoLocal = useMemo(
@@ -297,7 +267,6 @@ export function CheckinPage() {
         return URL.createObjectURL(comprimida)
       })
       // A câmera fecha aqui: a partir deste ponto a tela é de revisão.
-      // Escrever a legenda com a câmera ligada só gastaria bateria.
       setEtapa('revisar')
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -312,9 +281,10 @@ export function CheckinPage() {
     })
   }
 
-  /** Volta ao passo 1 jogando fora a foto — "tirar outra" e a seta. */
+  /** Volta para a câmera jogando fora a foto — "tirar outra". */
   const voltarParaCamera = () => {
     descartarFoto()
+    setTocouAbrir(true)
     setEtapa('camera')
   }
 
@@ -323,29 +293,27 @@ export function CheckinPage() {
     setEnviando(true)
     try {
       await api.createCheckin(foto, legenda, posicao)
-      // O recado do que valeu deixou de ser um toast: ele some sozinho,
-      // e é justamente a resposta da pergunta que trouxe a pessoa aqui.
-      // Agora fica escrito na tela de confirmação.
-      setResultado(
-        aindaPontuamAqui.length > 0
-          ? 'Sua presença na noite já conta 🎉'
-          : jaPontuaram.length > 0
-            ? 'Seu ponto desta noite já tinha sido contado 😉'
+      const contou = aindaPontuamAqui.length > 0
+      // O recado do que valeu: a resposta da pergunta que trouxe a
+      // pessoa aqui. O que contou vira a etiqueta da tela de duplas.
+      if (!contou) {
+        toast(
+          jaPontuaram.length > 0
+            ? 'Seu ponto desta noite já tinha sido contado. A foto está no feed.'
             : suspensaoAgora
-              ? 'Hoje não tem forró, então a foto não marca ponto 🚫'
+              ? 'Hoje não tem forró, então a foto não marca ponto.'
               : foraDeles.length > 0
-                ? 'Já fica valendo caso você entre no desafio 🏆'
-                : 'Nenhum desafio aberto agora — a foto entra no feed 📸',
-      )
-      // O melhor momento para marcar com quem se dançou é agora, com a
-      // noite fresca — é o que o passo 3 oferece.
+                ? 'Foto no feed. Ela já fica valendo se você entrar no desafio.'
+                : 'Nenhum desafio aberto agora — a foto entrou no feed.',
+        )
+      }
+      setPublicada({ hora: new Date(), contou })
       descartarFoto()
       setLegenda('')
-      setMeusCheckins((atual) => [...atual, new Date()])
-      setEtapa('pronto')
-      // O botão do menu de baixo mora fora desta árvore e precisa saber
-      // agora, senão ficaria oferecendo "fazer check-in" ao lado da
-      // confirmação de que ele acabou de ser feito.
+      // O melhor momento para marcar com quem se dançou é agora, com a
+      // noite fresca — é o passo seguinte. O aviso atualiza a barra, a
+      // tela Hoje e a lista de check-ins da noite.
+      setEtapa('duplas')
       avisarCheckinPublicado()
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -359,405 +327,490 @@ export function CheckinPage() {
 
   /** Quem tem local e está longe demais — é o que dá para consertar andando. */
   const longe = situacaoLocal.filter((s) => s.distancia !== null && !s.dentro)
-
-  /**
-   * Tem desafio meu exigindo local agora, e a localização não veio
-   * (bloqueada, sem sinal, ainda buscando).
-   *
-   * Sem isto, quem bloqueia o GPS caía no último caso da lista e lia
-   * "nenhum desafio com janela aberta agora" — uma mentira, e das que
-   * fazem a pessoa achar que o app está quebrado. O desafio ESTÁ
-   * aberto; o que falta é provar que ela está lá.
-   */
+  /** Tem desafio meu exigindo local agora, e a localização não veio. */
   const semLocalizacao = meusComLocal.length > 0 && !posicao
 
   /**
-   * UM aviso, não cinco.
-   *
-   * Antes cada situação (valendo ponto, longe do local, já pontuou,
-   * aula cancelada, desafio que não participo, nada aberto) tinha seu
-   * próprio cartão, e vários apareciam juntos — empurrando a câmera,
-   * que é o motivo da tela existir, para fora do celular. Aqui vence a
-   * informação mais acionável, e o resto fica nos detalhes.
+   * UM aviso, não cinco: vence a informação mais acionável, e o resto
+   * fica nos detalhes. Retornos diretos, em ordem de prioridade.
    */
-  interface Status {
-    tom: 'ok' | 'info' | 'aviso'
-    emoji: string
-    texto: string
-  }
-
-  // Retornos diretos, em ordem de prioridade — antes isto era uma
-  // escada de ternários aninhados, e cada caso novo empurrava a
-  // indentação de todos os outros.
   const decidirStatus = (): Status => {
     if (aindaPontuamAqui.length > 0) {
+      const c = aindaPontuamAqui[0]
+      const ate = fimDaJanela(agora, c)
       return {
-        tom: 'ok',
-        emoji: '✅',
+        cor: 'brasa',
+        titulo: 'Valendo ponto agora',
+        curto: ate ? `até ${ate}` : c.titulo,
         texto:
           aindaPontuamAqui.length === 1
-            ? `Valendo ponto em ${aindaPontuamAqui[0].titulo}`
-            : `Valendo ponto em ${aindaPontuamAqui.length} desafios`,
+            ? `Valendo ponto em ${c.titulo}${ate ? ` até ${ate}` : ''}.`
+            : `Valendo ponto em ${aindaPontuamAqui.length} desafios.`,
       }
     }
     if (longe.length > 0) {
+      const lugar = longe[0].desafio.local?.nome || 'onde o desafio conta'
       return {
-        tom: 'aviso',
-        emoji: '📍',
-        texto: `Você está a ${distanciaLegivel(longe[0].distancia ?? 0)} de ${
-          longe[0].desafio.local?.nome || 'onde o desafio conta'
-        } — de lá, a foto marca ponto.`,
+        cor: 'pessego',
+        titulo: 'Longe do local',
+        curto: `a ${distanciaLegivel(longe[0].distancia ?? 0)}`,
+        texto: `Você está a ${distanciaLegivel(longe[0].distancia ?? 0)} de ${lugar} — de lá, a foto marca ponto.`,
       }
     }
     // Antes do "nenhum desafio aberto": o desafio ESTÁ aberto, o que
     // falta é a localização. Cair no caso final aqui era mentira.
     if (semLocalizacao) {
-      return {
-        tom: 'aviso',
-        emoji: '📍',
-        texto: erroLocal
-          ? `Tem desafio rolando que só conta ponto no local, e não deu para confirmar onde você está (${erroLocal.toLowerCase()}).`
-          : 'Confirmando sua localização para saber se a foto marca ponto…',
-      }
+      return erroLocal
+        ? {
+            cor: 'pessego',
+            titulo: 'Sem localização',
+            curto: 'não marca ponto',
+            texto: `Tem desafio rolando que só conta ponto no local, e não deu para confirmar onde você está (${erroLocal.toLowerCase()}).`,
+          }
+        : {
+            cor: 'brasa',
+            titulo: 'Valendo ponto agora',
+            curto: 'conferindo o local',
+            texto: 'Confirmando sua localização para saber se a foto marca ponto…',
+          }
     }
     if (jaPontuaram.length > 0) {
       return {
-        tom: 'info',
-        emoji: '👍',
-        texto:
-          'Seu ponto desta noite já foi contado. A foto entra no feed do mesmo jeito.',
+        cor: 'verde',
+        titulo: 'Você já pontuou hoje',
+        curto: 'não conta de novo',
+        texto: 'Seu ponto desta noite já foi contado. A foto entra no feed do mesmo jeito.',
       }
     }
     if (suspensaoAgora) {
       return {
-        tom: 'aviso',
-        emoji: '🚫',
-        texto: `Hoje não tem forró${
-          suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''
-        } — a foto não marca ponto.`,
+        cor: 'pessego',
+        titulo: 'Hoje não tem forró',
+        curto: 'sem ponto',
+        texto: `Hoje não tem forró${suspensaoAgora.motivo ? ` (${suspensaoAgora.motivo})` : ''} — a foto não marca ponto.`,
       }
     }
     if (foraDeles.length > 0) {
       return {
-        tom: 'info',
-        emoji: '🏆',
+        cor: 'azul',
+        titulo: 'Tem desafio rolando',
+        curto: 'você não entrou',
         texto:
           'Tem desafio rolando agora que você não entrou. Pode postar — a foto já fica valendo se você entrar depois.',
       }
     }
     return {
-      tom: 'aviso',
-      emoji: '⚠️',
-      texto:
-        'Nenhum desafio com janela aberta agora. A foto entra no feed, mas não marca ponto.',
+      cor: 'pessego',
+      titulo: 'Nada valendo agora',
+      curto: 'só vai pro feed',
+      texto: 'Nenhum desafio com janela aberta agora. A foto entra no feed, mas não marca ponto.',
     }
   }
-  const status: Status = decidirStatus()
-
-  // amber-800 e não 700: sobre o fundo em /10 o 700 dá 4,23:1, abaixo
-  // do mínimo de 4,5:1 para texto pequeno.
-  const CORES = {
-    ok: 'bg-emerald-500/10 text-emerald-800',
-    info: 'bg-azul-500/10 text-azul-700',
-    aviso: 'bg-amber-500/10 text-amber-800',
-  }
-
-  // Só vale abrir detalhes quando há mais de um desafio em jogo ou algum
-  // com trava de local — fora isso o resumo já disse tudo.
-  const valeDetalhar = abertosAgora.length > 1 || meusComLocal.length > 0
+  const status = decidirStatus()
 
   /**
-   * Em qual passo a tela abre.
-   *
-   * Chegar em /checkin é dizer "quero tirar uma foto", então a câmera
-   * abre sozinha — mas só para quem ainda tem foto a dar nesta noite.
-   * Quem já postou, ou bateu o limite, cai no passo 3, que é onde estão
-   * as duplas e a saída para o feed. Decide uma vez só: depois disso
-   * quem manda no passo é a pessoa.
+   * Em qual passo a tela abre. `?passo=duplas` (vindo da tela Hoje) vai
+   * direto para as duplas de quem já postou; `?passo=camera` pula o
+   * cartaz. Decide uma vez só: depois quem manda no passo é a pessoa.
    */
   useEffect(() => {
     if (jaDecidiu.current || !carregado) return
     jaDecidiu.current = true
-    setEtapa(jaPosteiHoje || !limite.pode ? 'pronto' : 'camera')
-  }, [carregado, jaPosteiHoje, limite.pode])
+    const passo = params.get('passo')
+    if (passo === 'duplas' && jaPosteiHoje) setEtapa('duplas')
+    else if (passo === 'camera' && limite.pode) setEtapa('camera')
+    else setEtapa('status')
+  }, [carregado, jaPosteiHoje, limite.pode, params])
 
-  if (etapa === null) return <Spinner texto="Preparando o check-in…" />
-
-  // ---- Passo 1: a câmera, em tela cheia por cima de tudo ----
-  if (etapa === 'camera') {
+  if (etapa === null) {
     return (
-      <CameraCapture
-        onCapture={(b) => void aoCapturar(b)}
-        onResolvida={() => setCameraResolvida(true)}
-        // Fechar não é cancelar o check-in: cai no passo 3, que é o
-        // estado de repouso da tela (duplas e saída para o feed).
-        onFechar={() => setEtapa('pronto')}
-        permitirFotoTeste={api.mode === 'demo'}
-        topo={
-          <>
-            {/* Mesmas cores da página: a faixa da câmera é clara, então
-                não há motivo para um visual só dela. */}
-            <div
-              className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${CORES[status.tom]}`}
-            >
-              <span aria-hidden>{status.emoji}</span>
-              <p className="flex-1">{status.texto}</p>
-            </div>
-            {erroLocal && comLocal.length > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-800">
-                <p className="flex-1">📍 {erroLocal}</p>
-                <button
-                  className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
-                  onClick={() => void buscarLocal()}
-                >
-                  Tentar de novo
-                </button>
-              </div>
-            )}
-          </>
+      <div className="flex min-h-dvh items-center justify-center">
+        <Spinner texto="Preparando o check-in…" />
+      </div>
+    )
+  }
+
+  // ---- Passo 1: o cartaz ----
+  if (etapa === 'status') {
+    return (
+      <Cartaz
+        status={statusDoCartaz()}
+        detalhes={detalhes}
+        onDetalhes={() => setDetalhes((d) => !d)}
+        onFechar={voltar}
+        onAbrir={() => {
+          setTocouAbrir(true)
+          setEtapa('camera')
+        }}
+        onDuplas={jaPosteiHoje ? () => setEtapa('duplas') : undefined}
+        bloqueio={
+          !limite.pode && limite.liberaEm
+            ? limite.motivo === 'intervalo'
+              ? `Calma no pé! Dá pra postar de novo em ${esperaLegivel(limite.liberaEm, agora)}.`
+              : `Você já postou ${LIMITE_POR_JANELA} check-ins nas últimas horas. Libera de novo em ${esperaLegivel(limite.liberaEm, agora)}.`
+            : null
         }
+        nota={notaAbertura()}
       />
     )
   }
 
-  // ---- Passo 2: revisar a foto e escrever a legenda ----
+  // ---- Passo 2: a câmera, em tela cheia por cima de tudo ----
+  if (etapa === 'camera') {
+    return (
+      <>
+        <CameraCapture
+          onCapture={(b) => void aoCapturar(b)}
+          onResolvida={() => setCameraResolvida(true)}
+          onFechar={() => setEtapa('status')}
+          abrirDireto={tocouAbrir}
+          permitirFotoTeste={api.mode === 'demo'}
+          topo={
+            <button
+              type="button"
+              onClick={() => setDetalhes((d) => !d)}
+              aria-expanded={detalhes}
+              className="flex h-11 min-w-0 max-w-full items-center justify-center gap-2 rounded-full border-2 border-preto px-3 text-sm font-extrabold text-preto"
+              style={{ background: FUNDO[status.cor] }}
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full bg-preto" />
+              <span className="truncate">
+                {status.titulo} · {status.curto}
+              </span>
+            </button>
+          }
+        />
+        {detalhes && (
+          <div
+            className="anima-aparece fixed inset-x-3.5 z-[55] mx-auto flex max-w-[calc(28rem-28px)] flex-col gap-1.5"
+            style={{ top: 'calc(env(safe-area-inset-top) + 66px)' }}
+          >
+            <div className="rounded-[14px] bg-[rgba(20,27,31,.94)] px-3.5 py-2.5 text-sm text-branco">
+              {status.texto}
+            </div>
+            {linhasDetalhe().map((l) => (
+              <div
+                key={l.titulo}
+                className="flex justify-between gap-3 rounded-[14px] bg-[rgba(20,27,31,.94)] px-3.5 py-2.5 text-sm text-branco"
+              >
+                <b className="truncate">{l.titulo}</b>
+                <span className="shrink-0 text-verde-300">{l.texto}</span>
+              </div>
+            ))}
+            {erroLocal && comLocal.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void buscarLocal()}
+                className="h-11 rounded-[14px] bg-brasa-300 text-sm font-extrabold text-preto"
+              >
+                Tentar a localização de novo
+              </button>
+            )}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // ---- Passo 3: revisar a foto e escrever a legenda ----
   if (etapa === 'revisar' && preview) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={voltarParaCamera}
-            disabled={enviando}
-            aria-label="Voltar para a câmera"
-            className="-ml-1 shrink-0 rounded-full px-2 py-1 text-lg text-tinta-600 transition active:scale-90 disabled:opacity-50"
-          >
-            ←
-          </button>
-          <h1 className="text-xl font-extrabold">Revisar o check-in</h1>
+      <div
+        className="anima-aparece flex min-h-dvh flex-col bg-fundo"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="flex h-14 items-center justify-center text-[17px] font-extrabold">
+          Prévia
         </div>
-
-        <div className="card overflow-hidden">
-          <img
-            src={preview}
-            alt="Prévia do check-in"
-            className="aspect-[4/5] w-full object-cover"
-          />
-        </div>
-
-        <div>
-          <label className="label" htmlFor="legenda">
-            Legenda (opcional)
-          </label>
+        <img
+          src={preview}
+          alt="Prévia do check-in"
+          className="mx-4 aspect-[4/5] rounded-[18px] border-2 border-preto object-cover"
+        />
+        <div className="flex flex-1 flex-col gap-3 px-4 pt-3.5">
           <textarea
-            id="legenda"
             className="input resize-none"
-            rows={2}
+            rows={1}
             maxLength={200}
-            placeholder="Escreva algo sobre a noite…"
+            aria-label="Legenda"
+            placeholder="Legenda (opcional)"
             value={legenda}
             onChange={(e) => setLegenda(e.target.value)}
           />
-        </div>
 
-        {/* Só aparece quando tem desafio com local em jogo — é o que
-            explica por que o botão está preso, em vez de deixar
-            parecer travado à toa. */}
-        {aguardandoLocal && (
-          <div className="flex items-center gap-3 rounded-2xl bg-azul-500/10 px-4 py-3 text-sm text-azul-700">
-            <span aria-hidden className="animate-pulse text-lg">
-              📍
-            </span>
-            <p className="flex-1">
-              Confirmando sua localização antes de publicar — só um
-              instante.
+          {/* Só aparece quando tem desafio com local em jogo — é o que
+              explica por que o botão está preso. */}
+          {aguardandoLocal && (
+            <p className="flex items-center gap-2.5 rounded-2xl border border-linha bg-sf px-4 py-3 text-sm text-ink2">
+              <Icone nome="local" tamanho={18} className="shrink-0 animate-pulse text-bl-t" />
+              Confirmando sua localização antes de publicar — só um instante.
             </p>
-          </div>
-        )}
-        {erroLocal && comLocal.length > 0 && (
-          <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-            <p className="flex-1">
-              📍 {erroLocal} — sem isso a foto não marca ponto nos
-              desafios com local.
-            </p>
-            <button
-              className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
-              onClick={() => void buscarLocal()}
+          )}
+          {erroLocal && comLocal.length > 0 && (
+            <div className="flex items-center gap-3 rounded-2xl border border-linha bg-sf px-4 py-3 text-sm text-ink2">
+              <p className="flex-1">
+                {erroLocal} — sem isso a foto não marca ponto nos desafios com local.
+              </p>
+              <button
+                type="button"
+                className="shrink-0 rounded-full bg-chip px-3 py-1.5 text-xs font-extrabold text-ink"
+                onClick={() => void buscarLocal()}
+              >
+                Tentar de novo
+              </button>
+            </div>
+          )}
+
+          <div
+            className="mt-auto flex gap-2.5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+          >
+            <BotaoSuave
+              tamanho="g"
+              className="flex-1"
+              disabled={enviando}
+              onClick={voltarParaCamera}
             >
-              Tentar de novo
-            </button>
+              Tirar outra
+            </BotaoSuave>
+            <BotaoAcao
+              tamanho="g"
+              className="flex-[1.4]"
+              // Trava enquanto o GPS ainda não respondeu nem sim nem não:
+              // publicar agora sairia sem coordenada, e isso não tem
+              // conserto depois (ver `aguardandoLocal`).
+              disabled={enviando || !limite.pode || aguardandoLocal}
+              onClick={() => void publicar()}
+            >
+              {enviando ? 'Publicando…' : aguardandoLocal ? 'Aguardando local…' : 'Publicar'}
+            </BotaoAcao>
           </div>
-        )}
-
-        <div className="space-y-2 border-t border-preto/10 pt-4">
-          <button
-            className="btn-primary w-full py-3.5 text-base"
-            // Trava enquanto o GPS ainda não respondeu nem sim nem não:
-            // publicar agora sairia sem coordenada, e isso não tem
-            // conserto depois (ver `aguardandoLocal`). Já errado
-            // (`erroLocal`) não trava — aí é escolha da pessoa publicar
-            // mesmo sem valer o local, como sempre foi.
-            disabled={enviando || !limite.pode || aguardandoLocal}
-            onClick={() => void publicar()}
-          >
-            {enviando
-              ? 'Publicando…'
-              : aguardandoLocal
-                ? 'Aguardando localização…'
-                : 'Publicar check-in'}
-          </button>
-          <button
-            className="w-full py-2 text-center text-sm font-bold text-tinta-600 disabled:opacity-50"
-            disabled={enviando}
-            onClick={voltarParaCamera}
-          >
-            Tirar outra
-          </button>
         </div>
       </div>
     )
   }
 
-  // ---- Passo 3: confirmação, duplas e saída ----
-  // Também é o repouso: quem fecha a câmera, quem já postou nesta noite
-  // e quem bateu o limite param aqui. O título diz qual dos casos é.
-  const acabouDePublicar = resultado !== null
-  const titulo = acabouDePublicar
-    ? 'Check-in registrado!'
-    : jaPosteiHoje
-      ? 'Sua presença de hoje já está registrada'
-      : 'Nada publicado ainda'
-
-  // Só reforça a explicação quando ela muda alguma coisa agora: existe
-  // abertura hoje E ela é o motivo de algo estar valendo. Fora disso a
-  // nota ficaria pairando sem servir pra nada.
-  const aberturaAtiva =
-    abertosAgora.length > 0 ? aberturaDoDia(toISODate(agora), aberturas) : null
-
+  // ---- Passo 4: com quem você dançou ----
+  const horaFeito = publicada?.hora ?? noite.checkinNoite
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col items-center gap-2 pt-2 text-center">
-        <span
-          aria-hidden
-          className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
-            acabouDePublicar || jaPosteiHoje
-              ? 'bg-verde-500/20 text-verde-800'
-              : 'bg-preto/5 text-tinta-500'
-          }`}
+    <TelaDuplas
+      data={noiteAtual}
+      etiqueta={
+        horaFeito
+          ? `${publicada ? (publicada.contou ? 'Presença registrada' : 'Foto publicada') : noite.situacao === 'pontuou' ? 'Presença registrada' : 'Check-in feito'} · ${horaCurta(horaFeito)}`
+          : null
+      }
+      onSair={() => navigate('/feed', { replace: true })}
+    />
+  )
+
+  /** O cartaz não pede GPS: usa a situação da noite e o veredito simples. */
+  function statusDoCartaz(): Status & { chips: [string, string] } {
+    const hora = noite.checkinNoite ? horaCurta(noite.checkinNoite) : null
+    switch (noite.situacao) {
+      case 'valendo': {
+        const c = noite.desafioDaVez
+        return {
+          cor: 'brasa',
+          titulo: 'Valendo ponto agora',
+          curto: '',
+          texto: '',
+          chips: [
+            c?.local ? `Só no ${c.local.nome || 'local'}` : (c?.titulo ?? 'Desafio'),
+            noite.ateHora ? `até ${noite.ateHora}` : 'agora',
+          ],
+        }
+      }
+      case 'pontuou':
+        return {
+          cor: 'verde',
+          titulo: 'Você já pontuou hoje',
+          curto: '',
+          texto: '',
+          chips: [hora ? `Presença às ${hora}` : 'Presença contada', 'Foto extra vai só pro feed'],
+        }
+      case 'postou':
+        return {
+          cor: 'verde',
+          titulo: 'Sua foto já está no feed',
+          curto: '',
+          texto: '',
+          chips: [hora ? `Check-in às ${hora}` : 'Check-in feito', 'Nada valendo ponto'],
+        }
+      case 'cancelada':
+        return {
+          cor: 'pessego',
+          titulo: 'Hoje não tem forró',
+          curto: '',
+          texto: '',
+          chips: [noite.motivoCancelamento ?? 'Aula cancelada', 'A foto não marca ponto'],
+        }
+      case 'fora':
+        return {
+          cor: 'azul',
+          titulo: 'Tem desafio rolando',
+          curto: '',
+          texto: '',
+          chips: [noite.desafioDaVez?.titulo ?? 'Desafio', 'Você não participa'],
+        }
+      default:
+        return {
+          cor: 'pessego',
+          titulo: 'Nada valendo agora',
+          curto: '',
+          texto: '',
+          chips: ['A foto vai para o feed', 'Sem ponto'],
+        }
+    }
+  }
+
+  /** Linhas do "como está cada desafio", com a distância quando há local. */
+  function linhasDetalhe(): { titulo: string; texto: string }[] {
+    return abertosAgora.map((c) => {
+      const s = situacaoLocal.find((x) => x.desafio.id === c.id)
+      const texto = !c.sou_membro
+        ? 'Você não participa'
+        : jaPontuaram.some((j) => j.id === c.id)
+          ? 'Já pontuou hoje'
+          : s
+            ? s.distancia === null
+              ? 'Conferindo o local…'
+              : s.dentro
+                ? 'No local · valendo'
+                : `A ${distanciaLegivel(s.distancia)} do local`
+            : (() => {
+                const ate = fimDaJanela(agora, c)
+                return ate ? `Valendo até ${ate}` : 'Valendo agora'
+              })()
+      return { titulo: c.titulo, texto }
+    })
+  }
+
+  /** O espaço abriu mais cedo hoje e isso é o que faz algo valer agora. */
+  function notaAbertura(): string | null {
+    const a = abertosAgora.length > 0 ? aberturaDoDia(toISODate(agora), aberturas) : null
+    return a
+      ? `O espaço abriu mais cedo hoje, às ${a.hora_abertura}${a.motivo ? ` (${a.motivo})` : ''}.`
+      : null
+  }
+}
+
+/**
+ * Cartaz do check-in: tela inteira na cor da situação, título enorme,
+ * duas etiquetas tortas e o botão redondo da câmera embaixo, onde o
+ * polegar está.
+ */
+function Cartaz({
+  status,
+  detalhes,
+  onDetalhes,
+  onFechar,
+  onAbrir,
+  onDuplas,
+  bloqueio,
+  nota,
+}: {
+  status: Status & { chips: [string, string] }
+  detalhes: boolean
+  onDetalhes: () => void
+  onFechar: () => void
+  onAbrir: () => void
+  onDuplas?: () => void
+  /** Limite de fotos: no lugar do botão da câmera, quando volta a liberar. */
+  bloqueio: string | null
+  nota: string | null
+}) {
+  const noite = useNoite()
+  const agora = noite.agora
+  const cabecalho = `${agora
+    .toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
+    .replace(/\./g, '')
+    .replace(',', '')
+    .replace(' de ', ' ')} · ${horaCurta(agora)}`
+  return (
+    <div
+      className="anima-aparece fixed inset-0 z-40 mx-auto flex max-w-md flex-col overflow-hidden px-[22px] text-preto"
+      style={{
+        background: FUNDO[status.cor],
+        paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)',
+      }}
+    >
+      <div className="relative z-[2] flex items-center justify-between">
+        <span className="text-[15px] font-extrabold first-letter:uppercase">{cabecalho}</span>
+        <button
+          type="button"
+          onClick={onFechar}
+          aria-label="Fechar"
+          className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-preto bg-branco text-preto"
         >
-          {acabouDePublicar || jaPosteiHoje ? '✓' : '📸'}
-        </span>
-        <h1 className="text-xl font-extrabold">{titulo}</h1>
-        {/* verde-800 e azul-700 têm contraste medido sobre o fundo claro */}
-        <p className="text-sm text-azul-700">
-          {resultado ?? `${status.emoji} ${status.texto}`}
-        </p>
-        {aberturaAtiva && (
-          <p className="text-xs text-tinta-500">
-            🕐 O espaço abriu mais cedo hoje, às {aberturaAtiva.hora_abertura}
-            {aberturaAtiva.motivo ? ` (${aberturaAtiva.motivo})` : ''} — check-ins
-            desde então contam normalmente.
-          </p>
-        )}
+          <Icone nome="fechar" tamanho={20} traco={2.6} />
+        </button>
       </div>
-
-      {!limite.pode && limite.liberaEm && (
-        <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
-          {limite.motivo === 'intervalo' ? (
-            <>
-              ⏳ Calma no pé! Dá pra postar de novo em{' '}
-              <strong>{esperaLegivel(limite.liberaEm, agora)}</strong>.
-            </>
-          ) : (
-            <>
-              ⏳ Você já postou {LIMITE_POR_JANELA} check-ins nas últimas
-              horas. Libera de novo em{' '}
-              <strong>{esperaLegivel(limite.liberaEm, agora)}</strong> — a
-              presença de hoje já está registrada 😉
-            </>
-          )}
+      <div
+        aria-hidden
+        className="absolute -right-[70px] top-[150px] h-[260px] w-[260px] rounded-full border-[2.5px] border-preto bg-branco opacity-[.18]"
+      />
+      <div className="sem-barra relative z-[2] flex flex-1 flex-col justify-center gap-[18px] overflow-y-auto py-4">
+        <h1 className="m-0 text-[clamp(56px,19vw,76px)] font-extrabold leading-[.88] tracking-[-.05em] [text-wrap:balance]">
+          {status.titulo}
+        </h1>
+        <div className="flex flex-wrap gap-2">
+          <span className="-rotate-3 rounded-full border-2 border-preto bg-branco px-3.5 py-2 text-[15px] font-extrabold">
+            {status.chips[0]}
+          </span>
+          <span className="rotate-2 rounded-full bg-preto px-3.5 py-2 text-[15px] font-extrabold text-branco">
+            {status.chips[1]}
+          </span>
         </div>
-      )}
-
-      {/* Marcar dupla exige que os dois tenham dado check-in, então isto
-          só faz sentido depois da foto — e é aqui que a noite está mais
-          fresca na memória. */}
-      {jaPosteiHoje && <MarcarDuplas data={noiteAtual} />}
-
-      {/* GPS falhou e ainda dá para tirar outra: aí sim é acionável. */}
-      {erroLocal && comLocal.length > 0 && limite.pode && (
-        <>
-          <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
-            <p className="flex-1">
-              📍 {erroLocal} — sem isso a foto não marca ponto nos desafios
-              com local.
-            </p>
-            <button
-              className="shrink-0 rounded-full bg-papel/70 px-3 py-1 text-xs font-bold"
-              onClick={() => void buscarLocal()}
-            >
-              Tentar de novo
-            </button>
+        {nota && <p className="text-sm font-bold">{nota}</p>}
+        {noite.linhas.length > 0 && (
+          <button
+            type="button"
+            onClick={onDetalhes}
+            aria-expanded={detalhes}
+            className="h-11 self-start text-[15px] font-extrabold underline underline-offset-[3px]"
+          >
+            Como está cada desafio
+          </button>
+        )}
+        {detalhes && (
+          <div className="anima-aparece flex flex-col gap-1.5">
+            {noite.linhas.map((l) => (
+              <div
+                key={l.desafio.id}
+                className="flex justify-between gap-3 rounded-[14px] border-2 border-preto bg-branco/85 px-3.5 py-2.5 text-[15px] font-bold"
+              >
+                <span className="truncate">{l.desafio.titulo}</span>
+                <span className="shrink-0">{l.texto}</span>
+              </div>
+            ))}
           </div>
-          {/* Aqui, e não só no feed: é neste momento que a pessoa está
-              incomodada com a permissão e disposta a resolver de vez. */}
-          <DicaInstalarParaPermissao />
-        </>
-      )}
-
-      {/* O detalhe desafio a desafio interessa a pouca gente e quase
-          nunca — fica embaixo, fechado, para quem quiser conferir. */}
-      {valeDetalhar && (
-        <details className="rounded-2xl bg-preto/5 px-4 py-3 text-sm">
-          <summary className="cursor-pointer text-xs font-bold text-tinta-600">
-            Como está cada desafio agora
-          </summary>
-          <ul className="mt-2 space-y-1.5 text-xs text-tinta-600">
-            {abertosAgora.map((c) => {
-              const s = situacaoLocal.find((x) => x.desafio.id === c.id)
-              return (
-                <li key={c.id}>
-                  <strong className="text-tinta-900">{c.titulo}</strong>
-                  {!c.sou_membro && ' — você não entrou nele'}
-                  {c.sou_membro &&
-                    jaPontuaram.some((j) => j.id === c.id) &&
-                    ' — ponto já contado nesta noite'}
-                  {s &&
-                    (s.distancia === null
-                      ? ' — conferindo sua localização…'
-                      : s.dentro
-                        ? ` — você está em ${c.local?.nome || 'no local'}`
-                        : ` — a ${distanciaLegivel(s.distancia)} de ${c.local?.nome || 'onde conta'}`)}
-                </li>
-              )
-            })}
-          </ul>
-        </details>
-      )}
-
-      <div className="space-y-2 pt-1">
-        <Link className="btn-ghost block w-full text-center" to="/">
-          Ir para o feed
-        </Link>
-        {limite.pode && (
-          <>
-            <button
-              className="w-full py-2 text-center text-sm font-bold text-tinta-600"
-              onClick={() => setEtapa('camera')}
-            >
-              {jaPosteiHoje ? 'Tirar outra foto 📸' : 'Abrir a câmera 📸'}
-            </button>
-            {limite.restantes <= 2 && (
-              <p className="px-2 text-center text-xs text-tinta-500">
-                Você ainda pode postar{' '}
-                <strong>
-                  {limite.restantes} {limite.restantes === 1 ? 'foto' : 'fotos'}
-                </strong>{' '}
-                nas próximas horas.
-              </p>
-            )}
-          </>
+        )}
+        {onDuplas && (
+          <button
+            type="button"
+            onClick={onDuplas}
+            className="h-12 self-start rounded-2xl border-2 border-preto bg-branco px-4 text-[15px] font-extrabold"
+          >
+            Com quem você dançou?
+          </button>
         )}
       </div>
+      {bloqueio ? (
+        <p className="relative z-[2] rounded-2xl border-2 border-preto bg-branco px-4 py-3 text-center text-[15px] font-extrabold">
+          {bloqueio}
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={onAbrir}
+          className="relative z-[2] flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-1 self-center rounded-full bg-preto text-[13px] font-extrabold text-branco shadow-[0_0_0_6px_rgba(0,5,7,.18)] active:scale-95"
+        >
+          <Icone nome="camera" tamanho={34} traco={2} />
+          Abrir câmera
+        </button>
+      )}
     </div>
   )
 }

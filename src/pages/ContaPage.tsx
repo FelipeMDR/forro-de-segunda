@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { CartaoInstalar } from '../components/BotaoInstalar'
 import { ConexaoSpotify } from '../components/ConexaoSpotify'
+import { Icone } from '../components/Icone'
 import { Spinner } from '../components/Spinner'
+import { Cabecalho, LinhaInterruptor } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
@@ -36,48 +38,19 @@ function LinhaConta({
       <button
         onClick={onAlternar}
         aria-expanded={aberta}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-preto/5"
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
       >
-        <span className="shrink-0 text-sm text-tinta-600">{rotulo}</span>
+        <span className="shrink-0 text-[15px] text-ink3">{rotulo}</span>
         <span
-          className={`min-w-0 flex-1 truncate text-right text-sm font-bold ${
-            acao ? 'text-azul-700' : 'text-tinta-900'
+          className={`min-w-0 flex-1 truncate text-right text-base font-bold ${
+            acao ? 'text-bl-t' : 'text-ink'
           }`}
         >
           {acao ?? valor ?? '—'}
         </span>
       </button>
-      {aberta && <div className="space-y-2 px-4 pb-4">{children}</div>}
+      {aberta && <div className="flex flex-col gap-2.5 px-4 pb-4">{children}</div>}
     </div>
-  )
-}
-
-/** Interruptor no padrão do print — usado só pelos lembretes push. */
-function Interruptor({
-  ligado,
-  onClick,
-  rotulo,
-}: {
-  ligado: boolean
-  onClick: () => void
-  rotulo: string
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={ligado}
-      aria-label={rotulo}
-      onClick={onClick}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-        ligado ? 'bg-verde-600' : 'bg-preto/20'
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-          ligado ? 'left-[22px]' : 'left-0.5'
-        }`}
-      />
-    </button>
   )
 }
 
@@ -92,7 +65,6 @@ function Interruptor({
 export function ContaPage() {
   const { api, profile, refreshProfile } = useAuth()
   const toast = useToast()
-  const navigate = useNavigate()
 
   const [aberta, setAberta] = useState<'nome' | 'email' | 'senha' | null>(null)
   const [nome, setNome] = useState(profile?.nome ?? '')
@@ -126,7 +98,7 @@ export function ContaPage() {
       await api.updateProfile({ nome: nome.trim() })
       await refreshProfile()
       setAberta(null)
-      toast('Nome atualizado! ✨')
+      toast('Nome atualizado!')
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -163,7 +135,7 @@ export function ContaPage() {
       setSenha('')
       setConfirmar('')
       setAberta(null)
-      toast('Senha alterada! 🔑')
+      toast('Senha alterada!')
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -197,27 +169,19 @@ export function ContaPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/perfil')}
-          aria-label="Voltar para o perfil"
-          className="-ml-1 shrink-0 rounded-full px-2 py-1 text-lg text-tinta-600 transition active:scale-90"
-        >
-          ←
-        </button>
-        <h1 className="text-xl font-extrabold">Meus dados e acesso</h1>
-      </div>
+    <div className="anima-tela">
+      <Cabecalho titulo="Minha conta" fallback="/perfil" />
+      <div className="flex flex-col gap-4 px-4 pt-1">
 
       {semEmail && (
-        <p className="rounded-2xl bg-amber-500/10 px-4 py-3 text-xs text-amber-800">
+        <p className="rounded-2xl border-[1.5px] border-brasa-500 bg-sf px-4 py-3 text-sm leading-snug">
           <strong>Cadastre seu e-mail.</strong> Sua conta é anterior a essa
           novidade, então hoje, se você esquecer a senha, só a organização
           consegue te destravar. Com um e-mail aqui, você resolve sozinho.
         </p>
       )}
 
-      <div className="card divide-y divide-preto/10 overflow-hidden">
+      <div className="card divide-y divide-linha overflow-hidden">
         <LinhaConta
           rotulo="Nome"
           valor={profile.nome}
@@ -230,12 +194,12 @@ export function ContaPage() {
             value={nome}
             onChange={(e) => setNome(e.target.value)}
           />
-          <p className="text-xs text-tinta-500">
+          <p className="px-1 text-[13px] text-ink3">
             Suas turmas quem define é a organização — fale com eles se algo
             mudou.
           </p>
           <button
-            className="btn-ghost w-full"
+            className="btn-primary w-full"
             disabled={
               salvando === 'nome' || !nome.trim() || nome === profile.nome
             }
@@ -260,18 +224,18 @@ export function ContaPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <p className="text-xs text-tinta-500">
+          <p className="px-1 text-[13px] text-ink3">
             É com ele que você entra no app e recupera a senha se esquecer.
           </p>
           {aguardandoLink && (
-            <p className="rounded-xl bg-azul-500/10 px-3 py-3 text-xs text-azul-700">
+            <p className="rounded-xl border-[1.5px] border-azul-500 px-3 py-3 text-sm leading-snug">
               <strong>Falta confirmar.</strong> Mandamos um link para{' '}
               <strong className="break-all">{aguardandoLink}</strong>. Enquanto
               você não clicar nele, seu login continua o de antes.
             </p>
           )}
           <button
-            className="btn-ghost w-full"
+            className="btn-primary w-full"
             disabled={
               salvando === 'email' || !email.trim() || email === profile.email
             }
@@ -308,7 +272,7 @@ export function ContaPage() {
             onChange={(e) => setConfirmar(e.target.value)}
           />
           <button
-            className="btn-ghost w-full"
+            className="btn-primary w-full"
             disabled={salvando === 'senha' || senha.length < 6}
             onClick={() => void salvarSenha()}
           >
@@ -320,19 +284,12 @@ export function ContaPage() {
       <ConexaoSpotify />
 
       {pushSupported() && (
-        <div className="card flex items-center gap-3 p-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Lembretes push</p>
-            <p className="text-xs text-tinta-500">
-              Avisar quando a aula começa
-            </p>
-          </div>
-          <Interruptor
-            ligado={pushAtivo}
-            rotulo="Lembretes push"
-            onClick={() => void alternarPush()}
-          />
-        </div>
+        <LinhaInterruptor
+          titulo="Lembretes por notificação"
+          descricao="Avisar quando a aula começa"
+          ligado={pushAtivo}
+          onChange={() => void alternarPush()}
+        />
       )}
 
       {/* Lugar fixo para instalar: o convite do feed é dispensável, e
@@ -343,19 +300,17 @@ export function ContaPage() {
           consultar a qualquer momento, não só na hora do cadastro. */}
       <Link
         to="/privacidade"
-        className="card flex items-center gap-3 p-4 transition hover:bg-preto/5"
+        className="card flex min-h-14 items-center gap-3 px-4"
       >
-        <span className="min-w-0 flex-1 text-sm font-bold">
+        <span className="min-w-0 flex-1 text-base font-bold">
           Privacidade e uso de dados
         </span>
-        <span aria-hidden className="shrink-0 text-tinta-400">
-          ›
-        </span>
+        <Icone nome="avancar" tamanho={20} className="shrink-0 text-ink3" />
       </Link>
 
-      <div className="space-y-2 pt-1">
+      <div className="flex flex-col gap-2 pt-1">
         <button
-          className="w-full py-3 text-center text-sm font-bold text-red-700"
+          className="h-12 w-full text-center text-base font-extrabold text-or-t"
           onClick={() => void api.signOut()}
         >
           Sair da conta
@@ -365,6 +320,7 @@ export function ContaPage() {
             Reiniciar demonstração (apaga os dados locais)
           </button>
         )}
+      </div>
       </div>
     </div>
   )

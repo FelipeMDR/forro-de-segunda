@@ -1,34 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
+import { Icone } from '../components/Icone'
 import { Spinner } from '../components/Spinner'
+import { TituloRaiz } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { agrupaPorDia } from '../lib/agrupaPorDia'
-import { formatRelative } from '../lib/dates'
+import { formatDate, formatRelative } from '../lib/dates'
 import { PAGINA_NOTIFICACOES } from '../lib/types'
 import type { Notificacao } from '../lib/types'
-
-/** Título de bloco: PENDÊNCIAS, HOJE, ONTEM… */
-function TituloBloco({
-  children,
-  destaque = false,
-}: {
-  children: ReactNode
-  destaque?: boolean
-}) {
-  return (
-    <h2
-      className={`px-1 text-xs font-extrabold uppercase tracking-wide ${
-        destaque ? 'text-brasa-700' : 'text-tinta-500'
-      }`}
-    >
-      {children}
-    </h2>
-  )
-}
 
 /**
  * Convite da retrospectiva.
@@ -42,160 +23,122 @@ function ConviteRetrospectiva() {
   return (
     <Link
       to="/retrospectiva"
-      // azul-600 e não o 500 oficial: branco sobre o 500 dá 3,49:1, e
-      // este texto é pequeno (precisa de 4,5:1). O 600 leva a 5,07:1 no
-      // ponto mais claro do gradiente, e a marca continua reconhecível.
-      className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-azul-600 to-marinho-500 p-4 text-white shadow-sm"
+      className="flex items-center gap-3 rounded-[22px] border-2 border-preto bg-azul-500 p-4 text-preto shadow-[0_4px_0_#000507]"
     >
-      <span
-        aria-hidden
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-xl"
-      >
-        ✨
-      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold leading-tight">
-          Sua retrospectiva do semestre chegou
-        </p>
-        {/* /90 e não /85: o 85 cai para 4,11:1 sobre o azul-600 */}
-        <p className="mt-0.5 text-xs text-white/90">
-          Toque para ver seu balanço
-        </p>
+        <p className="text-[13px] font-extrabold uppercase tracking-[.06em]">Retrospectiva</p>
+        <p className="text-lg font-extrabold leading-tight">Seu semestre chegou em stories</p>
       </div>
-      <span aria-hidden className="shrink-0 text-white/70">
-        ›
-      </span>
+      <Icone nome="avancar" tamanho={22} traco={2.6} />
     </Link>
   )
 }
 
+/** O texto de cada aviso, depois do nome de quem fez. */
+function textoDe(n: Notificacao): string {
+  if (n.tipo === 'dupla') {
+    return n.pendente
+      ? `marcou você como dupla na noite de ${n.data ? formatDate(n.data) : 'hoje'}`
+      : 'confirmou a dupla com você'
+  }
+  if (n.tipo === 'reacao') return 'reagiu à sua foto'
+  return `comentou: "${n.detalhe ?? ''}"`
+}
+
 /**
- * Pendência de dupla: a única linha do painel que pede uma resposta.
- *
- * Sai da lista comum e ganha cartão próprio no topo, com os dois botões
- * em tamanho de verdade — antes eram duas pílulas de 12px perdidas no
- * meio de reações e comentários, que só avisam.
+ * Um aviso. Reação e comentário levam à publicação (é o que resolve "não
+ * sei de qual foto ela está falando"); tocar no rosto ou no nome leva ao
+ * perfil de quem fez. A dupla pendente é o único que pede resposta, com
+ * os dois botões em tamanho de verdade.
  */
-function CartaoPendencia({
+function Aviso({
   n,
+  novo,
   ocupado,
-  onConfirmar,
-  onRecusar,
+  onResponder,
 }: {
   n: Notificacao
+  novo: boolean
   ocupado: boolean
-  onConfirmar: () => void
-  onRecusar: () => void
+  onResponder: (aceitar: boolean) => void
 }) {
-  return (
-    <div className="card space-y-3 border-brasa-500/40 p-4">
-      <div className="flex items-center gap-3">
-        <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
-          <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
-        </Link>
-        <p className="min-w-0 flex-1 text-sm">
-          <strong>{n.autor.nome}</strong> marcou vocês como dupla 💃
-        </p>
-      </div>
-      {/* py-3 leva os dois de 42px para 48: o padrão do `.btn` para
-          quando o botão fica no meio do texto, aqui é o alvo principal
-          da tela e precisa dos 44px mínimos. */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          className="btn-primary py-3"
-          disabled={ocupado}
-          onClick={onConfirmar}
-        >
-          Confirmar
-        </button>
-        <button
-          className="btn-ghost py-3"
-          disabled={ocupado}
-          onClick={onRecusar}
-        >
-          Não rolou
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Uma linha do painel.
- *
- * Reação e comentário viram `<Link>` até a publicação — é o que
- * resolve "não sei de qual foto ela está falando". Como o texto já
- * mostra o nome de quem reagiu (não do dono da foto), não tem link
- * para perfil aqui dentro: um `<a>` dentro de outro `<a>` quebra o
- * HTML, e quem quiser ver o perfil clica no autor já dentro da
- * publicação. "Dancei com" não é sobre uma foto, então continua sem
- * link — só a resposta de confirmar/recusar.
- */
-function LinhaNotificacao({ n }: { n: Notificacao }) {
-  const conteudo =
-    n.tipo === 'dupla' ? (
-      // Pendência não passa por aqui: ela vira cartão no topo. O que
-      // sobra é a dupla já confirmada, que é só um aviso.
-      <p className="text-sm">
-        <strong>{n.autor.nome}</strong> dançou com você 💃
-      </p>
-    ) : n.tipo === 'reacao' ? (
-      <p className="text-sm">
-        <strong>{n.autor.nome}</strong> reagiu à sua foto{' '}
-        <span className="text-base">{n.detalhe}</span>
-      </p>
-    ) : (
-      <p className="text-sm">
-        <strong>{n.autor.nome}</strong> comentou:{' '}
-        <span className="text-tinta-600">"{n.detalhe}"</span>
-      </p>
-    )
-
-  const rodape = (
-    <p className="mt-0.5 text-xs text-tinta-500">
-      {formatRelative(n.criado_em)}
-    </p>
-  )
-
-  // Sem cartão em volta, o respiro horizontal já vem da página; a
-  // margem negativa só alarga a área tocável para além do texto.
-  if (n.tipo === 'dupla' || !n.checkin_id) {
-    return (
-      <div className="flex items-start gap-3 py-3.5">
-        <Link to={`/perfil/${n.autor.id}`} className="shrink-0">
-          <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
-        </Link>
-        <div className="min-w-0 flex-1">
-          {conteudo}
-          {rodape}
-        </div>
-      </div>
-    )
+  const navigate = useNavigate()
+  const temPost = n.tipo !== 'dupla' && !!n.checkin_id
+  const abrirPerfil = (e: MouseEvent) => {
+    e.stopPropagation()
+    navigate(`/perfil/${n.autor.id}`)
   }
-
+  const aceso = novo || n.pendente
   return (
-    <Link
-      to={`/publicacao/${n.checkin_id}`}
-      className="-mx-2 flex items-start gap-3 rounded-xl px-2 py-3.5 transition hover:bg-preto/5"
-    >
-      <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={40} />
-      <div className="min-w-0 flex-1">
-        {conteudo}
-        {rodape}
-      </div>
-      {n.foto_url ? (
-        <img
-          src={n.foto_url}
-          alt=""
-          className="h-12 w-12 shrink-0 rounded-lg object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-preto/5 text-lg">
-          📷
+    <div className={`flex flex-col gap-3 rounded-[20px] p-3.5 ${aceso ? 'bg-sf' : ''}`}>
+      <div
+        role={temPost ? 'link' : undefined}
+        tabIndex={temPost ? 0 : undefined}
+        onClick={temPost ? () => navigate(`/publicacao/${n.checkin_id}`) : undefined}
+        onKeyDown={
+          temPost
+            ? (e) => e.key === 'Enter' && navigate(`/publicacao/${n.checkin_id}`)
+            : undefined
+        }
+        className={`flex items-start gap-3 text-left ${temPost ? 'cursor-pointer' : ''}`}
+      >
+        <button
+          type="button"
+          onClick={abrirPerfil}
+          className="relative shrink-0"
+          aria-label={`Ver perfil de ${n.autor.nome}`}
+        >
+          <Avatar nome={n.autor.nome} url={n.autor.avatar_url} tamanho={44} />
+          {n.tipo === 'reacao' && n.detalhe && (
+            <span className="absolute -bottom-1 -right-1.5 text-lg leading-none">
+              {n.detalhe}
+            </span>
+          )}
+        </button>
+        <span className="min-w-0 flex-1 text-[15px] leading-snug">
+          <b onClick={abrirPerfil} className="cursor-pointer">
+            {n.autor.nome}
+          </b>{' '}
+          <span className="break-words">{textoDe(n)}</span>
+          <br />
+          <span className="text-[13px] text-ink3">{formatRelative(n.criado_em)}</span>
         </span>
+        {aceso && (
+          <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brasa-500" aria-label="Novo" />
+        )}
+        {temPost &&
+          (n.foto_url ? (
+            <img
+              src={n.foto_url}
+              alt="Ver publicação"
+              loading="lazy"
+              className="h-12 w-12 shrink-0 rounded-[10px] border-[1.5px] border-linha object-cover"
+            />
+          ) : (
+            <span className="listras h-12 w-12 shrink-0 rounded-[10px] border-[1.5px] border-linha bg-marinho-600" />
+          ))}
+      </div>
+      {n.pendente && (
+        <div className="flex gap-2 pl-14">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => onResponder(true)}
+            className="h-[46px] flex-1 rounded-[14px] border-2 border-preto bg-verde-500 text-[15px] font-extrabold text-preto disabled:opacity-50"
+          >
+            Confirmar
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => onResponder(false)}
+            className="h-[46px] flex-1 rounded-[14px] border-[1.5px] border-linha bg-sf text-[15px] font-bold text-ink disabled:opacity-50"
+          >
+            Não rolou
+          </button>
+        </div>
       )}
-    </Link>
+    </div>
   )
 }
 
@@ -208,6 +151,12 @@ export function NotificacoesPage() {
   const [carregandoMais, setCarregandoMais] = useState(false)
   const [temMais, setTemMais] = useState(true)
   const [semestreEncerrado, setSemestreEncerrado] = useState(false)
+  /**
+   * Quando o painel tinha sido visto antes desta abertura — é o que diz
+   * quais avisos são novos. `undefined` enquanto não se sabe (nada
+   * acende), `null` = nunca tinha aberto (tudo é novo).
+   */
+  const [vistoAntes, setVistoAntes] = useState<string | null | undefined>(undefined)
   /** Marcador invisível no fim da lista — carrega mais ao entrar na tela. */
   const sentinela = useRef<HTMLDivElement | null>(null)
 
@@ -260,8 +209,12 @@ export function NotificacoesPage() {
 
   useEffect(() => {
     void carregar()
-    // Abriu o painel = viu tudo. O contador zera na próxima leitura.
-    void api.marcarNotificacoesVistas().catch(() => {})
+    // Abriu o painel = viu tudo. O contador da barra zera na próxima
+    // leitura; aqui os que eram novos continuam acesos até sair.
+    void api
+      .marcarNotificacoesVistas()
+      .then((antes) => setVistoAntes(antes))
+      .catch(() => setVistoAntes(undefined))
     void api
       .semestreEncerrado()
       .then(setSemestreEncerrado)
@@ -269,9 +222,7 @@ export function NotificacoesPage() {
       .catch(() => setSemestreEncerrado(false))
   }, [api, carregar])
 
-  // Rolagem infinita: mesma lógica do feed. `rootMargin` positivo busca
-  // um pouco ANTES do fim de verdade, para a próxima página já estar
-  // pronta quando a rolagem chegar lá.
+  // Rolagem infinita: mesma lógica do feed
   useEffect(() => {
     if (!temMais) return
     const el = sentinela.current
@@ -293,7 +244,11 @@ export function NotificacoesPage() {
       if (aceitar) await api.marcarDupla(n.autor.id, n.data)
       else await api.desmarcarDupla(n.autor.id, n.data)
       await carregar()
-      toast(aceitar ? 'Dupla confirmada! 💃' : 'Marcação removida')
+      toast(
+        aceitar
+          ? `Dupla confirmada com ${n.autor.nome.split(' ')[0]}. Conta no Rodízio e na Forródex.`
+          : 'Marcação recusada',
+      )
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -301,70 +256,67 @@ export function NotificacoesPage() {
     }
   }
 
-  if (erro) return <ErrorState erro={erro} onRetry={() => void carregar()} />
-  if (itens === null) return <Spinner texto="Carregando…" />
-
-  // Pendências saem da linha do tempo: são as únicas que pedem resposta,
-  // e ficavam soterradas entre reações e comentários, que só avisam.
-  const pendencias = itens.filter((n) => n.pendente)
-  const avisos = itens.filter((n) => !n.pendente)
-  const porDia = agrupaPorDia(avisos, (n) => n.criado_em)
-  const vazio = itens.length === 0 && !semestreEncerrado
+  // Pendências na frente: são as únicas que pedem resposta, e ficavam
+  // soterradas entre reações e comentários, que só avisam.
+  const ordenados = itens
+    ? [...itens.filter((n) => n.pendente), ...itens.filter((n) => !n.pendente)]
+    : null
+  const ehNovo = (n: Notificacao) =>
+    vistoAntes !== undefined && (vistoAntes === null || n.criado_em > vistoAntes)
+  const temNovos = !!itens?.some((n) => !n.pendente && ehNovo(n))
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-extrabold">🔔 Avisos</h1>
+    <div className="anima-tela">
+      <TituloRaiz
+        acao={
+          temNovos && (
+            <button
+              type="button"
+              onClick={() => setVistoAntes(new Date().toISOString())}
+              className="h-11 text-[15px] font-extrabold text-bl-t"
+            >
+              Marcar como lidos
+            </button>
+          )
+        }
+      >
+        Avisos
+      </TituloRaiz>
 
-      {semestreEncerrado && <ConviteRetrospectiva />}
-
-      {vazio ? (
-        <EmptyState emoji="🌵" titulo="Nada por aqui ainda">
-          <p className="text-sm text-tinta-500">
-            Curtidas, comentários e marcações de dança aparecem aqui.
-          </p>
-        </EmptyState>
+      {erro ? (
+        <div className="px-4">
+          <ErrorState erro={erro} onRetry={() => void carregar()} />
+        </div>
+      ) : ordenados === null ? (
+        <Spinner texto="Carregando…" />
       ) : (
-        <>
-          {pendencias.length > 0 && (
-            <section className="space-y-2">
-              <TituloBloco destaque>
-                ⚡ {pendencias.length === 1 ? 'Pendência' : 'Pendências'}
-              </TituloBloco>
-              {pendencias.map((n) => (
-                <CartaoPendencia
-                  key={n.id}
-                  n={n}
-                  ocupado={ocupado === n.id}
-                  onConfirmar={() => void responder(n, true)}
-                  onRecusar={() => void responder(n, false)}
-                />
-              ))}
-            </section>
-          )}
-
-          {/* Sem cartão em volta: uma caixa branca por bloco fazia o
-              painel virar uma pilha de caixas, e a lista é justamente o
-              lugar onde nada precisa de moldura. As linhas se separam
-              por um fio, e a superfície fica só na miniatura. */}
-          {porDia.map((grupo) => (
-            <section key={grupo.rotulo} className="space-y-1">
-              <TituloBloco>{grupo.rotulo}</TituloBloco>
-              <div className="divide-y divide-preto/10">
-                {grupo.itens.map((n) => (
-                  <LinhaNotificacao key={n.id} n={n} />
-                ))}
-              </div>
-            </section>
-          ))}
-
-          {temMais && (
-            <div ref={sentinela} className="flex justify-center py-4">
-              {carregandoMais && (
-                <p className="text-xs text-tinta-500">Carregando mais…</p>
-              )}
+        <div className="flex flex-col gap-2 px-3">
+          {semestreEncerrado && (
+            <div className="px-1 pb-2">
+              <ConviteRetrospectiva />
             </div>
           )}
-        </>
+          {ordenados.length === 0 && !semestreEncerrado && (
+            <p className="px-4 py-10 text-center text-[15px] leading-snug text-ink3">
+              Nada por aqui ainda. Reações, comentários e marcações de dupla
+              aparecem aqui.
+            </p>
+          )}
+          {ordenados.map((n) => (
+            <Aviso
+              key={n.id}
+              n={n}
+              novo={!n.pendente && ehNovo(n)}
+              ocupado={ocupado === n.id}
+              onResponder={(aceitar) => void responder(n, aceitar)}
+            />
+          ))}
+          {temMais && (
+            <div ref={sentinela} className="py-4 text-center text-[13px] text-ink3">
+              {carregandoMais ? 'Carregando mais…' : ' '}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

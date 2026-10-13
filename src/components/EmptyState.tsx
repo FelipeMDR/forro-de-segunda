@@ -12,10 +12,10 @@ export function EmptyState({
   children?: ReactNode
 }) {
   return (
-    <div className="card flex flex-col items-center gap-2 px-6 py-10 text-center">
+    <div className="flex flex-col items-center gap-2 rounded-[22px] border border-linha bg-sf px-6 py-10 text-center">
       <span className="text-5xl">{emoji}</span>
       <h2 className="mt-2 text-lg font-extrabold">{titulo}</h2>
-      {texto && <p className="max-w-xs text-sm text-tinta-600">{texto}</p>}
+      {texto && <p className="max-w-xs text-[15px] leading-snug text-ink3">{texto}</p>}
       {children && <div className="mt-3">{children}</div>}
     </div>
   )

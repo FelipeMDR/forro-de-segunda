@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
+import { Cabecalho, ChipEscolha } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import {
   agruparPorTurma,
@@ -14,53 +14,15 @@ import {
   ordenarTurmas,
   type CartaForrodex,
 } from '../lib/forrodex'
+import { useEstiloNivel, type EstiloNivel } from '../lib/metais'
 import type { ParceiroDanca, PerfilPublico } from '../lib/types'
 
-/**
- * Visual de cada nível: a Primeira dança é neutra,
- * e daí em diante bronze, prata e ouro — no anel da foto e na moldura
- * da carta. O degradê cônico imita o reflexo do metal.
- */
-const ESTILO_NIVEL: Record<
-  number,
-  { metal: string | null; anel: string; fundo: string; cor: string; texto: string }
-> = {
-  1: {
-    metal: null,
-    anel: '#d6d3cc',
-    fundo: '#ffffff',
-    cor: '#8a857c',
-    texto: 'text-tinta-500',
-  },
-  2: {
-    metal: 'linear-gradient(135deg, #7a4a24, #f3c79a, #a8673a)',
-    anel: 'conic-gradient(from 210deg, #7a4a24, #e0a370, #a8673a, #f3c79a, #7a4a24)',
-    fundo: '#fbf3ec',
-    cor: '#a8673a',
-    texto: 'text-[#7a4a24]',
-  },
-  3: {
-    metal: 'linear-gradient(135deg, #7d8590, #ffffff, #a7aeb7)',
-    anel: 'conic-gradient(from 210deg, #7d8590, #f4f6f8, #a7aeb7, #ffffff, #7d8590)',
-    fundo: '#f3f5f7',
-    cor: '#7d8590',
-    texto: 'text-[#4f5761]',
-  },
-  4: {
-    metal: 'linear-gradient(135deg, #a8740f, #fff3c4, #d9a21b)',
-    anel: 'conic-gradient(from 210deg, #a8740f, #ffe08a, #d9a21b, #fff3c4, #a8740f)',
-    fundo: '#fdf6e3',
-    cor: '#d9a21b',
-    texto: 'text-[#855c08]',
-  },
-}
-
 /** Bolinha com o metal do nível, para a contagem e a explicação. */
-function Metal({ nivel }: { nivel: number }) {
+function Metal({ estilo }: { estilo: EstiloNivel }) {
   return (
     <span
-      className="inline-block h-3 w-3 shrink-0 rounded-full"
-      style={{ background: ESTILO_NIVEL[nivel].anel }}
+      className="inline-block h-3.5 w-3.5 shrink-0 rounded-full"
+      style={{ background: estilo.anel }}
       aria-hidden
     />
   )
@@ -70,13 +32,12 @@ function Metal({ nivel }: { nivel: number }) {
  * Pontinhos até o próximo nível: um por noite que o nível pede, cheios
  * os que já foram. No topo, uma estrela no lugar.
  */
-function Pontos({ noites }: { noites: number }) {
+function Pontos({ noites, estilo }: { noites: number; estilo: EstiloNivel }) {
   const p = nivelDupla(noites)
   if (!p) return null
-  const { cor } = ESTILO_NIVEL[p.atual.nivel]
   if (!p.proximo) {
     return (
-      <span className="text-xs" style={{ color: cor }} aria-label="Nível máximo">
+      <span className="text-[13px] leading-none" style={{ color: estilo.texto }} aria-label="Nível máximo">
         ★
       </span>
     )
@@ -85,16 +46,15 @@ function Pontos({ noites }: { noites: number }) {
   const feitos = passos - p.faltam
   return (
     <span
-      className="flex justify-center gap-1"
+      className="flex justify-center gap-1 pt-[3px]"
       role="img"
       aria-label={`Faltam ${p.faltam} ${p.faltam === 1 ? 'noite' : 'noites'} para ${p.proximo.nome}`}
-      title={`Faltam ${p.faltam} para ${p.proximo.nome}`}
     >
       {Array.from({ length: passos }, (_, i) => (
         <span
           key={i}
           className="h-1.5 w-1.5 rounded-full"
-          style={{ background: i < feitos ? cor : 'rgb(0 5 7 / 0.15)' }}
+          style={{ background: i < feitos ? estilo.texto : 'var(--line)' }}
         />
       ))}
     </span>
@@ -102,59 +62,55 @@ function Pontos({ noites }: { noites: number }) {
 }
 
 function Carta({ carta }: { carta: CartaForrodex }) {
+  const estiloDe = useEstiloNivel()
   const progresso = nivelDupla(carta.noites)
-  const estilo = progresso ? ESTILO_NIVEL[progresso.atual.nivel] : null
   const primeiroNome = carta.nome.split(/\s+/)[0]
 
-  if (!progresso || !estilo) {
+  if (!progresso) {
     // Não descoberto: a cara fica apagada, mas o nome continua — sem
     // ele não dá para saber quem tirar para dançar.
     return (
       <Link
         to={`/perfil/${carta.user_id}`}
-        className="flex flex-col items-center gap-1.5 rounded-2xl bg-preto/5 px-2 py-3 text-center"
+        className="flex flex-col items-center gap-1.5 rounded-[18px] bg-chip px-1.5 pb-3 pt-3.5 text-center"
       >
-        <div className="opacity-40 grayscale">
-          <Avatar nome={carta.nome} url={carta.avatar_url} tamanho={56} />
-        </div>
-        <p className="w-full truncate text-xs font-bold text-tinta-500">
-          {primeiroNome}
-        </p>
-        <span className="rounded-full bg-preto/5 px-2 py-0.5 text-[10px] font-bold text-tinta-500">
+        <span className="opacity-60 grayscale">
+          <Avatar nome={carta.nome} url={carta.avatar_url} tamanho={58} borda={false} />
+        </span>
+        <span className="w-full truncate text-sm font-bold text-ink3">{primeiroNome}</span>
+        <span className="rounded-full bg-chip px-[9px] py-0.5 text-[11px] font-extrabold text-ink3">
           ???
         </span>
       </Link>
     )
   }
 
-  // Moldura de metal: o Link pinta o degradê e o miolo cobre tudo
-  // menos uma faixa de 3px — borda com degradê não existe em CSS puro.
+  const e = estiloDe(progresso.atual.nivel)
+  // Moldura de metal: o link pinta o degradê e o miolo cobre tudo menos
+  // uma faixa — borda com degradê não existe em CSS puro.
   return (
     <Link
       to={`/perfil/${carta.user_id}`}
-      className={`block rounded-2xl shadow-sm ${estilo.metal ? 'p-[3px]' : 'ring-1 ring-preto/10'}`}
-      style={estilo.metal ? { background: estilo.metal } : undefined}
+      className="block rounded-[18px] shadow-[0_2px_6px_rgba(0,5,7,.12)]"
+      style={{ padding: e.moldura ? 3 : 1, background: e.moldura ?? 'var(--line)' }}
     >
       <div
-        className="flex h-full flex-col items-center gap-1 rounded-[13px] px-2 pb-2.5 pt-3.5 text-center"
-        style={{ background: estilo.fundo }}
+        className="flex h-full flex-col items-center gap-[3px] rounded-[15px] px-1.5 pb-2.5 pt-3.5 text-center"
+        style={{ background: e.miolo }}
       >
-        <div
-          className="rounded-full p-1"
-          style={{ background: estilo.anel }}
-        >
-          <div className="rounded-full ring-2 ring-white">
-            <Avatar nome={carta.nome} url={carta.avatar_url} tamanho={48} />
-          </div>
-        </div>
-        <p className="mt-1.5 w-full truncate text-xs font-bold">{primeiroNome}</p>
-        <p className={`w-full truncate text-[10px] font-extrabold ${estilo.texto}`}>
+        <span className="flex rounded-full p-1" style={{ background: e.anel }}>
+          <span className="rounded-full" style={{ boxShadow: `0 0 0 2px ${e.miolo}` }}>
+            <Avatar nome={carta.nome} url={carta.avatar_url} tamanho={50} borda={false} />
+          </span>
+        </span>
+        <span className="mt-[5px] w-full truncate text-sm font-extrabold">{primeiroNome}</span>
+        <span className="w-full truncate text-[11px] font-extrabold" style={{ color: e.texto }}>
           {progresso.atual.nome}
-        </p>
-        <p className="text-[10px] text-tinta-500">
+        </span>
+        <span className="text-[11px] text-ink3">
           ×{carta.noites} {carta.noites === 1 ? 'noite' : 'noites'}
-        </p>
-        <Pontos noites={carta.noites} />
+        </span>
+        <Pontos noites={carta.noites} estilo={e} />
       </div>
     </Link>
   )
@@ -187,6 +143,7 @@ export function ForrodexPage() {
   const [erro, setErro] = useState<string | null>(null)
   const [turma, setTurma] = useState<string | null>(null)
   const [explicacao, setExplicacao] = useState(false)
+  const estiloDe = useEstiloNivel()
 
   useEffect(() => {
     if (!userId) return
@@ -237,35 +194,36 @@ export function ForrodexPage() {
     [dados, userId, turma, turmas],
   )
 
-  if (erro) return <ErrorState erro={erro} onRetry={() => navigate(0)} />
+  if (erro) {
+    return (
+      <div className="px-4 pt-14">
+        <ErrorState erro={erro} onRetry={() => navigate(0)} />
+      </div>
+    )
+  }
   if (!dex) return <Spinner texto="Abrindo a Forródex…" />
 
   const pct = dex.total > 0 ? Math.round((dex.descobertos.length / dex.total) * 100) : 0
   const porNivel = contarPorNivel(dex.descobertos)
 
   return (
-    <div className="space-y-4">
-      <button
-        className="text-sm font-bold text-tinta-600"
-        onClick={() => navigate(-1)}
-      >
-        ← Voltar
-      </button>
+    <div className="anima-tela">
+      <Cabecalho titulo="Forródex" fallback="/perfil" />
 
-      <div className="card space-y-3 p-5">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-azul-700">
+      <div className="mx-4 mb-3.5 mt-2 flex flex-col gap-3 rounded-[22px] border border-linha bg-sf p-[18px]">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-extrabold uppercase tracking-[.06em] text-bl-t">
             Forródex · neste semestre
-          </p>
-          <h1 className="text-2xl font-extrabold">
+          </span>
+          <span className="text-[30px] font-extrabold leading-[1.05]">
             {dex.descobertos.length}{' '}
-            <span className="text-base font-bold text-tinta-500">
+            <span className="text-base font-bold text-ink3">
               de {dex.total} {dex.total === 1 ? 'descoberto' : 'descobertos'}
             </span>
-          </h1>
+          </span>
         </div>
         <div
-          className="h-3 overflow-hidden rounded-full bg-preto/10"
+          className="h-3 overflow-hidden rounded-full bg-chip"
           role="progressbar"
           aria-valuenow={pct}
           aria-valuemin={0}
@@ -273,110 +231,89 @@ export function ForrodexPage() {
           aria-label="Progresso da Forródex"
         >
           <div
-            className="h-full rounded-full bg-gradient-to-r from-brasa-500 to-verde-500 transition-all"
+            className="h-full rounded-full bg-gradient-to-r from-brasa-500 to-verde-500 transition-[width] duration-400"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="text-xs text-tinta-500">
+        <span className="text-[13px] text-ink3">
           Conta dupla confirmada pelos dois lados. Zera a cada semestre.
-        </p>
+        </span>
 
         {/* Quantas duplas em cada nível; tocar explica a regra */}
         <button
           type="button"
           aria-expanded={explicacao}
           onClick={() => setExplicacao((v) => !v)}
-          className="flex w-full items-center justify-between rounded-xl bg-fundo px-3 py-2 text-sm font-bold"
+          className="flex h-11 items-center justify-between rounded-[14px] bg-chip px-3 text-[15px] font-extrabold text-ink"
         >
-          <span className="flex gap-3">
+          <span className="flex gap-3.5">
             {NIVEIS_DUPLA.map((n, i) => (
               <span key={n.nivel} title={n.nome} className="flex items-center gap-1.5">
-                <Metal nivel={n.nivel} />
+                <Metal estilo={estiloDe(n.nivel)} />
                 {porNivel[i]}
               </span>
             ))}
           </span>
-          <span className="text-xs text-tinta-500">
-            níveis {explicacao ? '▴' : '▾'}
-          </span>
+          <span className="text-[13px] font-bold text-ink3">níveis {explicacao ? '▴' : '▾'}</span>
         </button>
         {explicacao && (
-          <div className="space-y-1.5 rounded-xl bg-fundo px-3 py-2.5 text-xs">
-            <p className="text-tinta-600">
+          <div className="anima-aparece flex flex-col gap-2 rounded-[14px] bg-chip p-3 text-sm">
+            <span className="text-ink2">
               Quanto mais noites vocês dançam juntos, mais a carta evolui:
-            </p>
-            <ul className="space-y-1">
-              {NIVEIS_DUPLA.map((n) => (
-                <li key={n.nivel} className="flex justify-between">
-                  <span className="flex items-center gap-1.5 font-bold">
-                    <Metal nivel={n.nivel} />
-                    {n.nome}
-                  </span>
-                  <span className="text-tinta-500">
-                    {n.minimo} {n.minimo === 1 ? 'noite' : 'noites'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-tinta-500">Os níveis zeram a cada semestre.</p>
+            </span>
+            {NIVEIS_DUPLA.map((n) => (
+              <div key={n.nivel} className="flex justify-between">
+                <span className="flex items-center gap-2 font-extrabold">
+                  <Metal estilo={estiloDe(n.nivel)} />
+                  {n.nome}
+                </span>
+                <span className="text-ink3">
+                  {n.minimo} {n.minimo === 1 ? 'noite' : 'noites'}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       {turmas.length > 0 && (
-        <div className="rolagem-lateral -mx-4 flex gap-2 overflow-x-auto px-4 py-0.5">
-          {[null, ...turmas].map((t) => {
-            const ativo = turma === t
-            return (
-              <button
-                key={t ?? 'todos'}
-                type="button"
-                aria-pressed={ativo}
-                onClick={() => setTurma(t)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                  ativo
-                    ? 'bg-brasa-500 text-white'
-                    : 'bg-papel text-tinta-600 ring-1 ring-preto/10'
-                }`}
-              >
-                {t ?? 'Todos'}
-              </button>
-            )
-          })}
+        <div className="sem-barra flex gap-2 overflow-x-auto px-4 pb-4">
+          {[null, ...turmas].map((t) => (
+            <ChipEscolha
+              key={t ?? 'todas'}
+              ativo={turma === t}
+              onClick={() => setTurma(t)}
+              className="h-10"
+            >
+              {t ?? 'Todas'}
+            </ChipEscolha>
+          ))}
         </div>
       )}
 
-      {dex.total === 0 ? (
-        turma ? (
-          <EmptyState
-            emoji="🔍"
-            titulo="Ninguém nessa turma ainda"
-            texto="Quando a turma tiver gente, ela aparece aqui."
-          />
+      <div className="flex flex-col gap-5 px-4">
+        {dex.total === 0 ? (
+          <p className="rounded-[20px] border border-linha bg-sf px-5 py-8 text-center text-[15px] leading-snug text-ink3">
+            {turma
+              ? 'Ninguém nessa turma ainda. Quando a turma tiver gente, ela aparece aqui.'
+              : 'Semestre encerrado. A Forródex volta com as turmas novas — até lá, bom descanso!'}
+          </p>
+        ) : secoes ? (
+          secoes.map((s) => (
+            <section key={s.turma ?? 'sem-turma'} className="flex flex-col gap-2.5">
+              <div className="flex items-baseline justify-between px-1">
+                <span className="text-[15px] font-extrabold">{s.turma ?? 'Sem turma'}</span>
+                <span className="text-[13px] font-bold text-ink3">
+                  {s.descobertos.length} de {s.total}
+                </span>
+              </div>
+              <GradeCartas cartas={[...s.descobertos, ...s.faltam]} />
+            </section>
+          ))
         ) : (
-          <EmptyState
-            emoji="🪗"
-            titulo="Semestre encerrado"
-            texto="A Forródex volta com as turmas novas. Até lá, bom descanso!"
-          />
-        )
-      ) : secoes ? (
-        secoes.map((s) => (
-          <section key={s.turma ?? 'sem-turma'} className="space-y-2">
-            <h2 className="flex items-baseline justify-between px-1">
-              <span className="text-sm font-extrabold">
-                {s.turma ?? 'Sem turma'}
-              </span>
-              <span className="text-xs font-bold text-tinta-500">
-                {s.descobertos.length} de {s.total}
-              </span>
-            </h2>
-            <GradeCartas cartas={[...s.descobertos, ...s.faltam]} />
-          </section>
-        ))
-      ) : (
-        <GradeCartas cartas={[...dex.descobertos, ...dex.faltam]} />
-      )}
+          <GradeCartas cartas={[...dex.descobertos, ...dex.faltam]} />
+        )}
+      </div>
     </div>
   )
 }

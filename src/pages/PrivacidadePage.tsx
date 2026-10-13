@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { LogoWordmark } from '../components/Logo'
+import { Cabecalho } from '../components/ui'
 import { VERSAO_TERMOS } from '../lib/termos'
 
 /** Contato do encarregado de dados (LGPD, art. 41). */
@@ -8,10 +7,10 @@ export const EMAIL_CONTATO = 'fds.itajuba.suporte@gmail.com'
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-extrabold uppercase tracking-wide text-tinta-500">
+      <h2 className="text-[13px] font-extrabold uppercase tracking-[.08em] text-ink3">
         {titulo}
       </h2>
-      <div className="space-y-2 text-sm leading-relaxed text-tinta-700">
+      <div className="space-y-2 text-[15px] leading-relaxed text-ink2">
         {children}
       </div>
     </section>
@@ -30,23 +29,15 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
  * (ver VERSAO_TERMOS).
  */
 export function PrivacidadePage() {
-  const navigate = useNavigate()
-
   return (
-    <div className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
-      <div className="mb-6 flex flex-col items-center gap-3 text-center">
-        <LogoWordmark largura={200} />
-      </div>
-
-      <button
-        onClick={() => navigate(-1)}
-        className="mb-4 text-sm font-bold text-tinta-600"
-      >
-        ← Voltar
-      </button>
-
-      <h1 className="text-xl font-extrabold">Privacidade e uso de dados</h1>
-      <p className="mt-1 text-xs text-tinta-500">
+    <div
+      className="anima-tela mx-auto w-full max-w-md pb-16"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 8px)' }}
+    >
+      <Cabecalho titulo="Privacidade" fallback="/login" />
+      <div className="px-5">
+      <h1 className="pt-2 text-[26px] font-extrabold leading-tight">Privacidade e uso de dados</h1>
+      <p className="mt-1 text-[13px] text-ink3">
         Versão {VERSAO_TERMOS} · Forró de Segunda, Itajubá&nbsp;(MG)
       </p>
 
@@ -215,6 +206,7 @@ export function PrivacidadePage() {
             conta.
           </p>
         </Secao>
+      </div>
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Cabecalho } from '../components/ui'
 import { CheckinCard } from '../components/CheckinCard'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -36,30 +37,30 @@ export function PublicacaoPage() {
     void carregar()
   }, [carregar])
 
-  if (erro) return <ErrorState erro={erro} onRetry={() => void carregar()} />
-  if (item === undefined) return <Spinner texto="Carregando publicação…" />
-  if (item === null) {
-    return (
-      <EmptyState emoji="🤔" titulo="Publicação não encontrada">
-        <p className="text-sm text-tinta-500">
-          Ela pode ter sido removida.
-        </p>
-        <button className="btn-ghost" onClick={() => navigate('/')}>
-          Voltar ao feed
-        </button>
-      </EmptyState>
-    )
-  }
-
   return (
-    <div className="space-y-4">
-      <button
-        className="text-sm font-bold text-tinta-600"
-        onClick={() => navigate(-1)}
-      >
-        ← Voltar
-      </button>
-      <CheckinCard item={item} onChanged={() => void carregar()} />
+    <div className="anima-tela">
+      <Cabecalho titulo="Publicação" fallback="/feed" />
+      {erro ? (
+        <div className="px-4">
+          <ErrorState erro={erro} onRetry={() => void carregar()} />
+        </div>
+      ) : item === undefined ? (
+        <Spinner texto="Carregando publicação…" />
+      ) : item === null ? (
+        <div className="px-4">
+          <EmptyState
+            emoji="🤔"
+            titulo="Publicação não encontrada"
+            texto="Ela pode ter sido removida."
+          >
+            <button className="btn-ghost" onClick={() => navigate('/feed')}>
+              Ir para o feed
+            </button>
+          </EmptyState>
+        </div>
+      ) : (
+        <CheckinCard item={item} onChanged={() => void carregar()} />
+      )}
     </div>
   )
 }

@@ -5,7 +5,9 @@ import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
 import type { Comment } from '../lib/types'
 import { Avatar } from './Avatar'
+import { Icone } from './Icone'
 import { Spinner } from './Spinner'
+import { BotaoAcao, Folha } from './ui'
 
 export function CommentsSheet({
   checkinId,
@@ -57,70 +59,16 @@ export function CommentsSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[75dvh] w-full max-w-md flex-col rounded-t-3xl border-t border-preto/10 bg-papel"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-preto/10" />
-        <h2 className="px-5 py-3 text-base font-extrabold">Comentários</h2>
-
-        <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-4">
-          {comments === null ? (
-            <Spinner />
-          ) : comments.length === 0 ? (
-            <p className="py-8 text-center text-sm text-tinta-500">
-              Seja a primeira pessoa a comentar 💬
-            </p>
-          ) : (
-            comments.map((c) => (
-              <div key={c.id} className="flex items-start gap-2.5">
-                <Link to={`/perfil/${c.user_id}`} onClick={onClose}>
-                  <Avatar
-                    nome={c.autor.nome}
-                    url={c.autor.avatar_url}
-                    tamanho={32}
-                  />
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm">
-                    <Link
-                      to={`/perfil/${c.user_id}`}
-                      onClick={onClose}
-                      className="font-bold"
-                    >
-                      {c.autor.nome}
-                    </Link>{' '}
-                    <span className="text-tinta-500 text-xs">
-                      {formatRelative(c.criado_em)}
-                    </span>
-                  </p>
-                  <p className="break-words text-sm text-tinta-700">{c.texto}</p>
-                </div>
-                {(c.user_id === userId || papel === 'organizador') && (
-                  <button
-                    onClick={() => void excluir(c.id)}
-                    className="p-1 text-tinta-400 hover:text-red-600"
-                    aria-label="Excluir comentário"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-
-        <div
-          className="flex gap-2 border-t border-preto/10 p-3"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-        >
+    <Folha
+      aberta
+      onFechar={onClose}
+      titulo="Comentários"
+      rodape={
+        <div className="flex gap-2">
           <input
-            className="input"
-            placeholder="Escreva um comentário…"
+            className="h-12 min-w-0 flex-1 rounded-[14px] border-[1.5px] border-linha bg-fundo px-3.5 text-base font-semibold text-ink outline-none focus:border-brasa-500"
+            placeholder="Escreva um comentário"
+            aria-label="Escreva um comentário"
             value={texto}
             maxLength={300}
             onChange={(e) => setTexto(e.target.value)}
@@ -128,15 +76,50 @@ export function CommentsSheet({
               if (e.key === 'Enter') void enviar()
             }}
           />
-          <button
-            className="btn-primary shrink-0"
+          <BotaoAcao
+            tamanho="p"
+            sombra={false}
+            className="h-12"
             disabled={enviando || !texto.trim()}
             onClick={() => void enviar()}
           >
             Enviar
-          </button>
+          </BotaoAcao>
         </div>
+      }
+    >
+      <div className="flex flex-col gap-3.5 px-5 pb-4">
+        {comments === null ? (
+          <Spinner />
+        ) : comments.length === 0 ? (
+          <p className="py-6 text-[15px] text-ink3">Ninguém comentou ainda.</p>
+        ) : (
+          comments.map((c) => (
+            <div key={c.id} className="flex items-start gap-2.5">
+              <Link to={`/perfil/${c.user_id}`} onClick={onClose} className="shrink-0">
+                <Avatar nome={c.autor.nome} url={c.autor.avatar_url} tamanho={34} borda={false} />
+              </Link>
+              <div className="min-w-0 flex-1 text-[15px] leading-snug">
+                <Link to={`/perfil/${c.user_id}`} onClick={onClose} className="font-extrabold">
+                  {c.autor.nome}
+                </Link>{' '}
+                <span className="break-words text-ink">{c.texto}</span>
+                <div className="text-xs text-ink3">{formatRelative(c.criado_em)}</div>
+              </div>
+              {(c.user_id === userId || papel === 'organizador') && (
+                <button
+                  type="button"
+                  onClick={() => void excluir(c.id)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-ink3"
+                  aria-label="Excluir comentário"
+                >
+                  <Icone nome="fechar" tamanho={16} traco={2.4} />
+                </button>
+              )}
+            </div>
+          ))
+        )}
       </div>
-    </div>
+    </Folha>
   )
 }

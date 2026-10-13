@@ -31,6 +31,7 @@ import type {
   PapelDanca,
   ParceiroDanca,
   ParceiroPossivel,
+  PresenteNoite,
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
@@ -324,6 +325,8 @@ export interface ForroApi {
    * minha não existe candidato válido, e a marcação seria recusada de
    * qualquer forma (ver `marcarDupla`).
    */
+  /** Quem fez check-in na noite `data` (dia da noite), do mais recente ao mais antigo. */
+  presentesDaNoite(data: string): Promise<PresenteNoite[]>
   parceirosPossiveis(data: string): Promise<ParceiroPossivel[]>
   /**
    * Marca que dancei com alguém. O banco exige que os dois tenham
@@ -359,8 +362,11 @@ export interface ForroApi {
   }): Promise<Notificacao[]>
   /** Quantas são mais novas que a última vez que abri o painel. */
   contarNaoLidas(): Promise<number>
-  /** Carimba o painel como visto agora. */
-  marcarNotificacoesVistas(): Promise<void>
+  /**
+   * Carimba o painel como visto agora. Devolve o carimbo ANTERIOR (null
+   * se nunca abriu), que é o que diz quais avisos eram novos.
+   */
+  marcarNotificacoesVistas(): Promise<string | null>
 
   // ---- Organizador ----
   getAttendance(inicioISO: string, fimISO: string): Promise<AttendanceRow[]>
@@ -504,6 +510,8 @@ export interface ForroApi {
   /** `assumir` = fechar a sessão de outro professor e abrir a minha. */
   ligarModoDJ(assumir: boolean): Promise<ResultadoLigarDJ>
   desligarModoDJ(): Promise<void>
+  /** Quando os pedidos fecham sozinhos; null = até desligar (migração 034). */
+  programarFechamentoDJ(fechaEm: string | null): Promise<void>
   /** Roda uma passada do loop agora (ao ligar), sem esperar o cron. */
   cutucarLoopDJ(): Promise<void>
   /**

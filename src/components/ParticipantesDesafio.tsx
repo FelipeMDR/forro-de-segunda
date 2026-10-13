@@ -127,7 +127,7 @@ export function ParticipantesDesafio({
               candidatos.map((p) => (
                 <li
                   key={p.id}
-                  className="flex items-center gap-2 rounded-xl bg-fundo px-3 py-2"
+                  className="flex items-center gap-2 rounded-xl bg-chip px-3 py-2"
                 >
                   <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
                   <span className="min-w-0 flex-1 truncate text-sm">
@@ -175,7 +175,7 @@ export function ParticipantesDesafio({
       </div>
 
       {avisos.length > 0 && (
-        <ul className="space-y-1 rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700">
+        <ul className="space-y-1 rounded-xl bg-brasa-500/10 px-3 py-2 text-[11px] text-or-t">
           {avisos.slice(0, 8).map((a) => (
             <li key={a}>{a}</li>
           ))}
@@ -184,13 +184,13 @@ export function ParticipantesDesafio({
       )}
 
       {participantes.length > 0 && (
-        <ul className="divide-y divide-preto/10 rounded-xl bg-fundo">
+        <ul className="divide-y divide-linha rounded-xl bg-chip">
           {participantes.map((p) => (
             <li key={p.id} className="flex items-center gap-2 px-3 py-2">
               <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
               <span className="min-w-0 flex-1 truncate text-sm">{p.nome}</span>
               <button
-                className="shrink-0 px-2 text-xs font-bold text-red-600"
+                className="shrink-0 px-2 text-xs font-bold text-or-t"
                 disabled={ocupado}
                 onClick={() =>
                   void executar(async () => {
@@ -211,7 +211,7 @@ export function ParticipantesDesafio({
           <h4 className="text-xs font-bold uppercase tracking-wide text-tinta-500">
             Esperando criar conta ({convidados.length})
           </h4>
-          <ul className="divide-y divide-preto/10 rounded-xl bg-fundo">
+          <ul className="divide-y divide-linha rounded-xl bg-chip">
             {convidados.map((c) => (
               <li
                 key={c.telefone}
@@ -225,7 +225,7 @@ export function ParticipantesDesafio({
                   </p>
                 </div>
                 <button
-                  className="shrink-0 px-2 text-xs font-bold text-red-600"
+                  className="shrink-0 px-2 text-xs font-bold text-or-t"
                   disabled={ocupado}
                   onClick={() =>
                     void executar(async () => {

@@ -12,13 +12,13 @@ type Estado =
 
 const MENSAGENS: Record<ResultadoConexao, { titulo: string; texto: string }> = {
   ok: {
-    titulo: 'Spotify conectado! 🎧',
-    texto: 'Você ganhou o cargo de 💿 DJ. Agora é só ligar o Modo DJ no Espaço Livre.',
+    titulo: 'Spotify conectado!',
+    texto: 'Você ganhou o cargo de DJ. Agora é só ligar o Modo DJ no Espaço Livre.',
   },
   sem_premium: {
     titulo: 'Conectado, mas falta o Premium',
     texto:
-      'Você ganhou o cargo de 💿 DJ, mas o Modo DJ precisa de Spotify Premium: sem ele, o Spotify não deixa o app colocar músicas na fila.',
+      'Você ganhou o cargo de DJ, mas o Modo DJ precisa de Spotify Premium: sem ele, o Spotify não deixa o app colocar músicas na fila.',
   },
   nao_liberado: {
     titulo: 'Sua conta ainda não foi liberada',
@@ -69,9 +69,9 @@ export function SpotifyConectadoPage() {
     estado.tipo === 'pronto' ? MENSAGENS[estado.resultado].texto : estado.mensagem
 
   return (
-    <div className="card space-y-3 p-5">
-      <h1 className="text-lg font-extrabold">{titulo}</h1>
-      <p className="text-sm text-tinta-700">{texto}</p>
+    <div className="anima-tela mx-4 mt-6 flex flex-col gap-3 rounded-[22px] border border-linha bg-sf p-5">
+      <h1 className="text-2xl font-extrabold leading-tight">{titulo}</h1>
+      <p className="text-[15px] leading-relaxed text-ink2">{texto}</p>
       <div className="flex flex-wrap gap-2">
         {estado.tipo === 'pronto' && estado.resultado === 'ok' && (
           <Link to="/dj" className="btn-primary">

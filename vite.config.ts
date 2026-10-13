@@ -40,6 +40,9 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,webp,ico,woff2}'],
+        // Português cabe no subconjunto latino da fonte: o vietnamita só
+        // baixa (pela rede) se algum texto precisar dele.
+        globIgnores: ['**/*vietnamese*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

@@ -65,7 +65,7 @@ export function NovaSenhaPage() {
 
         {semSessao ? (
           <>
-            <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-sm text-amber-800">
+            <p className="rounded-xl border-[1.5px] border-brasa-500 bg-sf px-3 py-3 text-sm text-ink">
               Este link não vale mais. Eles expiram depois de um tempo e só
               podem ser usados uma vez — peça um novo em "Esqueci minha
               senha".

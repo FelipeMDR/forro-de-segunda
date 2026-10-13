@@ -1,8 +1,8 @@
-@import '@fontsource-variable/nunito';
+@import '@fontsource-variable/bricolage-grotesque/opsz.css';
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   /*
    * Paleta oficial da diretoria de comunicação. Os valores marcados
@@ -38,28 +38,74 @@
   --color-marinho-500: #024565;
   --color-marinho-600: #01344c;
 
-  /* Neutros — oficiais #000507 (preto) e #F5F4F2 (branco) */
+  /* Neutro oficial #000507 (preto). Fundo, cartão e tinta seguem o
+     tema — ver @theme inline logo abaixo. */
   --color-preto: #000507;
-  --color-fundo: #f5f4f2;
-  --color-papel: #ffffff;
+  --color-branco: #f5f4f2;
+}
 
-  /*
-   * Tinta: o preto oficial em graus de ênfase sobre fundo claro.
-   * Os valores foram medidos, não escolhidos a olho — todos passam de
-   * 4,5:1 sobre o fundo #F5F4F2 E sobre o branco dos cartões, que é o
-   * mínimo do WCAG AA para texto normal. Escala mais clara que isto
-   * some no claro, mesmo parecendo aceitável na tela do editor.
-   */
-  --color-tinta-900: #000507; /* 19,9:1 */
-  --color-tinta-700: #2c3134; /* 12,0:1 */
-  --color-tinta-600: #4a5155; /*  7,4:1 */
-  --color-tinta-500: #5c6367; /*  5,6:1 */
-  --color-tinta-400: #656c70; /*  4,9:1 */
+/*
+ * Tema. Claro por padrão, com o escuro como opção no perfil
+ * (lib/tema.ts). As cores de texto -t são as oficiais ajustadas para
+ * passar 4,5:1 sobre o fundo de cada tema.
+ */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f4f2;
+  --sf: #ffffff;
+  --sf2: #eceae6;
+  --line: rgb(0 5 7 / 0.1);
+  --ink: #000507;
+  --ink2: #4a5155;
+  --ink3: #5c6367;
+  --or-t: #b84500;
+  --gr-t: #5f791b;
+  --bl-t: #0275ac;
+  --bar: rgb(245 244 242 / 0.92);
+  --chip: rgb(0 5 7 / 0.06);
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0b1013;
+  --sf: #141b1f;
+  --sf2: #1f292e;
+  --line: rgb(245 244 242 / 0.11);
+  --ink: #f5f4f2;
+  --ink2: #c3c8cb;
+  --ink3: #959da1;
+  --or-t: #f97316;
+  --gr-t: #b0d24a;
+  --bl-t: #2ba5e2;
+  --bar: rgb(11 16 19 / 0.88);
+  --chip: rgb(245 244 242 / 0.08);
+}
+
+@theme inline {
+  --color-fundo: var(--bg);
+  --color-sf: var(--sf);
+  --color-sf2: var(--sf2);
+  --color-linha: var(--line);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-ink3: var(--ink3);
+  --color-chip: var(--chip);
+  --color-barra: var(--bar);
+  --color-or-t: var(--or-t);
+  --color-gr-t: var(--gr-t);
+  --color-bl-t: var(--bl-t);
+  /* Nomes antigos, apontando para o tema. */
+  --color-papel: var(--sf);
+  --color-tinta-900: var(--ink);
+  --color-tinta-700: var(--ink2);
+  --color-tinta-600: var(--ink2);
+  --color-tinta-500: var(--ink3);
+  --color-tinta-400: var(--ink3);
 }
 
 @layer base {
   html {
-    background-color: var(--color-fundo);
+    background-color: var(--bg);
     /* Sem isso o iOS aumenta o texto sozinho ao girar a tela */
     -webkit-text-size-adjust: 100%;
     /*
@@ -76,7 +122,7 @@
     touch-action: pan-x pan-y;
   }
   body {
-    @apply bg-fundo text-tinta-900 font-sans antialiased;
+    @apply bg-fundo text-ink font-sans antialiased;
     min-height: 100dvh;
   }
   /*
@@ -88,73 +134,220 @@
   input,
   textarea,
   select {
-    @apply text-tinta-900;
+    @apply text-ink;
     font-size: 16px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink3);
+  }
+  button {
+    cursor: pointer;
+  }
+  /* Rolagem sem a barra cinza do navegador, como no app nativo. */
+  .sem-barra {
+    scrollbar-width: none;
+  }
+  .sem-barra::-webkit-scrollbar {
+    display: none;
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-papel border border-preto/10 shadow-sm shadow-preto/5;
+    @apply rounded-[20px] bg-sf border border-linha;
   }
+  /*
+   * Linguagem do logo: contorno preto grosso e sombra dura nos
+   * elementos de ação. Texto preto sobre o laranja, que é o que passa
+   * de 4,5:1 (branco sobre #DE5300 fica em 3,6).
+   */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 min-h-11 text-[15px] font-extrabold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-gradient-to-r from-brasa-600 to-brasa-700 text-white shadow-sm shadow-brasa-700/20;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 min-h-11 text-[15px] font-extrabold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 border-2 border-preto bg-brasa-500 text-preto shadow-[0_4px_0_#000507] active:translate-y-0.5 active:shadow-[0_2px_0_#000507];
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-preto/5 text-tinta-700 border border-preto/10;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 min-h-11 text-[15px] font-extrabold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 border-[1.5px] border-linha bg-sf text-ink;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 bg-red-50 text-red-700 border border-red-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 min-h-11 text-[15px] font-extrabold transition-transform select-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 border-[1.5px] border-linha bg-sf text-or-t;
   }
-  /* text-base (16px) e não text-sm: abaixo de 16px o iOS dá zoom
-     automático ao focar o campo. Ver a regra de base acima. */
   .input {
-    @apply w-full rounded-xl border border-preto/15 bg-papel px-3.5 py-2.5 text-base placeholder:text-tinta-400 focus:border-azul-500 focus:outline-none focus:ring-1 focus:ring-azul-500;
+    @apply w-full min-h-[54px] rounded-2xl border-2 border-linha bg-sf px-4 py-3 text-[17px] font-semibold text-ink outline-none placeholder:font-semibold focus:border-brasa-500;
   }
   .label {
-    @apply mb-1.5 block text-xs font-bold uppercase tracking-wide text-tinta-600;
+    @apply mb-1.5 block px-1 text-sm font-extrabold text-ink2;
   }
 }
 
-/*
- * Cartão "Pedidos de música abertos" (PedidosAbertos): equalizador e
- * brilho pulsando, para o cartão parecer o que é — música tocando agora.
- * Quem pediu ao sistema para reduzir movimento vê tudo parado.
- */
+@keyframes tela-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes folha-sobe {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes aparece {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes flash-some {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes estoura {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes sobe {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes entra-esq {
+  from {
+    opacity: 0;
+    transform: translateX(-80px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes entra-dir {
+  from {
+    opacity: 0;
+    transform: translateX(80px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes flutua {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-160px) scale(1.3);
+  }
+}
+@keyframes cai {
+  0% {
+    opacity: 0;
+    transform: translateY(-140%) rotate(-25deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(5%) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-4deg);
+  }
+}
 @keyframes equalizador {
   0%,
   100% {
-    transform: scaleY(0.35);
+    transform: scaleY(0.3);
   }
   50% {
     transform: scaleY(1);
   }
 }
-
-@keyframes brilho-pedidos {
+@keyframes pulso {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgb(222 83 0 / 0.35);
+    box-shadow: 0 0 0 0 rgb(222 83 0 / 0.55);
   }
-  50% {
-    box-shadow: 0 0 0 6px rgb(222 83 0 / 0);
+  60% {
+    box-shadow: 0 0 0 10px rgb(222 83 0 / 0);
+  }
+}
+@keyframes pulso-verde {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(155 194 45 / 0.6);
+  }
+  60% {
+    box-shadow: 0 0 0 8px rgb(155 194 45 / 0);
   }
 }
 
+.anima-tela {
+  animation: tela-entra 0.3s ease;
+}
+.anima-folha {
+  animation: folha-sobe 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anima-aparece {
+  animation: aparece 0.2s ease;
+}
+.pulso {
+  animation: pulso 1.8s infinite;
+}
+.pulso-verde {
+  animation: pulso-verde 2s infinite;
+}
+
+/* Barras de música tocando (cartões de pedidos, Modo DJ). */
 .equalizador {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 22px;
+  height: 18px;
 }
 .equalizador span {
   width: 4px;
   height: 100%;
   border-radius: 2px;
-  background: var(--color-brasa-500);
+  background: currentColor;
   transform-origin: bottom;
   animation: equalizador 0.9s ease-in-out infinite;
 }
@@ -166,23 +359,22 @@
   animation-delay: -0.6s;
   animation-duration: 1.1s;
 }
-
-.brilho-pedidos {
-  animation: brilho-pedidos 2.4s ease-in-out infinite;
+.equalizador span:nth-child(4) {
+  animation-delay: -0.15s;
+  animation-duration: 0.8s;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .equalizador span,
-  .brilho-pedidos {
-    animation: none;
-  }
-  .equalizador span {
-    transform: scaleY(0.7);
-  }
+/* Foto sem imagem (carregando ou arquivada): listras diagonais. */
+.listras {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.06) 0 12px,
+    transparent 12px 24px
+  );
 }
 
-/* Fileira que rola de lado (chips da Forródex): sem a barra cinza do
-   navegador e com as pontas esmaecendo, que já avisam que tem mais. */
+/* Fileira que rola de lado: sem a barra cinza do navegador e com as
+   pontas esmaecendo, que já avisam que tem mais. */
 .rolagem-lateral {
   scrollbar-width: none;
   mask-image: linear-gradient(
@@ -195,4 +387,17 @@
 }
 .rolagem-lateral::-webkit-scrollbar {
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .equalizador span {
+    transform: scaleY(0.7);
+  }
 }

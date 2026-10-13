@@ -46,6 +46,7 @@ import type {
   PapelDanca,
   ParceiroDanca,
   ParceiroPossivel,
+  PresenteNoite,
   PedidoMusica,
   PedidoNaFila,
   PerfilPublico,
@@ -1900,15 +1901,63 @@ export class SupabaseApi implements ForroApi {
 
   async marcarNotificacoesVistas() {
     const uid = await this.requireUid()
+    const antes = ok(
+      await this.sb
+        .from('profiles')
+        .select('notificacoes_vistas_em')
+        .eq('id', uid)
+        .maybeSingle(),
+    ) as { notificacoes_vistas_em: string | null } | null
     ok(
       await this.sb
         .from('profiles')
         .update({ notificacoes_vistas_em: new Date().toISOString() })
         .eq('id', uid),
     )
+    return antes?.notificacoes_vistas_em ?? null
   }
 
   // ---- Duplas de dança ----
+
+  async presentesDaNoite(data: string): Promise<PresenteNoite[]> {
+    await this.requireUid()
+    const noite = limitesDaNoite(data)
+    const checkins = ok(
+      await this.sb
+        .from('checkins')
+        .select(
+          'user_id, criado_em, autor:profiles!user_id(nome, avatar_url, turmas:profile_turmas(turma, papel_danca), cargos:profile_cargos(cargo))',
+        )
+        .gte('criado_em', noite.de.toISOString())
+        .lte('criado_em', noite.ate.toISOString())
+        .order('criado_em', { ascending: true }),
+    ) as unknown as Array<{
+      user_id: string
+      criado_em: string
+      autor: {
+        nome: string
+        avatar_url: string | null
+        turmas: TurmaMembro[] | null
+        cargos: Array<{ cargo: string }> | null
+      } | null
+    }>
+    // Uma linha por pessoa, com a hora em que ela chegou (primeira foto)
+    const porPessoa = new Map<string, PresenteNoite>()
+    for (const c of checkins) {
+      if (porPessoa.has(c.user_id)) continue
+      porPessoa.set(c.user_id, {
+        user_id: c.user_id,
+        nome: c.autor?.nome ?? 'Alguém',
+        avatar_url: c.autor?.avatar_url ?? null,
+        turma: turmaLabel(c.autor?.turmas ?? []),
+        cargos: (c.autor?.cargos ?? []).map((x) => x.cargo),
+        chegou_em: c.criado_em,
+      })
+    }
+    return [...porPessoa.values()].sort((a, b) =>
+      b.chegou_em.localeCompare(a.chegou_em),
+    )
+  }
 
   async parceirosPossiveis(data: string): Promise<ParceiroPossivel[]> {
     const uid = await this.requireUid()
@@ -2644,7 +2693,9 @@ export class SupabaseApi implements ForroApi {
       await this.sb
         .from('dj_sessoes')
         .select(
-          'id, dj_user_id, noite, aberta_em, aviso, tocando_titulo, tocando_artista, tocando_capa, tocando_pedido_id, atualizado_em, dj:profiles!dj_user_id(nome), pedido:pedidos_musica!tocando_pedido_id(perfil:profiles!user_id(nome, avatar_url))',
+          // `*` e não a lista de colunas: assim `fecha_em` vem quando a
+          // migração 034 já rodou, e a consulta não quebra quando não.
+          '*, dj:profiles!dj_user_id(nome), pedido:pedidos_musica!tocando_pedido_id(perfil:profiles!user_id(nome, avatar_url))',
         )
         .is('fechada_em', null)
         .maybeSingle(),
@@ -2659,13 +2710,18 @@ export class SupabaseApi implements ForroApi {
       tocando_capa: string | null
       tocando_pedido_id: string | null
       atualizado_em: string | null
+      fecha_em?: string | null
       dj: { nome: string } | null
       pedido: { perfil: { nome: string; avatar_url: string | null } | null } | null
     } | null
     if (!data) return null
+    // Venceu e o agendamento ainda não passou para fechar (até 15 s):
+    // para quem olha, os pedidos já fecharam.
+    if (data.fecha_em && new Date(data.fecha_em).getTime() <= Date.now()) return null
     return {
       id: data.id,
       dj_user_id: data.dj_user_id,
+      fecha_em: data.fecha_em ?? null,
       dj_nome: data.dj?.nome ?? 'Alguém',
       noite: data.noite,
       aberta_em: data.aberta_em,
@@ -2692,6 +2748,10 @@ export class SupabaseApi implements ForroApi {
 
   async desligarModoDJ() {
     await this.rpcSimples('desligar_modo_dj')
+  }
+
+  async programarFechamentoDJ(fechaEm: string | null) {
+    await this.rpcSimples('programar_fechamento_dj', { p_fecha_em: fechaEm })
   }
 
   async cutucarLoopDJ() {

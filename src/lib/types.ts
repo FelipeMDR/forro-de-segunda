@@ -322,6 +322,21 @@ export interface ParceiroPossivel {
   confirmada: boolean
 }
 
+/**
+ * Quem fez check-in numa noite — a lista "No salão agora". Diferente de
+ * `ParceiroPossivel`, não depende de eu ter feito check-in: serve para
+ * ver quem está no salão antes de chegar.
+ */
+export interface PresenteNoite {
+  user_id: string
+  nome: string
+  avatar_url: string | null
+  turma: string | null
+  cargos: string[]
+  /** Primeiro check-in da pessoa na noite (ISO). */
+  chegou_em: string
+}
+
 /** Par confirmado dos dois lados — é o que conta para distintivo. */
 export interface ParceiroDanca {
   user_id: string
@@ -466,6 +481,16 @@ export interface Badge {
   emoji: string
   titulo: string
   descricao: string
+  /**
+   * Distintivo de marco (presença, rodízio, músicas): quanto falta para
+   * o próximo nível. Ausente nos outros e no último nível.
+   */
+  progresso?: {
+    atual: number
+    meta: number
+    /** "faltam 18 para 🥇 50" */
+    rotulo: string
+  }
 }
 
 /**
@@ -649,6 +674,11 @@ export interface SessaoDJ {
   noite: string
   aberta_em: string
   aviso: 'sem_aparelho' | 'sem_premium' | null
+  /**
+   * Quando os pedidos fecham sozinhos (migração 034). null = até o DJ
+   * desligar — e é o que vem de um banco sem a migração.
+   */
+  fecha_em: string | null
   /** O que o loop viu tocando na última passada. */
   tocando: {
     titulo: string

@@ -155,6 +155,10 @@ from (values
   (
     '033 — cargo de DJ com teto de 5',
     exists (select 1 from pg_proc where proname = 'conceder_cargo_dj')
+  ),
+  (
+    '034 — Modo DJ fecha os pedidos sozinho',
+    exists (select 1 from pg_proc where proname = 'programar_fechamento_dj')
   )
 ) as t(migracao, aplicada)
 order by migracao;

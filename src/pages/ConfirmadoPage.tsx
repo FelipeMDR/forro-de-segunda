@@ -84,12 +84,12 @@ export function ConfirmadoPage() {
         {falhou ? (
           <>
             <h1 className="text-lg font-extrabold">Link vencido 😕</h1>
-            <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-sm text-amber-800">
+            <p className="rounded-xl border-[1.5px] border-brasa-500 bg-sf px-3 py-3 text-sm text-ink">
               {erro ??
                 'Este link não vale mais. Eles expiram depois de um tempo e só podem ser usados uma vez.'}
             </p>
             {reenviado ? (
-              <p className="rounded-xl bg-emerald-500/10 px-3 py-3 text-sm text-emerald-800">
+              <p className="rounded-xl border-[1.5px] border-verde-500 bg-sf px-3 py-3 text-sm text-ink">
                 Mandamos outro link. 📬 Não achou? Olhe no spam.
               </p>
             ) : (

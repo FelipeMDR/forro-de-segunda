@@ -13,16 +13,15 @@ export function ErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div className="card flex flex-col items-center gap-3 px-6 py-8 text-center">
-      <span className="text-4xl">😕</span>
-      <h2 className="text-base font-extrabold">{titulo}</h2>
-      <p className="max-w-xs break-words text-xs text-tinta-600">{erro}</p>
+    <div className="flex flex-col items-center gap-3 rounded-[22px] border border-linha bg-sf px-6 py-8 text-center">
+      <h2 className="text-lg font-extrabold">{titulo}</h2>
+      <p className="max-w-xs break-words text-[13px] text-ink3">{erro}</p>
       {onRetry && (
         <button className="btn-primary" onClick={onRetry}>
           Tentar de novo
         </button>
       )}
-      <p className="text-[10px] text-tinta-400">
+      <p className="text-xs text-ink3">
         Se continuar, mande esta mensagem para quem cuida do app.
       </p>
     </div>

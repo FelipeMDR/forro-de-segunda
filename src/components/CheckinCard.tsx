@@ -3,26 +3,31 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatRelative } from '../lib/dates'
-import {
-  REACTION_TYPES,
-  cargoPrincipal,
-  emojiCargo,
-  type FeedItem,
-} from '../lib/types'
+import { REACTION_TYPES, cargoPrincipal, type FeedItem } from '../lib/types'
 import { Avatar } from './Avatar'
 import { CommentsSheet } from './CommentsSheet'
+import { Icone, IconeMais } from './Icone'
+import { BotaoAcao, BotaoSuave, Confirmar, MenuAcoes } from './ui'
 
+/**
+ * Uma publicação do feed: a foto ocupa a largura toda (é o que as
+ * pessoas vieram ver), com autor em cima e as quatro reações embaixo.
+ */
 export function CheckinCard({
   item,
   onChanged,
+  destaque = false,
 }: {
   item: FeedItem
   onChanged: () => void
+  /** Fundo levemente aceso — a publicação aberta a partir de um aviso. */
+  destaque?: boolean
 }) {
   const { api, userId, papel } = useAuth()
   const toast = useToast()
   const [menuAberto, setMenuAberto] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
+  const [excluindo, setExcluindo] = useState(false)
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
   /** Texto em edição; `null` quando a legenda não está sendo editada. */
   const [rascunho, setRascunho] = useState<string | null>(null)
@@ -46,14 +51,11 @@ export function CheckinCard({
    * Reagir era: mandar para o servidor, ESPERAR, recarregar o feed
    * inteiro, e só então o coração acendia. No 4G isso levava segundos
    * sem nenhum sinal na tela — a pessoa tocava de novo achando que não
-   * pegou, e o segundo toque DESFAZIA o primeiro. Somado à corrida de
-   * recargas do feed (ver `FeedPage.carregar`), a reação "parava de
-   * funcionar" justamente para quem mais reagia.
+   * pegou, e o segundo toque DESFAZIA o primeiro.
    *
    * Agora o toque muda a tela na hora e o servidor confirma depois. Se
    * falhar, volta ao que era e avisa. O feed sincroniza a cópia local
-   * quando a prop muda (tempo real, recarga), então quem reagiu de outro
-   * aparelho também aparece — só não é ele que faz o coração acender.
+   * quando a prop muda (tempo real, recarga).
    */
   const [reacoes, setReacoes] = useState(item.reacoes)
   useEffect(() => {
@@ -64,8 +66,7 @@ export function CheckinCard({
   const [reagindo, setReagindo] = useState(false)
 
   const minhaReacao = reacoes.find((r) => r.user_id === userId)?.tipo
-  const contagem = (tipo: string) =>
-    reacoes.filter((r) => r.tipo === tipo).length
+  const contagem = (tipo: string) => reacoes.filter((r) => r.tipo === tipo).length
 
   const reagir = async (tipo: string) => {
     if (reagindo || !userId) return
@@ -79,9 +80,6 @@ export function CheckinCard({
     setReagindo(true)
     try {
       await api.toggleReaction(item.id, tipo)
-      // Sem `onChanged()` de propósito: a tela já está certa, e uma
-      // recarga inteira do feed aqui era a principal fonte da corrida.
-      // O tempo real cuida de trazer as reações dos outros.
     } catch (e) {
       setReacoes(antes)
       toast((e as Error).message, 'erro')
@@ -94,20 +92,23 @@ export function CheckinCard({
     setMenuAberto(false)
     try {
       await api.reportCheckin(item.id, 'Conteúdo inadequado')
-      toast('Denúncia enviada. Obrigado por avisar! 🚩')
+      toast('Denúncia enviada. Obrigado por avisar!')
     } catch (e) {
       toast((e as Error).message, 'erro')
     }
   }
 
   const excluir = async () => {
+    setExcluindo(true)
     try {
       await api.deleteCheckin(item.id)
-      setMenuAberto(false)
-      toast('Check-in removido')
+      setConfirmandoExclusao(false)
+      toast('Publicação excluída')
       onChanged()
     } catch (e) {
       toast((e as Error).message, 'erro')
+    } finally {
+      setExcluindo(false)
     }
   }
 
@@ -142,7 +143,7 @@ export function CheckinCard({
       toast(
         item.favorito
           ? 'Tirado dos favoritos'
-          : 'Guardado nos favoritos! ⭐ Essa foto não será arquivada.',
+          : 'Guardado nos favoritos. Essa foto não será arquivada.',
       )
       onChanged()
     } catch (e) {
@@ -150,85 +151,71 @@ export function CheckinCard({
     }
   }
 
+  const acoes = [
+    ...(meuCheckin
+      ? [
+          {
+            rotulo: legenda ? 'Editar legenda' : 'Escrever legenda',
+            onClick: () => {
+              setMenuAberto(false)
+              setRascunho(legenda ?? '')
+            },
+          },
+        ]
+      : []),
+    { rotulo: 'Denunciar', onClick: () => void denunciar() },
+    ...(podeExcluir
+      ? [
+          {
+            rotulo: 'Excluir publicação',
+            perigo: true,
+            onClick: () => {
+              setMenuAberto(false)
+              setConfirmandoExclusao(true)
+            },
+          },
+        ]
+      : []),
+  ]
+
   return (
-    <article className="card overflow-hidden">
-      <header className="flex items-center gap-2.5 px-4 py-3">
-        <Link
-          to={`/perfil/${item.user_id}`}
-          className="flex min-w-0 flex-1 items-center gap-2.5"
-        >
-          <Avatar
-            nome={item.autor.nome}
-            url={item.autor.avatar_url}
-            tamanho={38}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="truncate text-sm font-extrabold">
-                {item.autor.nome}
-              </p>
-              {cargo && (
-                // Cargo em destaque: é o reconhecimento mais visível do app
-                <span className="shrink-0 rounded-full bg-brasa-500/20 px-2 py-0.5 text-[10px] font-extrabold text-brasa-700 ring-1 ring-brasa-500/30">
-                  {emojiCargo(cargo)} {cargo}
-                </span>
-              )}
-            </div>
-            <p className="truncate text-xs text-tinta-500">
-              {item.autor.turma ? `${item.autor.turma} · ` : ''}
-              {formatRelative(item.criado_em)}
-            </p>
-          </div>
+    <article
+      className={`flex flex-col gap-2.5 pb-5 pt-1.5 transition-colors duration-500 ${
+        destaque ? 'bg-sf2' : ''
+      }`}
+    >
+      <header className="flex items-center gap-2.5 px-4">
+        <Link to={`/perfil/${item.user_id}`} className="shrink-0">
+          <Avatar nome={item.autor.nome} url={item.autor.avatar_url} tamanho={42} />
         </Link>
-        <div className="relative">
-          <button
-            className="rounded-lg px-2 py-1 text-tinta-500 hover:bg-preto/5"
-            aria-label="Mais opções"
-            onClick={() => {
-              setMenuAberto((v) => !v)
-              setConfirmandoExclusao(false)
-            }}
-          >
-            ⋯
-          </button>
-          {menuAberto && (
-            <div className="absolute right-0 top-9 z-20 w-52 overflow-hidden rounded-xl border border-preto/10 bg-papel shadow-xl">
-              {meuCheckin && (
-                <button
-                  className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
-                  onClick={() => {
-                    setMenuAberto(false)
-                    setRascunho(legenda ?? '')
-                  }}
-                >
-                  ✏️ {legenda ? 'Editar legenda' : 'Escrever legenda'}
-                </button>
-              )}
-              <button
-                className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
-                onClick={() => void denunciar()}
-              >
-                🚩 Denunciar foto
-              </button>
-              {podeExcluir &&
-                (confirmandoExclusao ? (
-                  <button
-                    className="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-preto/5"
-                    onClick={() => void excluir()}
-                  >
-                    ⚠️ Confirmar exclusão?
-                  </button>
-                ) : (
-                  <button
-                    className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-preto/5"
-                    onClick={() => setConfirmandoExclusao(true)}
-                  >
-                    🗑️ Excluir check-in
-                  </button>
-                ))}
-            </div>
-          )}
+        <div className="flex min-w-0 flex-1 flex-col gap-px">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Link
+              to={`/perfil/${item.user_id}`}
+              className="truncate text-base font-extrabold"
+            >
+              {item.autor.nome}
+            </Link>
+            {cargo && (
+              // Cargo em destaque: é o reconhecimento mais visível do app
+              <span className="shrink-0 rounded-full bg-chip px-2 py-0.5 text-xs font-extrabold text-or-t">
+                {cargo}
+              </span>
+            )}
+          </div>
+          <span className="truncate text-[13px] text-ink3">
+            {item.autor.turma ? `${item.autor.turma} · ` : ''}
+            {formatRelative(item.criado_em)}
+          </span>
         </div>
+        <button
+          type="button"
+          aria-label="Mais opções"
+          onClick={() => setMenuAberto(true)}
+          className="flex h-11 w-11 shrink-0 items-center justify-center text-ink3"
+        >
+          <IconeMais />
+        </button>
       </header>
 
       {item.foto_url ? (
@@ -236,19 +223,18 @@ export function CheckinCard({
           src={item.foto_url}
           alt={legenda ?? `Check-in de ${item.autor.nome}`}
           loading="lazy"
-          className="aspect-[4/5] w-full bg-fundo object-cover"
+          className="aspect-[4/5] w-full bg-sf2 object-cover"
         />
       ) : (
         // Fotos antigas são apagadas pela política de retenção (4 meses);
         // o registro da presença continua valendo.
-        <div className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 bg-fundo text-tinta-400">
-          <span className="text-4xl">🎞️</span>
-          <span className="text-xs">Foto arquivada — presença registrada</span>
+        <div className="listras flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 bg-marinho-600 text-[13px] font-bold text-branco/75">
+          Foto arquivada · presença registrada
         </div>
       )}
 
       {rascunho !== null ? (
-        <div className="space-y-2 px-4 pt-3">
+        <div className="flex flex-col gap-2 px-4">
           <textarea
             className="input resize-none"
             rows={2}
@@ -260,80 +246,93 @@ export function CheckinCard({
             onChange={(e) => setRascunho(e.target.value)}
           />
           <div className="flex justify-end gap-2">
-            <button
-              className="btn-ghost"
-              disabled={salvandoLegenda}
-              onClick={() => setRascunho(null)}
-            >
+            <BotaoSuave tamanho="p" disabled={salvandoLegenda} onClick={() => setRascunho(null)}>
               Cancelar
-            </button>
-            <button
-              className="btn-primary"
+            </BotaoSuave>
+            <BotaoAcao
+              tamanho="p"
+              sombra={false}
               disabled={salvandoLegenda}
               onClick={() => void salvarLegenda()}
             >
               {salvandoLegenda ? 'Salvando…' : 'Salvar'}
-            </button>
+            </BotaoAcao>
           </div>
         </div>
       ) : (
-        legenda && <p className="px-4 pt-3 text-sm text-tinta-900">{legenda}</p>
+        legenda && (
+          <p className="break-words px-4 text-base leading-snug [text-wrap:pretty]">
+            {legenda}
+          </p>
+        )
       )}
 
-      <footer className="flex items-center gap-1.5 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 px-3">
         {REACTION_TYPES.map((tipo) => {
           const n = contagem(tipo)
           const minha = minhaReacao === tipo
           return (
             <button
               key={tipo}
+              type="button"
               onClick={() => void reagir(tipo)}
               aria-pressed={minha}
-              // Sem `disabled`: o botão fica clicável e a cor muda na
-              // hora; é o `reagindo` lá em cima que descarta o toque
-              // extra, invisível para quem toca uma vez só.
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm transition active:scale-90 ${
-                minha
-                  ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
-                  : 'bg-preto/5 hover:bg-preto/10'
+              aria-label={`Reagir com ${tipo}`}
+              // Sem `disabled`: a cor muda na hora; é o `reagindo` lá em
+              // cima que descarta o toque extra.
+              className={`flex h-10 min-w-11 items-center justify-center gap-[5px] rounded-full border-[1.5px] px-2.5 text-sm font-extrabold text-ink transition-transform active:scale-90 ${
+                minha ? 'border-brasa-500 bg-brasa-500/20' : 'border-transparent bg-chip'
               }`}
             >
-              <span>{tipo}</span>
-              {n > 0 && <span className="text-xs font-bold">{n}</span>}
+              <span className="text-[17px] leading-none">{tipo}</span>
+              {n > 0 && n}
             </button>
           )
         })}
+        <div className="flex-1" />
         <button
+          type="button"
           onClick={() => setComentariosAbertos(true)}
-          className="ml-auto flex items-center gap-1.5 rounded-full bg-preto/5 px-3 py-1.5 text-sm hover:bg-preto/10"
+          aria-label="Comentários"
+          className="flex h-11 min-w-11 items-center justify-center gap-1 text-sm font-extrabold text-ink2"
         >
-          💬
-          <span className="text-xs font-bold">{item.comentarios}</span>
+          <Icone nome="comentario" traco={2} />
+          {item.comentarios > 0 && item.comentarios}
         </button>
         {meuCheckin && (
           <button
+            type="button"
             onClick={() => void favoritar()}
             aria-pressed={item.favorito}
+            aria-label={item.favorito ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
             title={
               item.favorito
-                ? 'Guardado no seu perfil — clique para tirar'
+                ? 'Guardado no seu perfil — toque para tirar'
                 : 'Guardar no seu perfil (não será arquivado)'
             }
-            aria-label={
-              item.favorito ? 'Tirar dos favoritos' : 'Guardar nos favoritos'
-            }
-            className={`rounded-full px-3 py-1.5 text-sm transition active:scale-90 ${
-              item.favorito
-                ? 'bg-brasa-500/20 ring-1 ring-brasa-400'
-                : 'bg-preto/5 hover:bg-preto/10'
+            className={`flex h-11 w-11 items-center justify-center ${
+              item.favorito ? 'text-or-t' : 'text-ink2'
             }`}
           >
-            {item.favorito ? '⭐' : '☆'}
+            <Icone nome="favorito" traco={2} preenchido={item.favorito} />
           </button>
         )}
-      </footer>
+      </div>
 
-
+      <MenuAcoes aberto={menuAberto} onFechar={() => setMenuAberto(false)} acoes={acoes} />
+      <Confirmar
+        aberto={confirmandoExclusao}
+        titulo="Excluir esta publicação?"
+        texto={
+          meuCheckin
+            ? 'A foto sai do feed, e a presença que ela marcou sai junto. Não dá para desfazer.'
+            : `A foto de ${item.autor.nome.split(' ')[0]} sai do feed para todo mundo.`
+        }
+        ok="Excluir"
+        ocupado={excluindo}
+        onOk={() => void excluir()}
+        onVoltar={() => setConfirmandoExclusao(false)}
+      />
       {comentariosAbertos && (
         <CommentsSheet
           checkinId={item.id}

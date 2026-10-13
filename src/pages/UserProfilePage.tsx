@@ -1,26 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
-import {
-  BadgeGrid,
-  CargoChips,
-  FavoritosGrid,
-  StatsRow,
-  TurmaChips,
-} from '../components/PerfilResumo'
+import { BadgeGrid, ChipsPerfil, FavoritosGrid, StatsRow } from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
+import { BotaoIcone, BotaoSuave, useVoltar } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { diaDaNoite } from '../lib/dates'
+import { nivelDupla } from '../lib/forrodex'
+import { useEstiloNivel } from '../lib/metais'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
-import type {
-  Badge,
-  CheckinFavorito,
-  ParceiroPossivel,
-  Profile,
-} from '../lib/types'
+import type { Badge, CheckinFavorito, ParceiroPossivel, Profile } from '../lib/types'
 
 /**
  * "Dancei com" no perfil de alguém.
@@ -69,42 +60,77 @@ function DanceiCom({ perfilId, nome }: { perfilId: string; nome: string }) {
   }
 
   return (
-    <div className="w-full space-y-1.5 text-center">
+    <div className="flex flex-col gap-1.5 px-4 pt-3.5">
       <button
-        className={`w-full rounded-xl py-2.5 text-sm font-bold transition disabled:opacity-60 ${
-          estado.marcado
-            ? 'bg-verde-700 text-white'
-            : 'bg-preto/5 text-tinta-700'
-        }`}
+        type="button"
         disabled={ocupado}
         onClick={() => void alternar()}
+        className={`h-[52px] w-full rounded-2xl border-2 border-preto text-base font-extrabold text-preto disabled:opacity-60 ${
+          estado.marcado ? 'bg-verde-500' : 'bg-brasa-500 shadow-[0_4px_0_#000507]'
+        }`}
       >
-        {estado.marcado ? '✓ Dupla marcada' : `Marcar dupla com ${nome} 💃`}
+        {estado.marcado ? 'Dupla marcada ✓' : `Dancei com ${nome} hoje`}
       </button>
       {estado.marcado && (
-        <p className="text-xs text-tinta-500">
-          {estado.confirmada
-            ? 'Confirmado pelos dois 🤝'
-            : `Esperando ${nome} confirmar`}
+        <p className="text-center text-[13px] text-ink3">
+          {estado.confirmada ? 'Confirmada pelos dois' : `Esperando ${nome} confirmar`}
         </p>
       )}
     </div>
   )
 }
 
+/** "Vocês dois": o nível da dupla no semestre, na moldura de metal dele. */
+function VocesDois({ noites }: { noites: number | null }) {
+  const estilo = useEstiloNivel()
+  const p = noites !== null ? nivelDupla(noites) : null
+  const e = estilo(p?.atual.nivel ?? 1)
+  return (
+    <div
+      className="mx-4 mt-3.5 rounded-[20px]"
+      style={{
+        padding: e.moldura && p ? 3 : 1,
+        background: e.moldura && p ? e.moldura : 'var(--line)',
+      }}
+    >
+      <div
+        className="flex items-center gap-3 rounded-[17px] px-4 py-3.5"
+        style={{ background: p ? e.miolo : 'var(--sf)' }}
+      >
+        <span className="shrink-0 text-[13px] font-extrabold uppercase tracking-[.06em] text-bl-t">
+          Vocês dois
+        </span>
+        <span
+          className="flex-1 text-right text-[15px] font-extrabold"
+          style={{ color: p ? e.texto : 'var(--ink3)' }}
+        >
+          {noites === null
+            ? '…'
+            : p
+              ? `${p.atual.nome} · ×${noites} ${noites === 1 ? 'noite' : 'noites'}`
+              : 'Ainda não dançaram neste semestre'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 /**
- * Perfil público de outro aluno: mesmas informações do próprio perfil,
- * porém sem telefone e sem nenhuma opção de edição.
+ * Perfil público de outra pessoa: as mesmas informações do próprio
+ * perfil, sem telefone e sem nenhuma opção de edição — e com o que
+ * importa entre as duas pessoas (o nível da dupla e o "dancei com").
  */
 export function UserProfilePage() {
   const { id } = useParams<{ id: string }>()
-  const { api, userId } = useAuth()
+  const { api, userId, profile: eu } = useAuth()
   const navigate = useNavigate()
+  const voltar = useVoltar('/')
 
   const [perfil, setPerfil] = useState<Profile | null | undefined>()
   const [stats, setStats] = useState<PerfilStats | null>(null)
   const [badges, setBadges] = useState<Badge[] | null>(null)
   const [favoritos, setFavoritos] = useState<CheckinFavorito[] | null>(null)
+  const [noitesJuntos, setNoitesJuntos] = useState<number | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
@@ -114,6 +140,7 @@ export function UserProfilePage() {
     setStats(null)
     setBadges(null)
     setFavoritos(null)
+    setNoitesJuntos(null)
     setErro(null)
     void (async () => {
       try {
@@ -138,53 +165,68 @@ export function UserProfilePage() {
         setErro((e as Error).message || 'Erro desconhecido')
       }
     })()
+    // Noites juntos neste semestre (mesmo corte da Forródex)
+    if (userId) {
+      void api
+        .inicioSemestreAtual()
+        .catch(() => null)
+        .then((desde) => api.parceirosDe(userId, desde ?? eu?.criado_em ?? undefined))
+        .then((ps) => {
+          if (!cancelado) setNoitesJuntos(ps.find((x) => x.user_id === id)?.noites ?? 0)
+        })
+        .catch(() => !cancelado && setNoitesJuntos(0))
+    }
     return () => {
       cancelado = true
     }
-  }, [api, id])
+  }, [api, id, userId, eu?.criado_em])
 
   // O próprio perfil tem a versão completa (com dados e configurações)
   if (id && id === userId) return <Navigate to="/perfil" replace />
 
   if (erro) {
-    return <ErrorState erro={erro} onRetry={() => navigate(0)} />
+    return (
+      <div className="px-4 pt-14">
+        <ErrorState erro={erro} onRetry={() => navigate(0)} />
+      </div>
+    )
   }
   if (perfil === undefined) return <Spinner texto="Carregando perfil…" />
   if (perfil === null) {
     return (
-      <EmptyState emoji="🤔" titulo="Perfil não encontrado">
-        <button className="btn-ghost" onClick={() => navigate('/')}>
-          Voltar ao feed
-        </button>
-      </EmptyState>
+      <div className="flex flex-col items-center gap-4 px-6 pt-24 text-center">
+        <p className="text-lg font-extrabold">Perfil não encontrado</p>
+        <BotaoSuave onClick={voltar}>Voltar</BotaoSuave>
+      </div>
     )
   }
 
   const primeiroNome = perfil.nome.split(/\s+/)[0]
 
   return (
-    <div className="space-y-4">
-      <button
-        className="text-sm font-bold text-tinta-600"
-        onClick={() => navigate(-1)}
-      >
-        ← Voltar
-      </button>
-
-      <div className="card flex flex-col items-center gap-3 p-6">
-        <Avatar nome={perfil.nome} url={perfil.avatar_url} tamanho={88} />
-        <div className="text-center">
-          <h1 className="text-xl font-extrabold">{perfil.nome}</h1>
-          <CargoChips cargos={perfil.cargos} />
-          <TurmaChips turmas={perfil.turmas} />
-        </div>
-        <StatsRow stats={stats} />
-        <DanceiCom perfilId={perfil.id} nome={primeiroNome} />
+    <div className="anima-tela">
+      <div className="px-3 pt-1">
+        <BotaoIcone icone="voltar" rotulo="Voltar" onClick={voltar} />
       </div>
+      <div className="flex flex-col items-center gap-2.5 px-5 pb-[18px] text-center">
+        <span className="rounded-full shadow-[0_5px_0_#000507]">
+          <Avatar nome={perfil.nome} url={perfil.avatar_url} tamanho={96} />
+        </span>
+        <h1 className="m-0 mt-1.5 text-[30px] font-extrabold leading-none tracking-[-.02em]">
+          {perfil.nome}
+        </h1>
+        <ChipsPerfil cargos={perfil.cargos} turmas={perfil.turmas} />
+      </div>
+
+      <div className="px-4">
+        <StatsRow stats={stats} semDesafios />
+      </div>
+      <VocesDois noites={noitesJuntos} />
+      <DanceiCom perfilId={perfil.id} nome={primeiroNome} />
 
       <BadgeGrid
         badges={badges}
-        vazio={`${primeiroNome} ainda não tem distintivos. Chama pra dançar! 💃`}
+        vazio={`${primeiroNome} ainda não tem distintivos. Chama pra dançar!`}
       />
 
       <FavoritosGrid

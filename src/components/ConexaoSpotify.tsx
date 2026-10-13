@@ -10,6 +10,8 @@ import {
   urlAutorizacaoSpotify,
 } from '../lib/dj'
 import type { ConexaoDJ } from '../lib/types'
+import { Icone } from './Icone'
+import { BotaoAcao, BotaoSuave } from './ui'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 
 /**
@@ -42,7 +44,7 @@ export function ConexaoSpotify() {
       try {
         await api.conectarSpotify('demo', '')
         setConexao(await api.minhaConexaoDJ())
-        toast('Spotify conectado (demonstração) 🎧')
+        toast('Spotify conectado (demonstração)')
       } catch (e) {
         toast((e as Error).message, 'erro')
       } finally {
@@ -72,53 +74,51 @@ export function ConexaoSpotify() {
   }
 
   return (
-    <div className="card space-y-3 p-4">
-      <div>
-        <p className="text-sm font-bold">Spotify · Modo DJ 🎧</p>
-        <p className="text-xs text-tinta-500">
-          Para tocar os pedidos dos alunos no Espaço Livre, pelo seu Spotify
-          Premium.
-        </p>
+    <div className="flex flex-col gap-3 rounded-[22px] border border-linha bg-sf p-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-preto text-azul-300">
+          <Icone nome="fone" tamanho={22} traco={2.3} />
+        </span>
+        <div className="flex flex-col gap-0.5">
+          <p className="text-base font-extrabold">Spotify · Modo DJ</p>
+          <p className="text-[13px] leading-snug text-ink3">
+            Para tocar os pedidos no Espaço Livre, pelo seu Spotify Premium.
+          </p>
+        </div>
       </div>
       {conexao === null ? (
-        <p className="text-xs text-tinta-500">Carregando…</p>
+        <p className="text-sm text-ink3">Carregando…</p>
       ) : conexao.conectado ? (
         <>
-          <p className="text-sm">
-            Conectado como <strong>{conexao.spotify_nome ?? 'sua conta'}</strong>
+          <p className="text-[15px]">
+            Conectado como <b>{conexao.spotify_nome ?? 'sua conta'}</b>
           </p>
           {conexao.plano !== null && conexao.plano !== 'premium' && (
-            <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800">
+            <p className="rounded-xl border-[1.5px] border-brasa-500 px-3 py-2 text-sm">
               O Modo DJ precisa de Spotify Premium.
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            <Link to="/dj" className="btn-primary">
+            <Link
+              to="/dj"
+              className="flex h-11 items-center rounded-[14px] border-2 border-preto bg-azul-500 px-4 text-[15px] font-extrabold text-preto"
+            >
               Abrir Modo DJ
             </Link>
-            <button
-              className="btn-ghost"
-              disabled={ocupado}
-              onClick={() => void desconectar()}
-            >
+            <BotaoSuave tamanho="p" disabled={ocupado} onClick={() => void desconectar()}>
               Desconectar
-            </button>
+            </BotaoSuave>
           </div>
         </>
       ) : (
         <>
-          <p className="text-xs text-tinta-600">
-            Sua conta Spotify precisa estar liberada pela organização no painel
-            do Spotify. Quem conecta ganha o cargo de 💿 DJ — são só{' '}
-            {LIMITE_DJS} vagas.
+          <p className="text-sm leading-snug text-ink2">
+            Sua conta Spotify precisa estar liberada pela organização no painel do
+            Spotify. Quem conecta ganha o cargo de DJ — são só {LIMITE_DJS} vagas.
           </p>
-          <button
-            className="btn-primary w-full"
-            disabled={ocupado}
-            onClick={() => void conectar()}
-          >
+          <BotaoAcao tamanho="m" sombra={false} bloco disabled={ocupado} onClick={() => void conectar()}>
             Conectar meu Spotify
-          </button>
+          </BotaoAcao>
         </>
       )}
     </div>

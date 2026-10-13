@@ -36,19 +36,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={show}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex flex-col items-center gap-2 px-4">
+      <div
+        className="pointer-events-none fixed inset-x-0 z-[80] mx-auto flex max-w-md flex-col items-stretch gap-2 px-4"
+        style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
             role="status"
             // Fundo sólido, não translúcido: o aviso passa por cima de
             // fotos e listas, e com transparência o conteúdo de trás
-            // atravessava o texto. Escuro sobre o app claro para
-            // destacar sem precisar de cor de alerta.
-            className={`max-w-sm rounded-xl px-4 py-2.5 text-sm font-bold shadow-lg shadow-preto/20 ${
+            // atravessava o texto. Preto com contorno claro destaca nos
+            // dois temas; erro vai no laranja da marca, texto preto.
+            className={`anima-tela rounded-[18px] border-2 px-4 py-3.5 text-[15px] font-bold leading-snug shadow-[0_10px_30px_rgba(0,5,7,.35)] ${
               t.tipo === 'erro'
-                ? 'bg-red-600 text-white'
-                : 'bg-marinho-500 text-white'
+                ? 'border-preto bg-brasa-500 text-preto'
+                : 'border-branco bg-preto text-branco'
             }`}
           >
             {t.texto}

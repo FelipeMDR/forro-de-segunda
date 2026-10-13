@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { estadoDaPermissao } from '../lib/permissoes'
 import { DicaInstalarParaPermissao } from './DicaInstalarParaPermissao'
+import { Icone } from './Icone'
+import { BotaoAcao } from './ui'
 
 /**
  * A câmera já foi aberta com sucesso nesta sessão?
@@ -106,6 +108,7 @@ export function CameraCapture({
   topo,
   permitirFotoTeste = false,
   onResolvida,
+  abrirDireto = false,
 }: {
   onCapture: (foto: Blob) => void
   /** Sair da câmera sem tirar foto. */
@@ -123,15 +126,17 @@ export function CameraCapture({
    * respondido no chute só para sumir da tela.
    */
   onResolvida?: () => void
+  /**
+   * A pessoa acabou de tocar em "Abrir câmera" (no cartaz do check-in):
+   * o toque já aconteceu, então não há por que pedir outro.
+   */
+  abrirDireto?: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [facing, setFacing] = useState<'environment' | 'user'>('environment')
   const [erro, setErro] = useState<string | null>(null)
   const [pronta, setPronta] = useState(false)
-  // Dimensões do quadro que a câmera está entregando. Só dá para saber
-  // depois que o vídeo carrega, e mudam ao virar a câmera.
-  const [quadro, setQuadro] = useState<{ w: number; h: number } | null>(null)
 
   // `useRef` e não dependência: o callback muda de identidade a cada
   // render de quem chama, e como dependência ele reabriria a câmera —
@@ -143,7 +148,6 @@ export function CameraCapture({
   const abrirCamera = useCallback(async (modo: 'environment' | 'user') => {
     setErro(null)
     setPronta(false)
-    setQuadro(null)
     streamRef.current?.getTracks().forEach((t) => t.stop())
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -213,13 +217,16 @@ export function CameraCapture({
       // em `desconhecido`: aí esperamos o toque, que é justamente onde
       // o pedido repetido mais incomoda.
       const jaPode =
-        abriuNestaSessao || (await estadoDaPermissao('camera')) === 'liberada'
+        abrirDireto ||
+        abriuNestaSessao ||
+        (await estadoDaPermissao('camera')) === 'liberada'
       if (cancelado) return
       setAguardandoToque(!jaPode)
     })()
     return () => {
       cancelado = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Abre (e reabre ao virar a câmera) só depois de liberado o caminho.
@@ -287,33 +294,35 @@ export function CameraCapture({
     if (blob) onCapture(blob)
   }
 
+  const [flash, setFlash] = useState(false)
+  const disparar = () => {
+    setFlash(true)
+    setTimeout(() => setFlash(false), 260)
+    void capturar()
+  }
+
   const botaoFechar = (
     <button
+      type="button"
       onClick={onFechar}
       aria-label="Fechar câmera"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-preto/5 text-lg text-tinta-700 transition active:scale-90"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-branco/12 text-branco transition active:scale-90"
     >
-      ✕
+      <Icone nome="fechar" tamanho={20} traco={2.4} />
     </button>
   )
 
-  /** Faixa de cima: sair da câmera, e o aviso centrado na tela. */
+  /** Faixa de cima: sair da câmera e, no meio, o aviso do check-in. */
   const faixaDeCima = (
     <div
-      className="relative shrink-0 px-4 pb-3"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
+      className="relative z-10 flex shrink-0 items-center justify-between gap-2 px-3.5 pb-3"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
     >
-      <div
-        className="absolute left-4"
-        style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
-      >
-        {botaoFechar}
+      {botaoFechar}
+      <div className="flex min-w-0 flex-1 justify-center">
+        {topo ?? <span className="text-base font-extrabold">Check-in</span>}
       </div>
-      {topo && (
-        <div className="mx-auto flex max-w-[calc(100%-6rem)] flex-col items-center gap-2 text-center">
-          {topo}
-        </div>
-      )}
+      <span className="w-11 shrink-0" aria-hidden />
     </div>
   )
 
@@ -322,27 +331,30 @@ export function CameraCapture({
   if (!erro && aguardandoToque) {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-fundo"
+        className="fixed inset-0 z-50 flex flex-col bg-preto text-branco"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
       >
         {faixaDeCima}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <span className="text-5xl">📸</span>
-          <p className="text-sm text-tinta-600">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-branco/10">
+            <Icone nome="camera" tamanho={36} traco={2} />
+          </span>
+          <p className="text-[15px] text-branco/75">
             Toque para abrir a câmera e registrar sua presença.
           </p>
-          <button
-            className="btn-primary px-6 py-3 text-base"
-            onClick={() => setAguardandoToque(false)}
-          >
+          <BotaoAcao tamanho="m" sombra={false} onClick={() => setAguardandoToque(false)}>
             Abrir a câmera
-          </button>
-          <div className="w-full max-w-sm text-left">
+          </BotaoAcao>
+          <div className="w-full max-w-sm" data-theme="dark">
             <DicaInstalarParaPermissao />
           </div>
           {permitirFotoTeste && (
-            <button className="btn-ghost" onClick={() => void gerarFotoTeste()}>
-              Usar foto de teste (demo) 📸
+            <button
+              type="button"
+              className="text-sm font-bold text-branco/70 underline underline-offset-4"
+              onClick={() => void gerarFotoTeste()}
+            >
+              Usar foto de teste (demo)
             </button>
           )}
         </div>
@@ -353,15 +365,18 @@ export function CameraCapture({
   if (erro) {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-fundo"
+        className="fixed inset-0 z-50 flex flex-col bg-preto text-branco"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
       >
         {faixaDeCima}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <span className="text-5xl">📷</span>
-          <p className="text-sm text-tinta-600">{erro}</p>
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-branco/10">
+            <Icone nome="camera" tamanho={36} traco={2} />
+          </span>
+          <p className="text-[15px] leading-snug text-branco/75">{erro}</p>
           <button
-            className="btn-ghost"
+            type="button"
+            className="h-12 rounded-2xl border-[1.5px] border-branco/25 px-5 text-[15px] font-bold"
             onClick={() => void abrirCamera(facing)}
           >
             Tentar de novo
@@ -369,103 +384,97 @@ export function CameraCapture({
           {/* Quem chegou aqui é exatamente quem se cansou de liberar a
               câmera toda vez — é o melhor momento para contar que
               instalar resolve. Some sozinho para quem já instalou. */}
-          <div className="w-full max-w-sm text-left">
+          <div className="w-full max-w-sm" data-theme="dark">
             <DicaInstalarParaPermissao />
           </div>
           {permitirFotoTeste && (
-            <button className="btn-primary" onClick={() => void gerarFotoTeste()}>
-              Usar foto de teste (demo) 📸
-            </button>
+            <BotaoAcao tamanho="m" sombra={false} onClick={() => void gerarFotoTeste()}>
+              Usar foto de teste (demo)
+            </BotaoAcao>
           )}
         </div>
       </div>
     )
   }
 
-  // A moldura sai da MESMA conta da captura, em coordenadas do quadro. O
-  // SVG com `meet` encolhe igual ao `object-contain` do vídeo, então ela
-  // cai exatamente sobre a imagem sem ninguém medir pixel de tela.
-  const recorte = quadro
-    ? recorteCentral(quadro.w, quadro.h, ASPECTO_FOTO)
-    : null
-
+  // O visor tem o formato da publicação (4:5) e o vídeo o preenche com
+  // `object-cover`, centrado. É exatamente o recorte de `recorteCentral`
+  // — o que aparece no quadro é o que vai para o feed, sem zoom além do
+  // corte que a foto vai ter de qualquer jeito.
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-fundo">
+    <div className="fixed inset-0 z-50 flex flex-col bg-preto text-branco">
       {faixaDeCima}
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          onLoadedMetadata={(e) =>
-            setQuadro({
-              w: e.currentTarget.videoWidth,
-              h: e.currentTarget.videoHeight,
-            })
-          }
-          className={`h-full w-full object-contain ${
-            facing === 'user' ? '-scale-x-100' : ''
-          }`}
-        />
-
-        {quadro && recorte && (
-          <svg
-            viewBox={`0 0 ${quadro.w} ${quadro.h}`}
-            preserveAspectRatio="xMidYMid meet"
-            className="pointer-events-none absolute inset-0 h-full w-full"
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+        <div
+          className="relative aspect-[4/5] overflow-hidden bg-[#141B1F]"
+          style={{ width: 'min(100%, calc((100dvh - 290px) * 0.8))' }}
+        >
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className={`absolute inset-0 h-full w-full object-cover ${
+              facing === 'user' ? '-scale-x-100' : ''
+            }`}
+          />
+          {/* Regra dos terços e cantos do quadro */}
+          <div
             aria-hidden
-          >
-            {/* Escurece tudo menos o recorte (regra par-ímpar) */}
-            <path
-              fillRule="evenodd"
-              fill="rgba(0,0,0,0.45)"
-              d={`M0 0 H${quadro.w} V${quadro.h} H0 Z M${recorte.sx} ${recorte.sy} H${
-                recorte.sx + recorte.sw
-              } V${recorte.sy + recorte.sh} H${recorte.sx} Z`}
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(245,244,242,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(245,244,242,.12) 1px,transparent 1px)',
+              backgroundSize: '33.333% 33.333%',
+            }}
+          />
+          <span aria-hidden className="absolute left-2.5 top-2.5 h-[26px] w-[26px] rounded-tl-lg border-l-[3px] border-t-[3px] border-branco" />
+          <span aria-hidden className="absolute right-2.5 top-2.5 h-[26px] w-[26px] rounded-tr-lg border-r-[3px] border-t-[3px] border-branco" />
+          <span aria-hidden className="absolute bottom-2.5 left-2.5 h-[26px] w-[26px] rounded-bl-lg border-b-[3px] border-l-[3px] border-branco" />
+          <span aria-hidden className="absolute bottom-2.5 right-2.5 h-[26px] w-[26px] rounded-br-lg border-b-[3px] border-r-[3px] border-branco" />
+          {!pronta && (
+            <div className="absolute inset-0 flex items-center justify-center text-branco/50">
+              <span className="animate-pulse">
+                <Icone nome="camera" tamanho={36} />
+              </span>
+            </div>
+          )}
+          {flash && (
+            <div
+              className="absolute inset-0 bg-branco"
+              style={{ animation: 'flash-some .25s ease forwards' }}
             />
-            <rect
-              x={recorte.sx}
-              y={recorte.sy}
-              width={recorte.sw}
-              height={recorte.sh}
-              fill="none"
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth={Math.max(2, quadro.w / 400)}
-            />
-          </svg>
-        )}
-
-        {!pronta && (
-          <div className="absolute inset-0 flex items-center justify-center text-tinta-400">
-            <span className="animate-pulse text-3xl">📷</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div
-        className="flex shrink-0 items-center justify-center gap-10 px-6 pt-5"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+        className="flex shrink-0 flex-col items-center gap-4 pt-4"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
-        <button
-          onClick={() =>
-            setFacing((f) => (f === 'user' ? 'environment' : 'user'))
-          }
-          aria-label="Virar câmera"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-preto/5 text-xl transition active:scale-90"
-        >
-          🔄
-        </button>
-        <button
-          onClick={() => void capturar()}
-          disabled={!pronta}
-          aria-label="Tirar foto"
-          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-preto/15 transition active:scale-90 disabled:opacity-40"
-        >
-          <span className="block h-14 w-14 rounded-full bg-gradient-to-br from-brasa-500 to-brasa-700" />
-        </button>
-        {/* Contrapeso do botão de virar, para o disparo ficar centrado */}
-        <span className="h-12 w-12" aria-hidden />
+        <span className="text-[13px] font-semibold text-branco/70">
+          Tudo dentro do quadro entra na publicação
+        </span>
+        <div className="flex w-full items-center justify-around">
+          <span className="h-[52px] w-[52px]" aria-hidden />
+          <button
+            type="button"
+            onClick={disparar}
+            disabled={!pronta}
+            aria-label="Tirar foto"
+            className="flex h-[84px] w-[84px] rounded-full border-[5px] border-branco p-[5px] transition active:scale-[.94] disabled:opacity-40"
+          >
+            <span className="flex-1 rounded-full bg-brasa-500" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}
+            aria-label="Alternar câmera"
+            className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-branco/14 transition active:scale-90"
+          >
+            <Icone nome="girar" tamanho={24} traco={2} />
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -63,12 +63,12 @@ function Passo({
 }) {
   return (
     <li className="flex items-center gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brasa-600 text-sm font-extrabold text-white">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-preto bg-brasa-500 text-sm font-extrabold text-preto">
         {numero}
       </span>
       <span className="flex-1 text-sm">{children}</span>
       {icone && (
-        <span className="shrink-0 rounded-lg bg-preto/5 p-1.5 text-azul-600">
+        <span className="shrink-0 rounded-lg bg-chip p-1.5 text-bl-t">
           {icone}
         </span>
       )}
@@ -90,7 +90,7 @@ function GuiaIOS({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-preto/60 sm:items-center"
       onClick={onFechar}
       role="dialog"
       aria-label="Como instalar no iPhone"
@@ -119,7 +119,7 @@ function GuiaIOS({
                 Lá no Safari, toque em <strong>Instalar</strong> de novo
               </Passo>
             </ol>
-            <p className="mt-4 rounded-xl bg-azul-500/10 px-3 py-2 text-xs text-azul-700">
+            <p className="mt-4 rounded-xl bg-azul-500/10 px-3 py-2 text-xs text-bl-t">
               Chegou aqui pelo link do Instagram? É por isso — o navegador
               do Instagram não tem essa opção.
             </p>
@@ -150,7 +150,7 @@ function GuiaIOS({
               barra, sem os <strong>···</strong> — nesse caso, pule o
               passo 1.
             </p>
-            <p className="mt-4 rounded-xl bg-verde-500/15 px-3 py-2 text-xs text-verde-800">
+            <p className="mt-4 rounded-xl bg-verde-500/15 px-3 py-2 text-xs text-gr-t">
               Pronto! O Forró de Segunda vira um ícone na sua tela, junto
               com os outros apps.
             </p>

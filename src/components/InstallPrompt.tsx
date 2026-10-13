@@ -24,29 +24,32 @@ export function InstallPrompt() {
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-brasa-500/30 bg-brasa-500/10 px-4 py-3">
-      <span className="text-2xl">📲</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-brasa-700">
+    <div className="flex flex-col gap-3 rounded-[22px] border border-linha bg-sf p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-base font-extrabold">
           Deixe o Forró de Segunda na tela inicial
         </p>
         {/* A permissão vem primeiro: é a queixa real de quem usa pelo
             navegador, onde o celular esquece o "permitir" a cada vez.
             Ícone e lembretes são bônus — não é por eles que alguém
             para o que está fazendo para instalar um app. */}
-        <p className="text-xs text-tinta-600">
+        <p className="text-sm leading-snug text-ink3">
           Assim o celular para de pedir câmera e localização toda vez — e
           o app abre direto, com ícone próprio.
         </p>
-        <div className="mt-2 flex gap-2">
-          <BotaoInstalar
-            className="btn-primary px-3 py-1.5 text-xs"
-            rotulo="Instalar"
-          />
-          <button className="btn-ghost px-3 py-1.5 text-xs" onClick={dispensar}>
-            Agora não
-          </button>
-        </div>
+      </div>
+      <div className="flex gap-2">
+        <BotaoInstalar
+          className="flex h-11 flex-1 items-center justify-center rounded-[14px] border-2 border-preto bg-brasa-500 px-3 text-[15px] font-extrabold text-preto"
+          rotulo="Instalar"
+        />
+        <button
+          type="button"
+          className="h-11 rounded-[14px] border-[1.5px] border-linha bg-sf px-4 text-[15px] font-bold text-ink"
+          onClick={dispensar}
+        >
+          Agora não
+        </button>
       </div>
     </div>
   )

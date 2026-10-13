@@ -162,13 +162,13 @@ export function ChallengeForm({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-preto/60 sm:items-center"
       onClick={onClose}
     >
       <form
         onSubmit={submeter}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl border-t border-preto/10 bg-papel p-5 sm:rounded-3xl sm:border"
+        className="max-h-[92dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl border-t border-linha bg-papel p-5 sm:rounded-3xl sm:border"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
         <h2 className="text-lg font-extrabold">
@@ -238,7 +238,7 @@ export function ChallengeForm({
         {/* Quais disputas rodam neste desafio. Duas ou mais convivem no
             mesmo período, com a mesma inscrição — o aluno compete em
             todas sem fazer nada a mais. */}
-        <div className="space-y-2 rounded-2xl bg-fundo p-3">
+        <div className="space-y-2 rounded-2xl bg-chip p-3">
           <span className="label">Disputas deste desafio</span>
           {MODALIDADES.map((m) => {
             const marcada = form.modalidades.includes(m.id)
@@ -287,19 +287,19 @@ export function ChallengeForm({
               {form.janelas.map((j) => (
                 <div
                   key={j.dia_semana}
-                  className="flex items-center justify-between rounded-lg bg-fundo px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg bg-chip px-3 py-2 text-sm"
                 >
                   <span className="font-bold">{DIAS_ABREV[j.dia_semana]}</span>
                   <span className="text-tinta-600">
                     {j.hora_inicio}–{j.hora_fim}
                     {j.hora_fim < j.hora_inicio && (
-                      <span className="ml-1 text-azul-600">🌙 +1 dia</span>
+                      <span className="ml-1 text-bl-t">🌙 +1 dia</span>
                     )}
                   </span>
                   <button
                     type="button"
                     onClick={() => removerJanela(j.dia_semana)}
-                    className="text-tinta-500 hover:text-red-600"
+                    className="text-tinta-500 hover:text-or-t"
                     aria-label={`Remover ${DIAS_ABREV[j.dia_semana]}`}
                   >
                     ✕
@@ -311,7 +311,7 @@ export function ChallengeForm({
         </div>
 
         {/* Montagem: escolhe dias + horário e aplica */}
-        <div className="space-y-3 rounded-xl bg-fundo p-3">
+        <div className="space-y-3 rounded-xl bg-chip p-3">
           <span className="label">
             Marque os dias e defina o horário pra eles
           </span>
@@ -324,8 +324,8 @@ export function ChallengeForm({
                 aria-pressed={diasEscolhidos.includes(dia)}
                 className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
                   diasEscolhidos.includes(dia)
-                    ? 'bg-gradient-to-r from-brasa-600 to-brasa-700 text-white'
-                    : 'bg-preto/5 text-tinta-600'
+                    ? 'border-2 border-preto bg-brasa-500 text-preto'
+                    : 'bg-chip text-tinta-600'
                 }`}
               >
                 {abrev}
@@ -359,7 +359,7 @@ export function ChallengeForm({
             </div>
           </div>
           {horaFim < horaInicio && (
-            <p className="text-xs text-azul-600">
+            <p className="text-xs text-bl-t">
               🌙 Vira a noite: abre às {horaInicio} e fecha às {horaFim} da
               madrugada seguinte. Mais de um check-in na mesma janela ainda
               vale só 1 ponto.
@@ -378,7 +378,7 @@ export function ChallengeForm({
           </p>
         </div>
 
-        <div className="space-y-3 rounded-2xl bg-fundo p-4">
+        <div className="space-y-3 rounded-2xl bg-chip p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-bold">🎟️ Entrada só pela organização</p>
@@ -400,7 +400,7 @@ export function ChallengeForm({
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl bg-fundo p-4">
+        <div className="space-y-3 rounded-2xl bg-chip p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-bold">📍 Exigir estar no local</p>
@@ -445,7 +445,7 @@ export function ChallengeForm({
               </button>
 
               {form.local.lat === 0 && form.local.lng === 0 ? (
-                <p className="text-xs text-amber-700">
+                <p className="text-xs text-or-t">
                   Vá até o local e toque no botão acima. Sem isso o desafio
                   não pode ser salvo com a trava ligada.
                 </p>
