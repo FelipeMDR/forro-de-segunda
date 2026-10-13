@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConexaoSpotify } from '../components/ConexaoSpotify'
 import { Icone } from '../components/Icone'
@@ -67,6 +67,20 @@ export function DJPage() {
   useSessaoDJAoVivo(api, carregar)
   useAtualizacaoPeriodica(carregar, 120_000)
 
+  // A busca periódica roda ao montar, quando `pode` ainda é null e
+  // `carregar` não faz nada: sem isto, a primeira carga só viria em 2 min
+  const [falhou, setFalhou] = useState(false)
+  const primeiraCarga = useCallback(() => {
+    setFalhou(false)
+    carregar().catch((e) => {
+      console.error('[dj]', e)
+      setFalhou(true)
+    })
+  }, [carregar])
+  useEffect(() => {
+    if (pode) primeiraCarga()
+  }, [pode, primeiraCarga])
+
   const ligar = async (assumir: boolean) => {
     setOcupado(true)
     try {
@@ -132,6 +146,19 @@ export function DJPage() {
             Música da noite.
           </span>
           <BotaoSuave onClick={() => navigate('/musica')}>Música da noite</BotaoSuave>
+        </div>
+      </div>
+    )
+  }
+  if (conexao === null && falhou) {
+    return (
+      <div className="anima-tela">
+        <Cabecalho titulo="Modo DJ" />
+        <div className="mx-4 flex flex-col items-start gap-3 rounded-[20px] border border-linha bg-sf p-5">
+          <span className="text-[15px] leading-relaxed text-ink2">
+            Não deu para carregar o Modo DJ. Confira a internet e tente de novo.
+          </span>
+          <BotaoSuave onClick={primeiraCarga}>Tentar de novo</BotaoSuave>
         </div>
       </div>
     )
