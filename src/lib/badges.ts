@@ -1,4 +1,4 @@
-import { diasDistintos } from './dates'
+import { diasDistintos, toISODate } from './dates'
 import { emojiCargo } from './types'
 import type { Badge, TurmaMembro } from './types'
 
@@ -48,6 +48,23 @@ function progressoAte(
     meta: proximo[0] - base,
     rotulo: `faltam ${proximo[0] - valor} para ${proximo[1]} ${proximo[0]}`,
   }
+}
+
+/** Todos os níveis de um marco, para a trilha do detalhe. */
+function trilhaDe(marcos: Marco[], valor: number, unidade: string): Badge['trilha'] {
+  return {
+    marcos: marcos.map(([minimo, emoji, titulo]) => ({ minimo, emoji, titulo })),
+    valor,
+    unidade,
+  }
+}
+
+/**
+ * Em que dia o marco caiu: o `minimo`-ésimo das datas em ordem. Sem
+ * datas suficientes (dados antigos, sem `primeira`), fica sem data.
+ */
+function diaDoMarco(datas: string[], minimo: number): string | undefined {
+  return [...datas].sort()[minimo - 1]
 }
 
 const MARCOS_PRESENCA: Marco[] = [
@@ -101,6 +118,11 @@ export function computeBadges(input: {
    * marcando gente que nem dançou com você.
    */
   parceiros?: number
+  /**
+   * Primeira noite com cada um desses parceiros ("AAAA-MM-DD") — é
+   * dela que sai a data em que cada marco de rodízio foi alcançado.
+   */
+  primeirasNoites?: string[]
   /** Pedidos de música que tocaram no Espaço Livre (migração 029). */
   musicasTocadas?: number
 }): Badge[] {
@@ -113,13 +135,19 @@ export function computeBadges(input: {
       emoji: emojiCargo(cargo),
       titulo: cargo,
       descricao: 'Cargo no Forró de Segunda',
+      tipo: 'Cargo',
+      regra: 'Dado pela organização a quem tem um papel no projeto. Aparece primeiro no perfil.',
     })
   }
 
   // 0.5 Distintivos personalizados — concedidos manualmente pela
   // organização, por qualquer motivo (não só vencer um desafio)
   for (const b of input.distintivosCustom ?? []) {
-    badges.push(b)
+    badges.push({
+      tipo: 'Distintivo especial',
+      regra: 'Concedido à mão pela organização — não sai de nenhuma conta automática.',
+      ...b,
+    })
   }
 
   // 1. Turma e função na dança (ex.: "Condutor(a) · Avançado")
@@ -135,6 +163,8 @@ export function computeBadges(input: {
       emoji,
       titulo: m.papel_danca ? `${m.papel_danca} ${m.turma}` : `Turma ${m.turma}`,
       descricao: 'Função e turma no semestre',
+      tipo: 'Turma',
+      regra: 'Vem da turma e da função do semestre. Muda junto quando a turma ou a função mudar.',
     })
   }
 
@@ -152,6 +182,14 @@ export function computeBadges(input: {
       // Texto neutro: o mesmo distintivo aparece no perfil dos outros
       descricao: `Presença em ${total} ${total === 1 ? 'dia' : 'dias'}`,
       progresso: progressoAte(MARCOS_PRESENCA, total),
+      tipo: 'Presença',
+      regra:
+        'Conta dias, não fotos: vários check-ins na mesma noite valem uma presença só, igual ao ranking. Só entra a noite em que o check-in valeu num desafio.',
+      alcancadoEm: diaDoMarco(
+        [...new Set(input.checkinDates.map((d) => toISODate(d)))],
+        minimo,
+      ),
+      trilha: trilhaDe(MARCOS_PRESENCA, total, total === 1 ? 'dia' : 'dias'),
     })
   }
 
@@ -168,6 +206,11 @@ export function computeBadges(input: {
         parceiros === 1 ? 'dupla confirmada' : 'duplas confirmadas'
       }`,
       progresso: progressoAte(MARCOS_RODIZIO, parceiros),
+      tipo: 'Rodízio',
+      regra:
+        'Conta pessoas diferentes, não danças. Só entra a dupla confirmada pelos dois lados.',
+      alcancadoEm: diaDoMarco(input.primeirasNoites ?? [], minimo),
+      trilha: trilhaDe(MARCOS_RODIZIO, parceiros, parceiros === 1 ? 'pessoa' : 'pessoas'),
     })
   }
 
@@ -184,6 +227,10 @@ export function computeBadges(input: {
         tocadas === 1 ? 'música tocada' : 'músicas tocadas'
       } no Espaço Livre`,
       progresso: progressoAte(MARCOS_DJ, tocadas),
+      tipo: 'Espaço Livre',
+      regra:
+        'Conta os pedidos que de fato tocaram no Espaço Livre, não os que ficaram na fila quando ela fechou.',
+      trilha: trilhaDe(MARCOS_DJ, tocadas, tocadas === 1 ? 'música' : 'músicas'),
     })
   }
 

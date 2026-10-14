@@ -1675,6 +1675,7 @@ export class DemoApi implements ForroApi {
         nome: v.nome,
         avatar_url: v.avatar,
         noites: v.dias.size,
+        primeira: [...v.dias].sort()[0],
       }))
       .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
   }
@@ -2175,7 +2176,7 @@ export class DemoApi implements ForroApi {
   async distintivosDe(userId: string): Promise<Badge[]> {
     return this.db.distintivosConcedidos
       .filter((c) => c.user_id === userId)
-      .map((c) => {
+      .map((c): Badge | null => {
         const def = this.db.distintivos.find((d) => d.id === c.distintivo_id)
         return def
           ? {
@@ -2183,6 +2184,7 @@ export class DemoApi implements ForroApi {
               emoji: def.emoji,
               titulo: def.titulo,
               descricao: def.descricao,
+              alcancadoEm: c.concedido_em,
             }
           : null
       })

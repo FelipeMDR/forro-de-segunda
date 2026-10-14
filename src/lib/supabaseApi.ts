@@ -271,7 +271,7 @@ function agruparParceiros(rows: LinhaParceiro[]): ParceiroDanca[] {
     p.dias.add(r.data)
   }
   return [...porPessoa.values()]
-    .map(({ dias, ...p }) => ({ ...p, noites: dias.size }))
+    .map(({ dias, ...p }) => ({ ...p, noites: dias.size, primeira: [...dias].sort()[0] }))
     .sort((a, b) => b.noites - a.noites || a.nome.localeCompare(b.nome))
 }
 
@@ -2706,16 +2706,20 @@ export class SupabaseApi implements ForroApi {
     const data = ok(
       await this.sb
         .from('distintivos_concedidos')
-        .select('distintivo:distintivos(id, emoji, titulo, descricao)')
+        .select('concedido_em, distintivo:distintivos(id, emoji, titulo, descricao)')
         .eq('user_id', userId),
-    ) as unknown as Array<{ distintivo: DistintivoBasico | null }>
+    ) as unknown as Array<{ concedido_em: string; distintivo: DistintivoBasico | null }>
     return data
-      .filter((r): r is { distintivo: DistintivoBasico } => r.distintivo !== null)
+      .filter(
+        (r): r is { concedido_em: string; distintivo: DistintivoBasico } =>
+          r.distintivo !== null,
+      )
       .map((r) => ({
         id: `custom-${r.distintivo.id}`,
         emoji: r.distintivo.emoji,
         titulo: r.distintivo.titulo,
         descricao: r.distintivo.descricao,
+        alcancadoEm: r.concedido_em,
       }))
   }
 

@@ -353,6 +353,8 @@ export interface ParceiroDanca {
   avatar_url: string | null
   /** Quantas noites vocês dançaram juntos. */
   noites: number
+  /** Primeira noite juntos ("AAAA-MM-DD") — data dos marcos de rodízio. */
+  primeira?: string
 }
 
 /** O desafio a que a Forródex está presa: período e quem participa. */
@@ -507,6 +509,22 @@ export interface Badge {
     meta: number
     /** "faltam 18 para 🥇 50" */
     rotulo: string
+  }
+  /** Categoria no detalhe do distintivo: "Presença", "Rodízio"… */
+  tipo?: string
+  /** Como o distintivo conta — o critério, explicado no detalhe. */
+  regra?: string
+  /**
+   * Quando foi alcançado (marcos) ou concedido (personalizados), em ISO
+   * ou "AAAA-MM-DD". Ausente quando não dá pra saber.
+   */
+  alcancadoEm?: string
+  /** Distintivos de marco: todos os níveis e o total de agora. */
+  trilha?: {
+    marcos: Array<{ minimo: number; emoji: string; titulo: string }>
+    valor: number
+    /** "dias", "pessoas", "músicas" */
+    unidade: string
   }
 }
 

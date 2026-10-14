@@ -81,6 +81,7 @@ export async function carregarPerfilStats(
       distintivosCustom,
       checkinDates: datas,
       parceiros: parceiros.length,
+      primeirasNoites: parceiros.flatMap((p) => (p.primeira ? [p.primeira] : [])),
       musicasTocadas,
     }),
   }
