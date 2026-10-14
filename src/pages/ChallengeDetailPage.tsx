@@ -311,9 +311,10 @@ export function ChallengeDetailPage() {
           )}
         </div>
 
-        {/* Logo depois das regras: lida a descrição, entrar ou sair é a
-            decisão da tela. Entrada restrita: quem entra é a organização,
-            então nem o botão de entrar nem o de sair fazem sentido para o aluno */}
+        {/* Logo depois das regras: lida a descrição, entrar é a decisão da
+            tela. Sair fica no fim da página, longe do caminho. Entrada
+            restrita: quem entra é a organização, então nem o botão de entrar
+            nem o de sair fazem sentido para o aluno */}
         {desafio.entrada_restrita ? (
           <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
             {desafio.sou_membro
@@ -321,18 +322,17 @@ export function ChallengeDetailPage() {
               : 'Este desafio é restrito — só a organização adiciona participantes. Acha que deveria estar aqui? Fale com a organização.'}
           </p>
         ) : (
-          fase !== 'encerrado' && (
+          fase !== 'encerrado' &&
+          !desafio.sou_membro && (
             <>
               <BotaoAcao
-                cor={desafio.sou_membro ? 'claro' : 'brasa'}
+                cor="brasa"
                 tamanho="g"
                 bloco
                 disabled={ocupado}
-                onClick={() =>
-                  desafio.sou_membro ? setConfirmandoSaida(true) : void entrarOuSair()
-                }
+                onClick={() => void entrarOuSair()}
               >
-                {desafio.sou_membro ? 'Sair do desafio' : 'Entrar no desafio'}
+                Entrar no desafio
               </BotaoAcao>
               <span className="text-center text-[13px] leading-snug text-ink3">
                 Entrar é opcional e não zera o passado: check-ins já feitos no período
@@ -421,6 +421,20 @@ export function ChallengeDetailPage() {
               </BotaoSuave>
             </div>
           </section>
+        )}
+
+        {!desafio.entrada_restrita && fase !== 'encerrado' && desafio.sou_membro && (
+          <div className="pt-4">
+            <BotaoAcao
+              cor="claro"
+              tamanho="g"
+              bloco
+              disabled={ocupado}
+              onClick={() => setConfirmandoSaida(true)}
+            >
+              Sair do desafio
+            </BotaoAcao>
+          </div>
         )}
       </div>
 
