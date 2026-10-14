@@ -62,7 +62,15 @@ export function TelaDuplas({
     () => ordenadas.filter((p) => combinaBusca(busca, [p.nome, p.turma ?? ''])),
     [ordenadas, busca],
   )
-  const marcadas = ordenadas.filter((p) => escolhidos.has(p.user_id))
+  // Ordem de marcação, a mais recente primeiro (o Set guarda a ordem de
+  // inserção): quem acabou de ser tocado aparece logo no começo da fileira
+  const marcadas = useMemo(() => {
+    const porId = new Map(ordenadas.map((p) => [p.user_id, p]))
+    return [...escolhidos]
+      .reverse()
+      .map((id) => porId.get(id))
+      .filter((p): p is ParceiroPossivel => p !== undefined)
+  }, [ordenadas, escolhidos])
 
   const novas = ordenadas.filter((p) => escolhidos.has(p.user_id) && !p.marcado)
   const retiradas = ordenadas.filter((p) => !escolhidos.has(p.user_id) && p.marcado)
@@ -75,6 +83,13 @@ export function TelaDuplas({
       else n.add(id)
       return n
     })
+
+  // Marcar alguém achado pela busca limpa o campo: o próximo nome já pode
+  // ser digitado sem apagar o anterior. Desmarcar mantém a busca
+  const tocarNaLista = (id: string) => {
+    if (!escolhidos.has(id)) setBusca('')
+    alternar(id)
+  }
 
   const enviar = async () => {
     if (mudancas === 0) {
@@ -113,95 +128,103 @@ export function TelaDuplas({
       className="anima-tela fixed inset-0 z-40 mx-auto flex max-w-md flex-col bg-fundo"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
     >
-      <div className="flex flex-col gap-1.5 px-5 pb-3 pt-1">
-        {etiqueta && (
-          <span className="self-start rounded-full border-[1.5px] border-preto bg-verde-500 px-2.5 py-1 text-[13px] font-extrabold text-preto">
-            {etiqueta}
+      {/* Um só rolamento: o título sai de cena e busca + marcados ficam
+          presos no topo, para a lista ocupar a tela quase toda */}
+      <div className="sem-barra min-h-0 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-1.5 px-5 pb-3 pt-1">
+          {etiqueta && (
+            <span className="self-start rounded-full border-[1.5px] border-preto bg-verde-500 px-2.5 py-1 text-[13px] font-extrabold text-preto">
+              {etiqueta}
+            </span>
+          )}
+          <h1 className="m-0 text-[30px] font-extrabold leading-[1.05] tracking-[-.03em]">
+            Com quem você dançou hoje?
+          </h1>
+          <span className="text-sm leading-snug text-ink3">
+            {pessoas === null
+              ? 'Carregando quem está no salão…'
+              : `${pessoas.length + 1} ${pessoas.length === 0 ? 'pessoa fez' : 'pessoas fizeram'} check-in hoje. A dupla só vale quando a outra pessoa confirma.`}
           </span>
-        )}
-        <h1 className="m-0 text-[30px] font-extrabold leading-[1.05] tracking-[-.03em]">
-          Com quem você dançou hoje?
-        </h1>
-        <span className="text-sm leading-snug text-ink3">
-          {pessoas === null
-            ? 'Carregando quem está no salão…'
-            : `${pessoas.length + 1} ${pessoas.length === 0 ? 'pessoa fez' : 'pessoas fizeram'} check-in hoje. A dupla só vale quando a outra pessoa confirma.`}
-        </span>
-      </div>
-
-      {pessoas && pessoas.length > 0 && (
-        <div className="px-4 pb-2.5">
-          <CampoBusca
-            placeholder="Buscar entre os presentes"
-            aria-label="Buscar entre os presentes"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
         </div>
-      )}
 
-      {marcadas.length > 0 && (
-        <div className="flex flex-col gap-2 px-4 pb-2.5">
-          <RotuloSecao className="px-0 tracking-[.06em]">
-            Marcados · {marcadas.length}
-          </RotuloSecao>
-          <div className="flex flex-wrap gap-1.5">
-            {marcadas.map((p) => (
+        <div className="sticky top-0 z-10 border-b border-linha bg-fundo">
+          {pessoas && pessoas.length > 0 && (
+            <div className="px-4 pb-2.5">
+              <CampoBusca
+                placeholder="Buscar entre os presentes"
+                aria-label="Buscar entre os presentes"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+          )}
+
+          {marcadas.length > 0 && (
+            <div className="flex flex-col gap-2 px-4 pb-2.5">
+              <RotuloSecao className="px-0 tracking-[.06em]">
+                Marcados · {marcadas.length}
+              </RotuloSecao>
+              {/* Uma fileira só, rolando para o lado: a altura não cresce com
+              o número de marcados e não espreme a lista */}
+              <div className="sem-barra -mx-4 flex gap-1.5 overflow-x-auto px-4">
+                {marcadas.map((p) => (
+                  <button
+                    key={p.user_id}
+                    type="button"
+                    onClick={() => alternar(p.user_id)}
+                    aria-label={`Desmarcar ${p.nome}`}
+                    className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border-2 border-preto bg-brasa-300 pl-1 pr-1.5 text-sm font-extrabold text-preto"
+                  >
+                    <Avatar nome={p.nome} url={p.avatar_url} tamanho={26} borda={false} />
+                    {p.nome.split(/\s+/)[0]}
+                    <Icone nome="fechar" tamanho={14} traco={3} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-3">
+          {pessoas !== null && pessoas.length === 0 && (
+            <p className="px-2 py-8 text-center text-[15px] leading-snug text-ink3">
+              Ninguém mais fez check-in nesta noite ainda. Volte aqui depois — dá para marcar até o
+              fim da noite.
+            </p>
+          )}
+          {encontradas.map((p) => {
+            const on = escolhidos.has(p.user_id)
+            return (
               <button
                 key={p.user_id}
                 type="button"
-                onClick={() => alternar(p.user_id)}
-                aria-label={`Desmarcar ${p.nome}`}
-                className="flex h-9 items-center gap-1.5 rounded-full border-2 border-preto bg-brasa-300 pl-1 pr-1.5 text-sm font-extrabold text-preto"
+                onClick={() => tocarNaLista(p.user_id)}
+                aria-pressed={on}
+                className="flex min-h-14 w-full items-center gap-3 border-b border-linha bg-transparent p-2 text-left text-ink"
               >
-                <Avatar nome={p.nome} url={p.avatar_url} tamanho={26} borda={false} />
-                {p.nome.split(/\s+/)[0]}
-                <Icone nome="fechar" tamanho={14} traco={3} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="sem-barra min-h-0 flex-1 overflow-y-auto border-t border-linha px-3">
-        {pessoas !== null && pessoas.length === 0 && (
-          <p className="px-2 py-8 text-center text-[15px] leading-snug text-ink3">
-            Ninguém mais fez check-in nesta noite ainda. Volte aqui depois —
-            dá para marcar até o fim da noite.
-          </p>
-        )}
-        {encontradas.map((p) => {
-          const on = escolhidos.has(p.user_id)
-          return (
-            <button
-              key={p.user_id}
-              type="button"
-              onClick={() => alternar(p.user_id)}
-              aria-pressed={on}
-              className="flex min-h-14 w-full items-center gap-3 border-b border-linha bg-transparent p-2 text-left text-ink"
-            >
-              <Avatar nome={p.nome} url={p.avatar_url} tamanho={40} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-base font-bold">{p.nome}</span>
-                <span className="truncate text-[13px] text-ink3">
-                  {p.confirmada ? 'Dupla confirmada' : p.turma}
+                <Avatar nome={p.nome} url={p.avatar_url} tamanho={40} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-base font-bold">{p.nome}</span>
+                  <span className="truncate text-[13px] text-ink3">
+                    {p.confirmada ? 'Dupla confirmada' : p.turma}
+                  </span>
                 </span>
-              </span>
-              <span
-                className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-2 text-preto ${
-                  on ? 'border-preto bg-brasa-500' : 'border-linha bg-transparent'
-                }`}
-              >
-                {on && <Icone nome="check" tamanho={16} traco={3.4} />}
-              </span>
-            </button>
-          )
-        })}
-        {busca.trim() !== '' && encontradas.length === 0 && (
-          <p className="px-2 py-6 text-center text-[15px] text-ink3">
-            Ninguém com esse nome fez check-in hoje.
-          </p>
-        )}
+                <span
+                  className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-2 text-preto ${
+                    on ? 'border-preto bg-brasa-500' : 'border-linha bg-transparent'
+                  }`}
+                >
+                  {on && <Icone nome="check" tamanho={16} traco={3.4} />}
+                </span>
+              </button>
+            )
+          })}
+          {busca.trim() !== '' && encontradas.length === 0 && (
+            <p className="px-2 py-6 text-center text-[15px] text-ink3">
+              Ninguém com esse nome fez check-in hoje.
+            </p>
+          )}
+        </div>
       </div>
 
       <div
