@@ -6,6 +6,7 @@ const MIGRACOES = [
   '029-pedidos-de-musica.sql',
   '030-dj-loop-autorizado.sql',
   '033-cargo-dj.sql',
+  '036-trilha-de-videos.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
@@ -49,6 +50,26 @@ create function public.noite_do_checkin(quando timestamptz) returns date
 language sql immutable as $$
   select ((quando at time zone 'America/Sao_Paulo') - interval '5 hours')::date;
 $$;
+create table public.turmas (
+  id uuid primary key default gen_random_uuid(), nome text not null unique
+);
+create table public.events (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null, descricao text, turma text,
+  dia_semana int, data date, hora time
+);
+create table public.duplas (
+  id uuid primary key default gen_random_uuid(),
+  data date not null, de_user uuid not null, para_user uuid not null,
+  confirmada boolean not null default false
+);
+create table public.semestres (
+  id uuid primary key default gen_random_uuid(),
+  encerrado_em timestamptz not null default now()
+);
+create table public.turma_professores (
+  user_id uuid not null, turma text not null, primary key (user_id, turma)
+);
 `
 
 export const IDS = {
