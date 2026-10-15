@@ -133,7 +133,8 @@ export function AgendaPainelPage() {
     if (!f) return
     try {
       await api.deleteFeriado(f.id)
-      await recarregar.feriados()
+      // A reposição da aula (se houve) sai junto com o cancelamento
+      await Promise.all([recarregar.feriados(), carregarEventos()])
       toast(`${f.turma ? `Aula de ${f.turma}` : 'O dia'} volta a valer`)
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -151,7 +152,7 @@ export function AgendaPainelPage() {
         await recarregar.desafios()
       } else if (excluir.tipo === 'feriado') {
         await api.deleteFeriado(excluir.id)
-        await recarregar.feriados()
+        await Promise.all([recarregar.feriados(), carregarEventos()])
       } else {
         await api.deleteAbertura(excluir.id)
         await recarregar.aberturas()
@@ -329,7 +330,12 @@ export function AgendaPainelPage() {
         )}
       </div>
 
-      <FolhaCancelar alvo={cancelando} onFechar={() => setCancelando(null)} turmas={turmas.map((t) => t.nome)} />
+      <FolhaCancelar
+        alvo={cancelando}
+        onFechar={() => setCancelando(null)}
+        onSalvou={carregarEventos}
+        turmas={turmas.map((t) => t.nome)}
+      />
       <FolhaAbertura aberta={abrindo} onFechar={() => setAbrindo(false)} />
       <Confirmar
         aberto={excluir !== null}
@@ -366,22 +372,29 @@ function FolhaCancelar({
   alvo,
   turmas,
   onFechar,
+  onSalvou,
 }: {
   alvo: { data: string; turma: string | null; titulo: string } | null
   turmas: string[]
   onFechar: () => void
+  /** Recarrega os eventos: a reposição é um evento novo na agenda. */
+  onSalvou: () => Promise<void>
 }) {
   const { api } = useAuth()
   const toast = useToast()
   const { recarregar } = usePainel()
   const [form, setForm] = useState<FeriadoInput>({ data: '', motivo: '', turma: null, suspende_desafios: true })
   const [salvando, setSalvando] = useState(false)
+  const [repor, setRepor] = useState<'nao' | 'sim'>('nao')
+  const [reposicao, setReposicao] = useState({ data: '', hora: '' })
 
   useEffect(() => {
     if (!alvo) return
     // Cancelar só uma turma normalmente não fecha o espaço: as outras
     // continuam dançando ali. Cancelar todas, sim.
     setForm({ data: alvo.data, motivo: '', turma: alvo.turma, suspende_desafios: alvo.turma === null })
+    setRepor('nao')
+    setReposicao({ data: '', hora: '' })
   }, [alvo])
 
   const salvar = async () => {
@@ -389,10 +402,19 @@ function FolhaCancelar({
       toast('Escolha a data', 'erro')
       return
     }
+    const comReposicao = repor === 'sim' && form.turma !== null
+    if (comReposicao && !reposicao.data) {
+      toast('Escolha o dia da reposição', 'erro')
+      return
+    }
+    if (comReposicao && reposicao.data <= form.data) {
+      toast('A reposição precisa ser depois da aula cancelada', 'erro')
+      return
+    }
     setSalvando(true)
     try {
-      await api.saveFeriado(form)
-      await recarregar.feriados()
+      await api.saveFeriado({ ...form, reposicao: comReposicao ? reposicao : null })
+      await Promise.all([recarregar.feriados(), onSalvou()])
       toast(
         form.suspende_desafios
           ? 'Cancelado. Os alunos já veem na agenda, e os desafios não contam ponto nesse dia.'
@@ -441,6 +463,46 @@ function FolhaCancelar({
             onChange={(e) => setForm({ ...form, motivo: e.target.value })}
           />
         </Campo>
+        {form.turma !== null && (
+          <Campo rotulo="A aula vai ser reposta?">
+            <Segmentado
+              opcoes={[
+                { valor: 'nao', rotulo: 'Sem reposição' },
+                { valor: 'sim', rotulo: 'Repor em outro dia' },
+              ]}
+              valor={repor}
+              onChange={setRepor}
+            />
+          </Campo>
+        )}
+        {form.turma !== null && repor === 'sim' && (
+          <div className="grid grid-cols-2 gap-2.5">
+            <Campo rotulo="Dia da reposição">
+              <input
+                type="date"
+                className="input"
+                value={reposicao.data}
+                onChange={(e) => setReposicao({ ...reposicao, data: e.target.value })}
+              />
+            </Campo>
+            <Campo rotulo="Horário">
+              <input
+                type="time"
+                className="input"
+                value={reposicao.hora}
+                onChange={(e) => setReposicao({ ...reposicao, hora: e.target.value })}
+              />
+            </Campo>
+          </div>
+        )}
+        <div className="rounded-2xl bg-sf2 px-4 py-3 text-sm leading-snug text-ink2">
+          <b className="text-ink">Trilha de vídeos: </b>
+          {form.turma === null
+            ? 'todas as turmas com aula nesse dia andam uma semana.'
+            : repor === 'sim'
+              ? 'o passo desta aula vai para o dia da reposição, e nada mais muda. A reposição aparece na agenda da turma.'
+              : 'os passos seguintes desta turma andam uma semana.'}
+        </div>
         <LinhaInterruptor
           titulo="Não vai ter forró nesse dia"
           descricao="Fecha a janela dos desafios: quem aparecer não marca presença"
@@ -452,7 +514,11 @@ function FolhaCancelar({
             Voltar
           </BotaoSuave>
           <BotaoAcao tamanho="g" sombra={false} className="flex-[1.3]" disabled={salvando} onClick={() => void salvar()}>
-            {salvando ? 'Salvando…' : 'Cancelar e avisar'}
+            {salvando
+              ? 'Salvando…'
+              : repor === 'sim' && form.turma !== null
+                ? 'Cancelar e marcar reposição'
+                : 'Cancelar e avisar'}
           </BotaoAcao>
         </div>
       </div>
