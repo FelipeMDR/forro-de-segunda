@@ -243,6 +243,10 @@ export function ProfilePage() {
             </span>
           </button>
         )}
+        <button type="button" onClick={() => navigate('/trilha')} className={linha}>
+          Trilha de passos
+          <Icone nome="avancar" tamanho={20} className="text-ink3" />
+        </button>
         <button type="button" onClick={() => navigate('/perfil/conta')} className={linha}>
           Minha conta
           <Icone nome="avancar" tamanho={20} className="text-ink3" />

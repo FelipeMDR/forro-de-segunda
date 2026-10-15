@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AceiteTermos } from '../components/AceiteTermos'
+import { CartaoTrilha } from '../components/CartaoTrilha'
 import { Avatar } from '../components/Avatar'
 import { Equalizador, Icone } from '../components/Icone'
 import { InstallPrompt } from '../components/InstallPrompt'
@@ -161,6 +162,8 @@ export function HojePage() {
         <PedirNome />
 
         <CartaoCheckin />
+
+        <CartaoTrilha />
 
         {mostrarDJ && (
           <Link

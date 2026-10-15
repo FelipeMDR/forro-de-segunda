@@ -26,6 +26,13 @@ const TRACOS = {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </>
   ),
+  play: <path d="M8 5.5v13l10.5-6.5z" />,
+  chave: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l9-9M17 6l3 3M15 8l2 2" />
+    </>
+  ),
   fone: (
     <>
       <path d="M4 15v-3a8 8 0 0 1 16 0v3" />

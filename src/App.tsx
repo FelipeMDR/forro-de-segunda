@@ -5,6 +5,8 @@ import { Spinner } from './components/Spinner'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { BuscarPage } from './pages/BuscarPage'
+import { PassoPage } from './pages/PassoPage'
+import { TrilhaPage } from './pages/TrilhaPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
 import { DJPage } from './pages/DJPage'
@@ -76,6 +78,8 @@ export default function App() {
               <Route path="/feed" element={<FeedPage />} />
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/salao" element={<SalaoPage />} />
+              <Route path="/trilha" element={<TrilhaPage />} />
+              <Route path="/trilha/:id" element={<PassoPage />} />
               <Route path="/checkin" element={<CheckinPage />} />
               <Route path="/desafios" element={<ChallengesPage />} />
               <Route path="/desafios/:id" element={<ChallengeDetailPage />} />
