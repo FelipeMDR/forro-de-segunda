@@ -158,12 +158,11 @@ export function HojePage() {
       </div>
 
       <div className="flex flex-col gap-3 px-4">
+        <InstallPrompt />
         <AceiteTermos />
         <PedirNome />
 
         <CartaoCheckin />
-
-        <CartaoTrilha />
 
         {mostrarDJ && (
           <Link
@@ -272,7 +271,7 @@ export function HojePage() {
           <Icone nome="avancar" tamanho={20} className="shrink-0 text-ink3" />
         </Link>
 
-        <InstallPrompt />
+        <CartaoTrilha />
       </div>
     </div>
   )
