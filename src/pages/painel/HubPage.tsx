@@ -29,6 +29,13 @@ export function PainelHome() {
           onClick={() => navigate('/organizador/agenda')}
         />
         <CartaoAtalho
+          icone="play"
+          cor="#0391D5"
+          titulo="Vídeo-aulas"
+          descricao="Trilhas por nível · cronograma das turmas"
+          onClick={() => navigate('/trilha/gerenciar')}
+        />
+        <CartaoAtalho
           icone="medalha"
           cor="#CBE288"
           titulo="Distintivos"
