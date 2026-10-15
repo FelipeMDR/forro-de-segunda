@@ -26,7 +26,7 @@ Os alunos pedem um lugar para rever os passos ensinados em aula. Liberar tudo de
    - **3 pontos = 1 chave** e até **7 dias** antes, por padrão. A organização muda os dois números pelo painel (tabela `trilha_regras`, uma linha). "Só o próximo passo" é fixo.
    - Saldo = chaves ganhas − liberações feitas no semestre.
 7. **Gastar chave** é uma função no banco (`liberar_passo_com_chave`). Ela recusa se o aluno não tem saldo. O saldo é contado por cima: noites com check-in não anulado em vez da presença por janela. Assim o banco nunca recusa uma chave que o app mostra, e ninguém ganha chaves forjando chamadas.
-8. **Quem edita:** organização, cargos `Professor(a)` e `Diretor(a) de Ensino`, e quem dá aula em alguma turma (`turma_professores`). Tudo pelo celular, em `/trilha/gerenciar`, fora do painel (que é só da organização). O painel ganha um atalho.
+8. **Quem edita:** a gestão (passos, cronogramas e regras das chaves) fica só no Painel da organização, em `/organizador/videoaulas`, pelo celular. Professores e quem dá aula veem a trilha toda aberta, mas não editam pelo app.
 9. **Cancelar aula na Agenda** ganha a escolha "Sem reposição" ou "Repor em outro dia" (data e hora), com o aviso do efeito na trilha. Só existe quando o cancelamento é de uma turma específica.
 
 ## Fora do escopo (YAGNI)
