@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FolhaChave } from '../components/FolhaChave'
 import { Icone } from '../components/Icone'
-import { Cabecalho, Segmentado, Tela } from '../components/ui'
-import { formatDate } from '../lib/dates'
+import { Segmentado, Tela, useVoltar } from '../components/ui'
+import { lerPraticados } from '../lib/praticados'
+import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
   NOME_NIVEL,
   nivelDoAluno,
@@ -15,49 +16,93 @@ import {
 import type { NivelTrilha } from '../lib/types'
 import { useTrilha } from '../lib/useTrilha'
 
-function detalhe(s: PassoComSituacao): string {
-  if (s.estado === 'aberto') {
-    if (!s.passo.video_frente) return 'Vídeo em breve'
-    if (s.motivo === 'revisao') return 'Revisão'
-    if (s.motivo === 'chave') return 'Liberado com chave'
-    return s.data ? `Aula de ${formatDate(s.data)}` : 'Aberto'
-  }
-  if (s.estado === 'chave') return `Libera ${formatDate(s.data!)} · ou 1 chave`
-  return s.data ? `Libera ${formatDate(s.data)}` : 'Abre com a turma'
+type Visual = 'praticado' | 'aberto' | 'chave' | 'bloqueado'
+
+const ICONE: Record<Visual, { fundo: string; nome: 'check' | 'play' | 'chave' | 'cadeado' }> = {
+  praticado: { fundo: 'bg-verde-700 text-branco', nome: 'check' },
+  aberto: { fundo: 'bg-marinho-500 text-branco', nome: 'play' },
+  chave: { fundo: 'bg-brasa-300 text-or-t', nome: 'chave' },
+  bloqueado: { fundo: 'bg-chip text-ink3', nome: 'cadeado' },
+}
+
+function Numero({ valor, rotulo }: { valor: string | number; rotulo: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-2xl border border-linha bg-sf p-3">
+      <span className="text-[22px] font-extrabold leading-none">{valor}</span>
+      <span className="text-xs text-ink2">{rotulo}</span>
+    </div>
+  )
 }
 
 export function TrilhaPage() {
   const { dados, erro, liberar } = useTrilha()
+  const voltar = useVoltar('/')
   const [nivel, setNivel] = useState<NivelTrilha | null>(null)
   const [alvo, setAlvo] = useState<PassoComSituacao | null>(null)
+  const [praticados] = useState(lerPraticados)
 
-  const niveis = dados ? niveisVisiveis(dados.ctx) : []
   useEffect(() => {
     if (dados && nivel === null) setNivel(nivelInicial(dados.ctx))
   }, [dados, nivel])
 
-  const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
+  const niveis = dados ? niveisVisiveis(dados.ctx) : []
   const meu = dados ? nivelDoAluno(dados.ctx) : null
+  const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
+  const abertos = lista.filter((s) => s.estado === 'aberto')
+  const feitos = abertos.filter((s) => praticados.has(s.passo.id)).length
+  const saldo = dados?.saldo
+
+  const visual = (s: PassoComSituacao): Visual =>
+    s.estado === 'aberto' ? (praticados.has(s.passo.id) ? 'praticado' : 'aberto') : s.estado
+
+  const detalhe = (s: PassoComSituacao): string => {
+    if (s.estado !== 'aberto') return quandoLibera(s, dados!.ctx.hoje)
+    if (!s.passo.video_frente) return 'Vídeo em breve'
+    return praticados.has(s.passo.id) ? `${comoAbriu(s)} · praticado` : comoAbriu(s)
+  }
 
   return (
     <Tela>
-      <Cabecalho
-        titulo="Trilha de passos"
-        fallback="/"
-        acao={
-          dados && (
-            <span className="flex h-11 items-center gap-2 rounded-full bg-preto px-3.5 text-sm font-extrabold text-branco">
-              <Icone nome="chave" className="h-[18px] w-[18px] text-brasa-400" />
-              {dados.saldo.disponiveis} {dados.saldo.disponiveis === 1 ? 'chave' : 'chaves'}
-            </span>
-          )
-        }
-      />
-      <div className="flex flex-col gap-3 px-4 pt-2">
+      <div className="flex items-center justify-between px-2 pt-3">
+        <button
+          type="button"
+          onClick={voltar}
+          aria-label="Voltar"
+          className="flex h-11 w-11 items-center justify-center text-ink"
+        >
+          <Icone nome="voltar" className="h-6 w-6" />
+        </button>
+        {saldo && (
+          <span className="mr-2 flex h-11 items-center gap-2 rounded-full bg-preto px-3.5 text-sm font-extrabold text-branco">
+            <Icone nome="chave" className="h-[18px] w-[18px] text-brasa-400" />
+            {saldo.disponiveis} {saldo.disponiveis === 1 ? 'chave' : 'chaves'}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5 px-5 pt-1 pb-4">
+        <h1 className="text-[34px] font-extrabold leading-none tracking-[-0.02em]">Trilha de passos</h1>
+        <p className="text-[15px] leading-snug text-ink2">
+          Os vídeos abrem conforme a turma avança. Veio às aulas e dançou com a turma? Ganhe chaves e veja o próximo passo antes.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 px-4">
         {erro && <p className="text-sm text-or-t">{erro}</p>}
+
+        {saldo && lista.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            <Numero valor={abertos.length} rotulo={abertos.length === 1 ? 'passo liberado' : 'passos liberados'} />
+            <Numero valor={feitos} rotulo={feitos === 1 ? 'praticado' : 'praticados'} />
+            <Numero valor={`${saldo.pontosPorChave - saldo.faltam}/${saldo.pontosPorChave}`} rotulo="pontos p/ chave" />
+          </div>
+        )}
+
         {dados && niveis.length === 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
-            A trilha da sua turma ainda não foi configurada. Assim que os professores subirem os vídeos, eles aparecem aqui.
+            {dados.ctx.minhasTurmas.length === 0
+              ? 'Você ainda não está em nenhuma turma. Quando a organização te colocar numa, a trilha dela aparece aqui.'
+              : 'A trilha da sua turma ainda não foi configurada. Assim que os professores subirem os vídeos, eles aparecem aqui.'}
           </p>
         )}
         {dados && meu && !dados.ctx.equipe && niveis.length > 0 && !niveis.includes(meu) && (
@@ -65,6 +110,7 @@ export function TrilhaPage() {
             Os vídeos do seu nível ainda não subiram. Enquanto isso, dá para revisar os níveis anteriores.
           </p>
         )}
+
         {niveis.length > 1 && nivel && (
           <Segmentado
             opcoes={niveis.map((n) => ({
@@ -75,64 +121,86 @@ export function TrilhaPage() {
             onChange={setNivel}
           />
         )}
+
         {lista[0]?.motivo === 'revisao' && (
-          <p className="rounded-2xl bg-verde-300 px-4 py-3 text-sm text-preto">
-            <b>Modo revisão:</b> você já passou por esse nível, então todos os vídeos estão abertos.
-          </p>
+          <div className="flex items-start gap-2.5 rounded-2xl bg-verde-300 px-3.5 py-3 text-sm leading-snug text-preto">
+            <Icone nome="girar" className="mt-0.5 h-5 w-5 shrink-0" />
+            <span>
+              <b>Modo revisão:</b> você já passou por esse nível, então todos os vídeos estão abertos.
+            </span>
+          </div>
         )}
-        <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
-          {lista.map((s, i) => {
-            const conteudo = (
-              <>
-                <span
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                    s.estado === 'aberto' ? 'bg-marinho-500 text-branco' : s.estado === 'chave' ? 'bg-brasa-300 text-or-t' : 'bg-chip text-ink3'
-                  }`}
-                >
-                  <Icone nome={s.estado === 'aberto' ? 'play' : s.estado === 'chave' ? 'chave' : 'cadeado'} className="h-5 w-5" />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className={`text-[15px] font-extrabold ${s.estado === 'bloqueado' ? 'text-ink3' : ''}`}>
-                    {s.numero}. {s.passo.nome}
-                  </span>
-                  <span className="text-xs text-ink2">{detalhe(s)}</span>
-                </span>
-                {s.estado === 'chave' && (
-                  <span className="rounded-full border-[1.5px] border-brasa-500 px-3 py-1.5 text-[13px] font-extrabold text-or-t">
-                    Liberar
-                  </span>
-                )}
-              </>
-            )
-            const classe = `flex min-h-[64px] w-full items-center gap-3 px-3.5 py-3 text-left ${i > 0 ? 'border-t border-linha' : ''}`
-            if (s.estado === 'aberto' && s.passo.video_frente) {
-              return (
-                <Link key={s.passo.id} to={`/trilha/${s.passo.id}`} className={classe}>
-                  {conteudo}
-                </Link>
-              )
-            }
-            if (s.estado === 'chave') {
-              return (
-                <button key={s.passo.id} type="button" className={classe} onClick={() => setAlvo(s)}>
-                  {conteudo}
-                </button>
-              )
-            }
-            return (
-              <div key={s.passo.id} className={classe}>
-                {conteudo}
-              </div>
-            )
-          })}
-        </div>
+
+        {nivel && lista.length > 0 && (
+          <section className="flex flex-col gap-2 pt-1">
+            <div className="flex items-baseline justify-between px-1">
+              <h2 className="text-[19px] font-extrabold">{NOME_NIVEL[nivel]}</h2>
+              <span className="text-xs font-bold text-ink3">
+                {lista.length} {lista.length === 1 ? 'passo' : 'passos'}
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
+              {lista.map((s, i) => {
+                const v = visual(s)
+                const conteudo = (
+                  <>
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${ICONE[v].fundo}`}>
+                      <Icone
+                        nome={ICONE[v].nome}
+                        preenchido={v === 'aberto'}
+                        traco={v === 'praticado' ? 2.6 : undefined}
+                        className="h-5 w-5"
+                      />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className={`text-[15px] font-extrabold leading-tight ${v === 'bloqueado' ? 'text-ink3' : ''}`}>
+                        {s.passo.nome}
+                      </span>
+                      <span className="text-xs text-ink2">{detalhe(s)}</span>
+                    </span>
+                    {s.estado === 'chave' && (
+                      <span className="shrink-0 rounded-full border-[1.5px] border-brasa-500 px-3 py-1.5 text-[13px] font-extrabold text-or-t">
+                        Liberar
+                      </span>
+                    )}
+                    {s.estado === 'aberto' && s.passo.video_frente && (
+                      <Icone nome="avancar" className="h-5 w-5 shrink-0 text-ink3" />
+                    )}
+                  </>
+                )
+                const classe = `flex min-h-[68px] w-full items-center gap-3 px-3.5 py-3 text-left ${i > 0 ? 'border-t border-linha' : ''}`
+                if (s.estado === 'aberto' && s.passo.video_frente) {
+                  return (
+                    <Link key={s.passo.id} to={`/trilha/${s.passo.id}`} className={classe}>
+                      {conteudo}
+                    </Link>
+                  )
+                }
+                if (s.estado === 'chave') {
+                  return (
+                    <button key={s.passo.id} type="button" className={classe} onClick={() => setAlvo(s)}>
+                      {conteudo}
+                    </button>
+                  )
+                }
+                return (
+                  <div key={s.passo.id} className={classe}>
+                    {conteudo}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Chaves só abrem o <b className="text-ink">próximo passo</b> da trilha, até {dados?.ctx.regras?.antecedencia_dias ?? 7} dias antes da turma. Assim ninguém queima a largada.
+            Chaves só abrem o <b className="text-ink">próximo passo</b> da trilha, até{' '}
+            {dados?.ctx.regras?.antecedencia_dias ?? 7} dias antes da turma. Assim ninguém queima a largada.
           </p>
         )}
       </div>
-      {dados && <FolhaChave alvo={alvo} saldo={dados.saldo} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
+      {saldo && <FolhaChave alvo={alvo} saldo={saldo} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
     </Tela>
   )
 }

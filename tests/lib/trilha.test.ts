@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   aulasDaTurma,
+  diasAte,
+  miniaturaDoYoutube,
+  urlDoEmbed,
   nivelInicial,
   cronogramaDaTurma,
   idDoYoutube,
@@ -290,7 +293,30 @@ describe('nivelInicial', () => {
     expect(nivelInicial(ctx({ minhasTurmas: ['Intermediário'] }))).toBe('iniciante')
   })
 
+  it('equipe sem turma (organização testando): abre no primeiro nível com passos', () => {
+    expect(nivelInicial(ctx({ minhasTurmas: [], equipe: true }))).toBe('iniciante')
+  })
+
   it('sem nada para ver: null', () => {
     expect(nivelInicial(ctx({ minhasTurmas: [] }))).toBeNull()
+  })
+})
+
+describe('diasAte', () => {
+  it('conta dias de calendário entre duas datas', () => {
+    expect(diasAte('2026-10-20', '2026-10-20')).toBe(0)
+    expect(diasAte('2026-10-20', '2026-10-21')).toBe(1)
+    expect(diasAte('2026-10-20', '2026-11-02')).toBe(13)
+    expect(diasAte('2026-10-20', '2026-10-18')).toBe(-2)
+  })
+})
+
+describe('YouTube: miniatura e player', () => {
+  it('miniatura pelo ID', () => {
+    expect(miniaturaDoYoutube(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
+  })
+
+  it('player aceita comandos (velocidade) pela API do iframe', () => {
+    expect(urlDoEmbed(V)).toContain('enablejsapi=1')
   })
 })

@@ -3,10 +3,33 @@ import { Link } from 'react-router-dom'
 import { BotaoAcao, Cabecalho, ChipEscolha, Tela } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { formatDate } from '../../lib/dates'
+import { diaDaNoite } from '../../lib/dates'
+import { linhaCronograma, type TomLinha } from '../../lib/textosTrilha'
 import { cronogramaDeTurma, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { AgendaEvent, Feriado, NivelTrilha, PassoTrilha, Turma } from '../../lib/types'
 import { Campo } from './contexto'
+
+const FUNDO_TOM: Record<TomLinha, string> = {
+  feito: '',
+  proxima: 'bg-brasa-300/25',
+  normal: '',
+  cancelada: 'bg-brasa-300/15',
+  reposicao: 'bg-azul-300/20',
+}
+const COR_TEXTO: Record<TomLinha, string> = {
+  feito: 'text-gr-t',
+  proxima: 'text-or-t',
+  normal: 'text-ink2',
+  cancelada: 'text-or-t',
+  reposicao: 'text-bl-t',
+}
+const COR_DATA: Record<TomLinha, string> = {
+  feito: '',
+  proxima: 'text-or-t',
+  normal: '',
+  cancelada: 'text-ink3',
+  reposicao: 'text-bl-t',
+}
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
@@ -36,6 +59,9 @@ export function CronogramaPage() {
 
   if (!base) return null
   const linhas = turma ? cronogramaDeTurma(turma, base.passos, base.eventos, base.feriados) : []
+  const hoje = diaDaNoite(new Date())
+  // A próxima aula que ainda vai acontecer (a de hoje já abriu o vídeo)
+  const proxima = linhas.find((l) => l.passo && l.aula.tipo !== 'cancelada' && l.aula.data > hoje)
   const aulasNaAgenda = base.eventos.filter((e) => e.turma === escolhida && e.dia_semana !== null && !e.data)
 
   const salvar = async () => {
@@ -110,30 +136,29 @@ export function CronogramaPage() {
         )}
         {linhas.length > 0 && (
         <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
-          {linhas.map((l, i) => (
-            <div
-              key={`${l.aula.data}-${l.aula.tipo}`}
-              className={`flex items-center gap-3 px-3.5 py-2.5 ${i > 0 ? 'border-t border-linha' : ''} ${
-                l.aula.tipo === 'cancelada' ? 'bg-brasa-300/20' : l.aula.tipo === 'reposicao' ? 'bg-azul-300/20' : ''
-              }`}
-            >
-              <span className="w-[72px] shrink-0 text-sm font-extrabold">{formatDate(l.aula.data)}</span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <b className={`text-[15px] ${l.passo ? '' : 'text-ink3'}`}>
-                  {l.passo?.nome ?? (l.aula.tipo === 'cancelada' ? 'Aula cancelada na agenda' : 'Sem passo')}
-                </b>
-                <span className="text-xs text-ink2">
-                  {l.aula.tipo === 'cancelada'
-                    ? l.aula.reposicaoEm
-                      ? `Reposta em ${formatDate(l.aula.reposicaoEm)} · trilha não atrasa`
-                      : `${l.aula.motivo ?? 'Cancelada'} · trilha andou uma semana`
-                    : l.aula.tipo === 'reposicao'
-                      ? 'Reposição'
-                      : 'Aula'}
+          {linhas.map((l, i) => {
+            const { texto, tom } = linhaCronograma(l, hoje, l === proxima)
+            const dia = new Date(`${l.aula.data}T12:00:00`)
+            return (
+              <div
+                key={`${l.aula.data}-${l.aula.tipo}`}
+                className={`flex items-center gap-3 py-2.5 pr-3 pl-3.5 ${i > 0 ? 'border-t border-linha' : ''} ${FUNDO_TOM[tom]}`}
+              >
+                <span className="flex w-[46px] shrink-0 flex-col items-center leading-none">
+                  <span className={`text-[19px] font-extrabold ${COR_DATA[tom]}`}>{String(dia.getDate()).padStart(2, '0')}</span>
+                  <span className="text-[11px] font-bold uppercase text-ink3">
+                    {dia.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                  </span>
                 </span>
-              </span>
-            </div>
-          ))}
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <b className={`text-[15px] leading-tight ${l.passo ? '' : 'text-ink3'}`}>
+                    {l.passo?.nome ?? (l.aula.tipo === 'cancelada' ? 'Aula cancelada na agenda' : 'Sem passo')}
+                  </b>
+                  <span className={`text-xs font-bold ${COR_TEXTO[tom]}`}>{texto}</span>
+                </span>
+              </div>
+            )
+          })}
         </div>
         )}
         <p className="px-1 text-[13px] leading-snug text-ink2">

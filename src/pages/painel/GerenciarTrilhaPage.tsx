@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotaoAcao, Cabecalho, CartaoAtalho, Etiqueta, Segmentado, Tela } from '../../components/ui'
+import { Icone } from '../../components/Icone'
 import { useApi } from '../../context/AuthContext'
 import { NIVEIS, NOME_NIVEL, ordenarPassos } from '../../lib/trilha'
 import type { NivelTrilha, PassoTrilha, RegrasTrilha } from '../../lib/types'
@@ -22,7 +23,7 @@ export function GerenciarTrilhaPage() {
   return (
     <Tela>
       <Cabecalho titulo="Vídeo-aulas" sobretitulo="Painel" fallback="/organizador" />
-      <div className="flex flex-col gap-3 px-4 pt-2">
+      <div className="flex flex-col gap-3 px-4 pt-2 pb-24">
         <p className="px-1 text-sm text-ink2">Uma trilha por nível. As datas ficam no cronograma de cada turma.</p>
         <CartaoAtalho
           icone="agenda"
@@ -68,10 +69,14 @@ export function GerenciarTrilhaPage() {
             </button>
           ))}
         </div>
-        <BotaoAcao bloco onClick={() => navigate(`/organizador/videoaulas/passo/novo?nivel=${nivel}`)}>
-          Novo passo
-        </BotaoAcao>
       </div>
+      <BotaoAcao
+        className="fixed right-[max(1rem,calc(50%-14rem+1rem))] bottom-[calc(env(safe-area-inset-bottom)+84px)] z-20 rounded-full px-5"
+        onClick={() => navigate(`/organizador/videoaulas/passo/novo?nivel=${nivel}`)}
+      >
+        <Icone nome="mais" className="h-5 w-5" />
+        Novo passo
+      </BotaoAcao>
     </Tela>
   )
 }

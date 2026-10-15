@@ -82,8 +82,13 @@ export function idDoYoutube(link: string): string | null {
   return id && ID_YOUTUBE.test(id) ? id : null
 }
 
+/** `enablejsapi=1`: deixa a tela mudar a velocidade pelo postMessage. */
 export function urlDoEmbed(id: string): string {
-  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`
+  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`
+}
+
+export function miniaturaDoYoutube(id: string): string {
+  return `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
 }
 
 // ---- Datas ("YYYY-MM-DD", sempre em UTC para o fuso não mudar o dia) ----
@@ -97,6 +102,11 @@ export function somaDias(iso: string, n: number): string {
   const d = paraUTC(iso)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
+}
+
+/** Dias de calendário de `de` até `ate` (negativo se já passou). */
+export function diasAte(de: string, ate: string): number {
+  return Math.round((paraUTC(ate).getTime() - paraUTC(de).getTime()) / 86_400_000)
 }
 
 function diaDaSemana(iso: string): number {
