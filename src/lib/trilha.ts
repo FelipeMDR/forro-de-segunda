@@ -3,6 +3,7 @@ import type {
   Feriado,
   NivelTrilha,
   Papel,
+  RegrasTrilha,
   ParceiroDanca,
   PassoTrilha,
   Turma,
@@ -31,6 +32,12 @@ export const NOME_NIVEL: Record<NivelTrilha, string> = {
 
 export const PONTOS_POR_CHAVE = 3
 export const ANTECEDENCIA_CHAVE_DIAS = 7
+
+/** Valem enquanto a organização não mudar (ou sem a migração 036). */
+export const REGRAS_PADRAO: RegrasTrilha = {
+  pontos_por_chave: PONTOS_POR_CHAVE,
+  antecedencia_dias: ANTECEDENCIA_CHAVE_DIAS,
+}
 
 const CARGOS_TRILHA = ['Professor(a)', 'Diretor(a) de Ensino']
 
@@ -215,6 +222,8 @@ export interface ContextoTrilha {
   hoje: string
   /** Professores e organização: veem tudo. */
   equipe: boolean
+  /** Regras das chaves; sem elas, `REGRAS_PADRAO`. */
+  regras?: RegrasTrilha
 }
 
 export type EstadoPasso = 'aberto' | 'chave' | 'bloqueado'
@@ -291,7 +300,7 @@ export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoC
     primeiro.passo.pode_chave &&
     primeiro.passo.video_frente &&
     primeiro.data &&
-    primeiro.data <= somaDias(ctx.hoje, ANTECEDENCIA_CHAVE_DIAS)
+    primeiro.data <= somaDias(ctx.hoje, (ctx.regras ?? REGRAS_PADRAO).antecedencia_dias)
   ) {
     primeiro.estado = 'chave'
   }
@@ -310,6 +319,8 @@ export interface EntradaChaves {
   desde: string | null
   /** Chaves gastas no semestre. */
   usadas: number
+  /** Regra da organização; sem ela, 3. */
+  pontosPorChave?: number
 }
 
 export interface SaldoChaves {
@@ -317,8 +328,9 @@ export interface SaldoChaves {
   ganhas: number
   usadas: number
   disponiveis: number
-  /** Pontos até a próxima chave (1–3). */
+  /** Pontos até a próxima chave (1 até `pontosPorChave`). */
   faltam: number
+  pontosPorChave: number
 }
 
 export function saldoDeChaves(e: EntradaChaves): SaldoChaves {
@@ -327,12 +339,14 @@ export function saldoDeChaves(e: EntradaChaves): SaldoChaves {
   const noites = new Set(e.noitesComDupla.filter((d) => d >= corte)).size
   const novas = e.parceiros.filter((p) => p.primeira && p.primeira >= corte).length
   const pontos = presencas + noites + novas
-  const ganhas = Math.floor(pontos / PONTOS_POR_CHAVE)
+  const porChave = e.pontosPorChave ?? PONTOS_POR_CHAVE
+  const ganhas = Math.floor(pontos / porChave)
   return {
     pontos,
     ganhas,
     usadas: e.usadas,
     disponiveis: Math.max(0, ganhas - e.usadas),
-    faltam: PONTOS_POR_CHAVE - (pontos % PONTOS_POR_CHAVE),
+    faltam: porChave - (pontos % porChave),
+    pontosPorChave: porChave,
   }
 }

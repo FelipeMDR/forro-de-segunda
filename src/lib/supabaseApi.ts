@@ -14,6 +14,7 @@ import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
+import { REGRAS_PADRAO } from './trilha'
 import { NOME_PADRAO } from './nome'
 import { CARGO_DJ } from './dj'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
@@ -65,6 +66,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  RegrasTrilha,
 } from './types'
 
 /**
@@ -2229,6 +2231,23 @@ export class SupabaseApi implements ForroApi {
 
   async liberarPassoComChave(passoId: string) {
     const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async regrasTrilha(): Promise<RegrasTrilha> {
+    const { data, error } = await this.sb
+      .from('trilha_regras')
+      .select('pontos_por_chave, antecedencia_dias')
+      .maybeSingle()
+    if (error || !data) return { ...REGRAS_PADRAO } // sem a migração 036
+    return data as RegrasTrilha
+  }
+
+  async salvarRegrasTrilha(r: RegrasTrilha) {
+    const { error } = await this.sb.rpc('salvar_regras_trilha', {
+      p_pontos: r.pontos_por_chave,
+      p_dias: r.antecedencia_dias,
+    })
     if (error) throw new Error(traduz(error.message))
   }
 

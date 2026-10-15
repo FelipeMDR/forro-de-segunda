@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../lib/dates'
-import { PONTOS_POR_CHAVE, type PassoComSituacao, type SaldoChaves } from '../lib/trilha'
+import type { PassoComSituacao, SaldoChaves } from '../lib/trilha'
 import { BotaoAcao, BotaoSuave, Folha } from './ui'
 
 const GANHOS = [
@@ -24,7 +24,8 @@ export function FolhaChave({
   const toast = useToast()
   const [salvando, setSalvando] = useState(false)
   const temChave = saldo.disponiveis > 0
-  const pontosNaVez = PONTOS_POR_CHAVE - saldo.faltam
+  const porChave = saldo.pontosPorChave
+  const pontosNaVez = porChave - saldo.faltam
 
   const liberar = async () => {
     if (!alvo) return
@@ -67,15 +68,15 @@ export function FolhaChave({
           ))}
           <div className="flex flex-col gap-1.5 border-t border-linha pt-2.5">
             <div className="flex justify-between text-[13px] font-bold text-ink2">
-              <span>{PONTOS_POR_CHAVE} pontos = 1 chave</span>
+              <span>{porChave} {porChave === 1 ? 'ponto' : 'pontos'} = 1 chave</span>
               <span>
-                {pontosNaVez} de {PONTOS_POR_CHAVE}
+                {pontosNaVez} de {porChave}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-chip">
               <div
                 className="h-full rounded-full bg-brasa-500"
-                style={{ width: `${(pontosNaVez / PONTOS_POR_CHAVE) * 100}%` }}
+                style={{ width: `${(pontosNaVez / porChave) * 100}%` }}
               />
             </div>
           </div>

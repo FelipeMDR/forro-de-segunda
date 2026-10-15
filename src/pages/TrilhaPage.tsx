@@ -128,7 +128,7 @@ export function TrilhaPage() {
         </div>
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Chaves só abrem o <b className="text-ink">próximo passo</b> da trilha, até 7 dias antes da turma. Assim ninguém queima a largada.
+            Chaves só abrem o <b className="text-ink">próximo passo</b> da trilha, até {dados?.ctx.regras?.antecedencia_dias ?? 7} dias antes da turma. Assim ninguém queima a largada.
           </p>
         )}
       </div>

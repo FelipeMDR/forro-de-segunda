@@ -9,6 +9,7 @@ import { PassoPage } from './pages/PassoPage'
 import { CronogramaPage } from './pages/painel/CronogramaPage'
 import { EditarPassoPage } from './pages/painel/EditarPassoPage'
 import { GerenciarTrilhaPage } from './pages/painel/GerenciarTrilhaPage'
+import { RegrasChavesPage } from './pages/painel/RegrasChavesPage'
 import { TrilhaPage } from './pages/TrilhaPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
@@ -115,6 +116,7 @@ export default function App() {
                 <Route path="videoaulas" element={<GerenciarTrilhaPage />} />
                 <Route path="videoaulas/passo/:id" element={<EditarPassoPage />} />
                 <Route path="videoaulas/cronograma" element={<CronogramaPage />} />
+                <Route path="videoaulas/regras" element={<RegrasChavesPage />} />
               </Route>
               <Route path="/dj" element={<DJPage />} />
               <Route path="/musica" element={<MusicaPage />} />

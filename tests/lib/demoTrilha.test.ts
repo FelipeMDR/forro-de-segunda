@@ -65,6 +65,32 @@ describe('DemoApi — trilha de vídeos', () => {
     expect((await api.minhasLiberacoes()).map((l) => l.passo_id)).toContain(p.id)
   })
 
+  it('regras: começa no padrão; organização muda e o gasto de chave segue', async () => {
+    const { api, banco, uid } = await novaApi()
+    expect(await api.regrasTrilha()).toEqual({ pontos_por_chave: 3, antecedencia_dias: 7 })
+    await api.signInTelefone('11 98888-0003', 'forro123') // Ana, organizadora no demo
+    await api.salvarRegrasTrilha({ pontos_por_chave: 2, antecedencia_dias: 5 })
+    expect(await api.regrasTrilha()).toEqual({ pontos_por_chave: 2, antecedencia_dias: 5 })
+    await api.signInTelefone('11 98888-0001', 'forro123')
+    await api.salvarPassoTrilha({
+      nivel: 'iniciante', ordem: 98, nome: 'Dois pontos', video_frente: 'dQw4w9WgXcQ',
+      video_condutor: null, video_conduzida: null, dica: null, pode_chave: true,
+    })
+    const p = (await api.listPassosTrilha()).find((x) => x.nome === 'Dois pontos')!
+    for (const d of ['2026-10-05', '2026-10-12']) {
+      banco.db.checkins.push({ id: d, user_id: uid, criado_em: `${d}T23:00:00.000Z`, foto_url: '', legenda: null })
+    }
+    await api.liberarPassoComChave(p.id)
+    expect((await api.minhasLiberacoes()).map((l) => l.passo_id)).toContain(p.id)
+  })
+
+  it('aluno não muda as regras', async () => {
+    const { api } = await novaApi()
+    await expect(api.salvarRegrasTrilha({ pontos_por_chave: 1, antecedencia_dias: 30 })).rejects.toThrow(
+      'Só a organização muda as regras das chaves',
+    )
+  })
+
   it('cancelar com reposição cria o evento; desfazer apaga os dois', async () => {
     const { api } = await novaApi()
     await api.saveFeriado({

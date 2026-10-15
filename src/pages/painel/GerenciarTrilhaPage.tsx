@@ -3,16 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { BotaoAcao, Cabecalho, CartaoAtalho, Etiqueta, Segmentado, Tela } from '../../components/ui'
 import { useApi } from '../../context/AuthContext'
 import { NIVEIS, NOME_NIVEL, ordenarPassos } from '../../lib/trilha'
-import type { NivelTrilha, PassoTrilha } from '../../lib/types'
+import type { NivelTrilha, PassoTrilha, RegrasTrilha } from '../../lib/types'
 
 export function GerenciarTrilhaPage() {
   const api = useApi()
   const navigate = useNavigate()
   const [passos, setPassos] = useState<PassoTrilha[] | null>(null)
   const [nivel, setNivel] = useState<NivelTrilha>('iniciante')
+  const [regras, setRegras] = useState<RegrasTrilha | null>(null)
 
   useEffect(() => {
     void api.listPassosTrilha().then(setPassos)
+    void api.regrasTrilha().then(setRegras)
   }, [api])
 
   const lista = ordenarPassos((passos ?? []).filter((p) => p.nivel === nivel))
@@ -28,6 +30,17 @@ export function GerenciarTrilhaPage() {
           titulo="Cronogramas das turmas"
           descricao="Nível, primeira aula e datas de cada passo"
           onClick={() => navigate('/organizador/videoaulas/cronograma')}
+        />
+        <CartaoAtalho
+          icone="chave"
+          cor="#FFB98C"
+          titulo="Regras das chaves"
+          descricao={
+            regras
+              ? `${regras.pontos_por_chave} pontos = 1 chave · até ${regras.antecedencia_dias} dias antes`
+              : 'Pontos por chave e antecedência'
+          }
+          onClick={() => navigate('/organizador/videoaulas/regras')}
         />
         <Segmentado
           opcoes={NIVEIS.map((n) => ({ valor: n, rotulo: NOME_NIVEL[n] }))}

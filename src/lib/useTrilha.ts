@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { diaDaNoite, diasSuspensos, mapaAberturas } from './dates'
 import { datasDePresenca } from './presenca'
-import { podeEditarTrilha, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
+import { podeEditarTrilha, REGRAS_PADRAO, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
 import type { AberturaAntecipada, Challenge, ParceiroDanca } from './types'
 
 export interface DadosTrilha {
@@ -23,7 +23,7 @@ export function useTrilha() {
   const carregar = useCallback(async () => {
     if (!userId || !profile) return
     try {
-      const [passos, turmas, eventos, feriados, liberacoes, checkins, desafios, aberturas, parceiros, noitesDupla, desde] =
+      const [passos, turmas, eventos, feriados, liberacoes, checkins, desafios, aberturas, parceiros, noitesDupla, desde, regras] =
         await Promise.all([
           api.listPassosTrilha(),
           api.listTurmas(),
@@ -36,6 +36,7 @@ export function useTrilha() {
           api.parceirosDe(userId).catch(() => [] as ParceiroDanca[]),
           api.noitesComDupla(userId).catch(() => [] as string[]),
           api.inicioSemestreAtual().catch(() => null),
+          api.regrasTrilha().catch(() => ({ ...REGRAS_PADRAO })),
         ])
       const presencas = datasDePresenca(checkins, {
         desafios,
@@ -52,6 +53,7 @@ export function useTrilha() {
           liberadas: new Set(liberacoes.map((l) => l.passo_id)),
           hoje: diaDaNoite(new Date()),
           equipe: podeEditarTrilha({ papel, cargos: profile.cargos, turmas_ensino: profile.turmas_ensino }),
+          regras,
         },
         saldo: saldoDeChaves({
           presencas,
@@ -59,6 +61,7 @@ export function useTrilha() {
           parceiros,
           desde,
           usadas: liberacoes.filter((l) => !desde || l.criado_em >= desde).length,
+          pontosPorChave: regras.pontos_por_chave,
         }),
       })
       setErro(null)

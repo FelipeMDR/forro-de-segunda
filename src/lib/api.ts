@@ -48,6 +48,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  RegrasTrilha,
 } from './types'
 
 /**
@@ -388,6 +389,10 @@ export interface ForroApi {
   liberarPassoComChave(passoId: string): Promise<void>
   /** Noites ("YYYY-MM-DD") com dupla confirmada de alguém, sem repetir. */
   noitesComDupla(userId: string): Promise<string[]>
+  /** Regras das chaves (padrão se a migração 036 não rodou). */
+  regrasTrilha(): Promise<RegrasTrilha>
+  /** Só a organização. */
+  salvarRegrasTrilha(r: RegrasTrilha): Promise<void>
 
   // ---- Notificações ----
   /**

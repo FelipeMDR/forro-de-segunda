@@ -23,7 +23,8 @@ Os alunos pedem um lugar para rever os passos ensinados em aula. Liberar tudo de
    - **+1 presença:** cada noite de presença válida (`datasDePresenca`, a mesma regra do perfil);
    - **+1 parceria:** cada noite com pelo menos uma dupla confirmada (no máximo 1 por noite);
    - **+1 nova parceria:** cada pessoa com quem a primeira dupla confirmada caiu neste semestre.
-   - **3 pontos = 1 chave.** Saldo = chaves ganhas − liberações feitas no semestre.
+   - **3 pontos = 1 chave** e até **7 dias** antes, por padrão. A organização muda os dois números pelo painel (tabela `trilha_regras`, uma linha). "Só o próximo passo" é fixo.
+   - Saldo = chaves ganhas − liberações feitas no semestre.
 7. **Gastar chave** é uma função no banco (`liberar_passo_com_chave`). Ela recusa se o aluno não tem saldo. O saldo é contado por cima: noites com check-in não anulado em vez da presença por janela. Assim o banco nunca recusa uma chave que o app mostra, e ninguém ganha chaves forjando chamadas.
 8. **Quem edita:** organização, cargos `Professor(a)` e `Diretor(a) de Ensino`, e quem dá aula em alguma turma (`turma_professores`). Tudo pelo celular, em `/trilha/gerenciar`, fora do painel (que é só da organização). O painel ganha um atalho.
 9. **Cancelar aula na Agenda** ganha a escolha "Sem reposição" ou "Repor em outro dia" (data e hora), com o aviso do efeito na trilha. Só existe quando o cancelamento é de uma turma específica.
@@ -31,5 +32,4 @@ Os alunos pedem um lugar para rever os passos ensinados em aula. Liberar tudo de
 ## Fora do escopo (YAGNI)
 
 - Velocidade e "repetir trecho" próprios: o player do YouTube já tem.
-- Regras de chave editáveis na tela: são constantes. O cartão "Regras das chaves" só informa.
 - "Marcar como praticado": fica no aparelho (localStorage), sem banco.

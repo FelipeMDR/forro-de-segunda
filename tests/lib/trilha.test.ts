@@ -191,6 +191,12 @@ describe('situacaoDoNivel', () => {
     expect(s[4].estado).toBe('bloqueado')
   })
 
+  it('antecedência menor que a padrão: o próximo passo ainda não vira "chave"', () => {
+    // hoje 20/10, p4 em 26/10: com 7 dias vira "chave", com 3 dias não
+    const s = situacaoDoNivel('iniciante', ctx({ regras: { pontos_por_chave: 3, antecedencia_dias: 3 } }))
+    expect(s[3].estado).toBe('bloqueado')
+  })
+
   it('passo sem vídeo não vira "chave"', () => {
     const passos = [1, 2, 3, 4].map((n) => passo(n, n === 4 ? { video_frente: null } : {}))
     expect(situacaoDoNivel('iniciante', ctx({ passos }))[3].estado).toBe('bloqueado')
@@ -246,7 +252,15 @@ describe('saldoDeChaves', () => {
       usadas: 1,
     })
     // 2 presenças + 2 noites com dupla + 1 parceria nova = 5
-    expect(s).toEqual({ pontos: 5, ganhas: 1, usadas: 1, disponiveis: 0, faltam: 1 })
+    expect(s).toEqual({ pontos: 5, ganhas: 1, usadas: 1, disponiveis: 0, faltam: 1, pontosPorChave: 3 })
+  })
+
+  it('segue os pontos por chave que a organização definiu', () => {
+    const s = saldoDeChaves({
+      presencas: ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02'],
+      noitesComDupla: [], parceiros: [], desde: null, usadas: 0, pontosPorChave: 2,
+    })
+    expect(s).toMatchObject({ pontos: 5, ganhas: 2, disponiveis: 2, faltam: 1, pontosPorChave: 2 })
   })
 
   it('nunca fica negativo', () => {

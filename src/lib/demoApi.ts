@@ -18,7 +18,7 @@ import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
-import { ordenarPassos, PONTOS_POR_CHAVE } from './trilha'
+import { ordenarPassos, REGRAS_PADRAO } from './trilha'
 import { compactarNotificacoes } from './notificacoes'
 import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
@@ -77,6 +77,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  RegrasTrilha,
 } from './types'
 
 /**
@@ -173,6 +174,7 @@ interface DB {
   /** Trilha de vídeos (migração 036) — ausente em bancos demo antigos. */
   trilhaPassos?: PassoTrilha[]
   trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string }>
+  trilhaRegras?: RegrasTrilha
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -2107,10 +2109,27 @@ export class DemoApi implements ForroApi {
     const noites = (await this.noitesComDupla(uid)).filter((d) => d >= corte).length
     const novas = (await this.parceirosDe(uid)).filter((p) => p.primeira && p.primeira >= corte).length
     const usadas = libs.filter((l) => l.user_id === uid && l.criado_em >= desde).length
-    if (presencas + noites + novas < PONTOS_POR_CHAVE * (usadas + 1)) {
+    const { pontos_por_chave } = await this.regrasTrilha()
+    if (presencas + noites + novas < pontos_por_chave * (usadas + 1)) {
       throw new Error('Você ainda não tem chave')
     }
     libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString() })
+    this.persist()
+  }
+
+  async regrasTrilha(): Promise<RegrasTrilha> {
+    return { ...(this.db.trilhaRegras ?? REGRAS_PADRAO) }
+  }
+
+  async salvarRegrasTrilha(r: RegrasTrilha) {
+    // Espelha salvar_regras_trilha (migração 036)
+    if (this.db.roles[this.uid()] !== 'organizador') {
+      throw new Error('Só a organização muda as regras das chaves')
+    }
+    if (r.pontos_por_chave < 1 || r.pontos_por_chave > 20 || r.antecedencia_dias < 0 || r.antecedencia_dias > 30) {
+      throw new Error('Pontos de 1 a 20 e antecedência de 0 a 30 dias')
+    }
+    this.db.trilhaRegras = { pontos_por_chave: r.pontos_por_chave, antecedencia_dias: r.antecedencia_dias }
     this.persist()
   }
 

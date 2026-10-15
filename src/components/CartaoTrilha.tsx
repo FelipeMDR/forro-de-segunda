@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { formatDate } from '../lib/dates'
-import { nivelDoAluno, PONTOS_POR_CHAVE, situacaoDoNivel } from '../lib/trilha'
+import { nivelDoAluno, situacaoDoNivel } from '../lib/trilha'
 import { useTrilha } from '../lib/useTrilha'
 import { Icone } from './Icone'
 
@@ -15,7 +15,8 @@ export function CartaoTrilha() {
   const atual = [...lista].reverse().find((s) => s.estado === 'aberto')
   const proximo = lista.find((s) => s.estado !== 'aberto')
   if (!atual && !proximo) return null
-  const pontosNaVez = PONTOS_POR_CHAVE - dados.saldo.faltam
+  const porChave = dados.saldo.pontosPorChave
+  const pontosNaVez = porChave - dados.saldo.faltam
 
   return (
     <button
@@ -51,11 +52,11 @@ export function CartaoTrilha() {
         <span className="flex justify-between text-xs font-bold text-ink2">
           <span>Presença e parceria até a próxima chave</span>
           <span>
-            {pontosNaVez} de {PONTOS_POR_CHAVE}
+            {pontosNaVez} de {porChave}
           </span>
         </span>
         <span className="h-2 overflow-hidden rounded-full bg-chip">
-          <span className="block h-full rounded-full bg-brasa-500" style={{ width: `${(pontosNaVez / PONTOS_POR_CHAVE) * 100}%` }} />
+          <span className="block h-full rounded-full bg-brasa-500" style={{ width: `${(pontosNaVez / porChave) * 100}%` }} />
         </span>
       </span>
     </button>

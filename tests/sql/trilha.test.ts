@@ -181,6 +181,46 @@ describe('trilha — quem edita', () => {
   })
 })
 
+describe('trilha — regras das chaves', () => {
+  async function regras(db: PGlite, uid: string, pontos: number, dias: number) {
+    await comoUsuario(db, uid)
+    await db.query(`select salvar_regras_trilha($1, $2)`, [pontos, dias])
+  }
+
+  it('começa com 3 pontos por chave e 7 dias', async () => {
+    const db = await bancoComMigracao()
+    const r = await db.query(`select pontos_por_chave, antecedencia_dias from trilha_regras`)
+    expect(r.rows).toEqual([{ pontos_por_chave: 3, antecedencia_dias: 7 }])
+  })
+
+  it('organização muda os pontos por chave, e o gasto passa a seguir a regra nova', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.org, 'Org', { organizador: true })
+    await pessoa(db, IDS.a, 'Ana')
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12'])
+    const p = await passo(db)
+    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chave')
+    await regras(db, IDS.org, 2, 7)
+    await liberar(db, IDS.a, p)
+    expect(await liberacoes(db, IDS.a)).toBe(1)
+  })
+
+  it('aluno e professor não mudam as regras', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    await pessoa(db, IDS.prof, 'Prof', { cargo: 'Professor(a)' })
+    await expect(regras(db, IDS.a, 1, 30)).rejects.toThrow('Só a organização muda as regras das chaves')
+    await expect(regras(db, IDS.prof, 1, 30)).rejects.toThrow('Só a organização muda as regras das chaves')
+  })
+
+  it('recusa valores fora da faixa', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.org, 'Org', { organizador: true })
+    await expect(regras(db, IDS.org, 0, 7)).rejects.toThrow()
+    await expect(regras(db, IDS.org, 3, 31)).rejects.toThrow()
+  })
+})
+
 describe('trilha — privilégios', () => {
   it('ninguém logado chama teto_pontos_trilha direto (vazaria a presença dos outros)', async () => {
     const db = await bancoComMigracao()

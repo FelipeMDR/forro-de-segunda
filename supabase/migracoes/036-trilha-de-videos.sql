@@ -98,6 +98,35 @@ begin
 end;
 $$;
 
+-- Regras das chaves, editáveis pela organização no painel. Uma linha só
+-- (id sempre true). "Só o próximo passo" NÃO é regra editável: é o que
+-- impede o aluno de queimar a largada.
+create table if not exists public.trilha_regras (
+  id boolean primary key default true check (id),
+  pontos_por_chave int not null default 3 check (pontos_por_chave between 1 and 20),
+  antecedencia_dias int not null default 7 check (antecedencia_dias between 0 and 30),
+  atualizado_em timestamptz not null default now()
+);
+insert into public.trilha_regras (id) values (true) on conflict (id) do nothing;
+
+alter table public.trilha_regras enable row level security;
+drop policy if exists "trilha_regras_select" on public.trilha_regras;
+create policy "trilha_regras_select" on public.trilha_regras
+  for select to authenticated using (true);
+
+create or replace function public.salvar_regras_trilha(p_pontos int, p_dias int)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not is_organizador() then
+    raise exception 'Só a organização muda as regras das chaves';
+  end if;
+  update trilha_regras
+  set pontos_por_chave = p_pontos, antecedencia_dias = p_dias, atualizado_em = now()
+  where id;
+end;
+$$;
+
 create or replace function public.inicio_semestre_trilha()
 returns timestamptz
 language sql stable security definer set search_path = public as $$
@@ -154,6 +183,7 @@ declare
   v_uid uuid := auth.uid();
   v_passo trilha_passos;
   v_usadas int;
+  v_pontos int;
 begin
   if v_uid is null then
     raise exception 'Você precisa entrar primeiro';
@@ -179,7 +209,8 @@ begin
   from trilha_liberacoes
   where user_id = v_uid and criado_em >= inicio_semestre_trilha();
 
-  if teto_pontos_trilha(v_uid) < 3 * (v_usadas + 1) then
+  select pontos_por_chave into v_pontos from trilha_regras where id;
+  if teto_pontos_trilha(v_uid) < coalesce(v_pontos, 3) * (v_usadas + 1) then
     raise exception 'Você ainda não tem chave';
   end if;
 
