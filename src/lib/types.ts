@@ -301,6 +301,11 @@ export interface AgendaEvent {
   data: string | null
   /** "HH:MM" */
   hora: string | null
+  /**
+   * Reposição: este evento (data única) repõe a aula cancelada nesta
+   * data ("YYYY-MM-DD"). Conta como aula da trilha. Migração 036.
+   */
+  reposicao_de?: string | null
 }
 
 export interface AgendaEventInput {
@@ -448,6 +453,8 @@ export interface FeriadoInput {
   motivo: string
   turma: string | null
   suspende_desafios: boolean
+  /** Repor a aula em outro dia (só com `turma`): cria o evento de reposição. */
+  reposicao?: { data: string; hora: string } | null
 }
 
 /**
@@ -587,6 +594,10 @@ export interface Report {
 export interface Turma {
   id: string
   nome: string
+  /** Nível da trilha de vídeos (migração 036). null = turma fora da trilha. */
+  nivel?: NivelTrilha | null
+  /** Primeira aula da trilha ("YYYY-MM-DD"). */
+  trilha_inicio?: string | null
 }
 
 /** Cargo no projeto (Presidência, Diretor(a) de Ensino, Monitor(a)…). */
@@ -746,3 +757,26 @@ export type ResultadoConexao = 'ok' | 'sem_premium' | 'nao_liberado'
 export type ResultadoLigarDJ =
   | { tipo: 'ligado' }
   | { tipo: 'ocupado'; dj_nome: string }
+
+// ---- Trilha de vídeo-aulas (migração 036) ----
+export type NivelTrilha = 'iniciante' | 'intermediario' | 'avancado'
+
+export interface PassoTrilha {
+  id: string
+  nivel: NivelTrilha
+  ordem: number
+  nome: string
+  /** IDs de 11 caracteres do YouTube. */
+  video_frente: string | null
+  video_condutor: string | null
+  video_conduzida: string | null
+  dica: string | null
+  pode_chave: boolean
+}
+
+export type PassoTrilhaInput = Omit<PassoTrilha, 'id'> & { id?: string }
+
+export interface LiberacaoTrilha {
+  passo_id: string
+  criado_em: string
+}
