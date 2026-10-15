@@ -181,6 +181,7 @@ Deno.serve(async (req) => {
         ? { id: pendente.id, trackUri: pendente.track_uri, enviadoEm: pendente.enviado_em }
         : null,
       temProximo: (proximos ?? []).length > 0,
+      voltouSemAparelho: sessao.aviso === 'sem_aparelho',
     })
 
     if (acao.tipo === 'fechar') {
@@ -198,6 +199,11 @@ Deno.serve(async (req) => {
         .update({ status: 'tocou', tocou_em: agoraIso() })
         .eq('id', acao.marcarTocou)
         .eq('status', 'enviado')
+    }
+    if (acao.devolver) {
+      // O celular perdeu o Spotify e a fila foi junto: o pedido volta
+      // para o lugar dele, e a próxima passada o manda de novo
+      doBanco(await admin.rpc('devolver_pedido', { p_id: acao.devolver }), 'devolver pedido perdido')
     }
 
     // "Tocando agora" que o aluno vê vem daqui, nunca do Spotify direto

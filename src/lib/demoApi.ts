@@ -2273,6 +2273,8 @@ export class DemoApi implements ForroApi {
         ? { id: pendente.id, trackUri: pendente.uri, enviadoEm: pendente.enviado_em ?? agora.toISOString() }
         : null,
       temProximo: fila.length > 0,
+      // O Spotify de mentira nunca perde o aparelho
+      voltouSemAparelho: false,
     })
     if (acao.tipo === 'fechar') {
       s.fechada_em = agora.toISOString()

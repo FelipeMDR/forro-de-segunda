@@ -161,7 +161,7 @@ export function camposQueMudaram(
 export type AcaoLoop =
   | { tipo: 'fechar'; motivo: 'virada' | 'conexao_perdida' }
   | { tipo: 'sem_aparelho' }
-  | { tipo: 'passada'; marcarTocou: string | null; enviar: boolean }
+  | { tipo: 'passada'; marcarTocou: string | null; enviar: boolean; devolver: string | null }
 
 /**
  * O que fazer nesta passada do loop.
@@ -177,6 +177,13 @@ export type AcaoLoop =
  * playlist, sem dizer qual é qual. Um pedido pulado cuja música também
  * está na playlist pareceria "ainda na fila" até a playlist chegar
  * nele — por isso, passado PRAZO_PENDENTE_MS, ele é dado como perdido.
+ *
+ * `voltouSemAparelho`: a passada anterior não achou aparelho. É o
+ * celular do DJ que perdeu contato com o Spotify e seguiu tocando
+ * sozinho — a fila guardada no Spotify vai embora junto. Se o pedido
+ * enviado não está tocando nem na fila, ninguém pulou: ele se perdeu, e
+ * `devolver` o põe de volta no lugar dele no rodízio. Nessa passada não
+ * se manda nada; a seguinte manda, já com ele de volta na fila.
  */
 export function decidirPassada(e: {
   agora: Date
@@ -185,6 +192,7 @@ export function decidirPassada(e: {
   player: EstadoPlayer | null
   enviadoPendente: { id: string; trackUri: string; enviadoEm: string } | null
   temProximo: boolean
+  voltouSemAparelho: boolean
 }): AcaoLoop {
   if (e.agora.getTime() >= fimDaNoite(e.noite).getTime()) {
     return { tipo: 'fechar', motivo: 'virada' }
@@ -199,9 +207,12 @@ export function decidirPassada(e: {
     e.agora.getTime() - new Date(p.enviadoEm).getTime() > PRAZO_PENDENTE_MS
   const aindaNaFila =
     p !== null && !tocando && !venceu && e.player.filaUris.includes(p.trackUri)
+  const perdido =
+    e.voltouSemAparelho && p !== null && !tocando && !e.player.filaUris.includes(p.trackUri)
   return {
     tipo: 'passada',
     marcarTocou: tocando && p ? p.id : null,
-    enviar: !aindaNaFila && e.temProximo,
+    enviar: !aindaNaFila && !perdido && e.temProximo,
+    devolver: perdido && p ? p.id : null,
   }
 }

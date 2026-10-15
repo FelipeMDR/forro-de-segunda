@@ -117,6 +117,7 @@ describe('decidirPassada', () => {
     player: player('spotify:track:playlist1'),
     enviadoPendente: null,
     temProximo: true,
+    voltouSemAparelho: false,
   }
 
   it('depois das 5h fecha por virada, antes de olhar qualquer outra coisa', () => {
@@ -137,7 +138,7 @@ describe('decidirPassada', () => {
   })
 
   it('sem pedido nosso pendente e com fila: manda o próximo', () => {
-    expect(decidirPassada(base)).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true })
+    expect(decidirPassada(base)).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true, devolver: null })
   })
 
   it('sem pedidos esperando: não manda nada', () => {
@@ -145,6 +146,7 @@ describe('decidirPassada', () => {
       tipo: 'passada',
       marcarTocou: null,
       enviar: false,
+      devolver: null,
     })
   })
 
@@ -155,7 +157,7 @@ describe('decidirPassada', () => {
         player: player('spotify:track:playlist1', ['spotify:track:nosso', 'spotify:track:playlist2']),
         enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
-    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: false })
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: false, devolver: null })
   })
 
   it('nosso pedido tocando: marca tocou e manda o próximo', () => {
@@ -165,7 +167,7 @@ describe('decidirPassada', () => {
         player: player('spotify:track:nosso', ['spotify:track:playlist2']),
         enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
-    ).toEqual({ tipo: 'passada', marcarTocou: 'p1', enviar: true })
+    ).toEqual({ tipo: 'passada', marcarTocou: 'p1', enviar: true, devolver: null })
   })
 
   it('pedido pulado que também está na playlist não trava a fila para sempre', () => {
@@ -179,7 +181,7 @@ describe('decidirPassada', () => {
         player: player('spotify:track:playlist1', ['spotify:track:playlist2', 'spotify:track:nosso']),
         enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:14:00Z' },
       }),
-    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true })
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true, devolver: null })
   })
 
   it('nosso pedido sumiu (pulado no Spotify): não conta, e manda o próximo', () => {
@@ -189,7 +191,44 @@ describe('decidirPassada', () => {
         player: player('spotify:track:playlist3', ['spotify:track:playlist4']),
         enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
       }),
-    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true })
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: true, devolver: null })
+  })
+
+  it('o celular perdeu o Spotify e nosso pedido sumiu: ele volta para a fila', () => {
+    // O celular do DJ perde contato com o Spotify e segue tocando sozinho
+    // (o loop vê "sem aparelho"). Quando volta, a fila do Spotify foi
+    // perdida junto: o pedido enviado não tocou nem está mais lá. Não
+    // foi pulado por ninguém — volta para o lugar dele no rodízio.
+    expect(
+      decidirPassada({
+        ...base,
+        voltouSemAparelho: true,
+        player: player('spotify:track:playlist3', ['spotify:track:playlist4']),
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:10:00Z' },
+      }),
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: false, devolver: 'p1' })
+  })
+
+  it('voltou do sem aparelho e nosso pedido segue na fila: só espera', () => {
+    expect(
+      decidirPassada({
+        ...base,
+        voltouSemAparelho: true,
+        player: player('spotify:track:playlist1', ['spotify:track:nosso']),
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:28:00Z' },
+      }),
+    ).toEqual({ tipo: 'passada', marcarTocou: null, enviar: false, devolver: null })
+  })
+
+  it('voltou do sem aparelho tocando o nosso pedido: marca tocou, nada volta', () => {
+    expect(
+      decidirPassada({
+        ...base,
+        voltouSemAparelho: true,
+        player: player('spotify:track:nosso'),
+        enviadoPendente: { id: 'p1', trackUri: 'spotify:track:nosso', enviadoEm: '2026-10-13T00:10:00Z' },
+      }),
+    ).toEqual({ tipo: 'passada', marcarTocou: 'p1', enviar: true, devolver: null })
   })
 })
 

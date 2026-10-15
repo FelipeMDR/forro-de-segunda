@@ -17,7 +17,7 @@ import { useLembrado } from '../lib/memoriaTelas'
 
 const AVISOS: Record<NonNullable<SessaoDJ['aviso']>, string> = {
   sem_aparelho:
-    'O Spotify não está tocando em nenhum aparelho. Dê play na playlist no Spotify.',
+    'O Spotify perdeu contato com o seu celular, e os pedidos não entram na fila. Abra o app do Spotify no celular (e confira a internet) — se nada estiver tocando, dê play na playlist.',
   sem_premium:
     'O Spotify recusou o controle do player. A conta precisa ser Premium e estar liberada no painel do Spotify.',
 }
