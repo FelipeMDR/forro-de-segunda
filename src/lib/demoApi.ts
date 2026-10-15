@@ -18,6 +18,7 @@ import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
+import { ordenarPassos, PONTOS_POR_CHAVE } from './trilha'
 import { compactarNotificacoes } from './notificacoes'
 import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
@@ -72,6 +73,10 @@ import type {
   SessaoDJ,
   StatusPedido,
   Turma,
+  LiberacaoTrilha,
+  NivelTrilha,
+  PassoTrilha,
+  PassoTrilhaInput,
 } from './types'
 
 /**
@@ -165,6 +170,9 @@ interface DB {
   notificacoesVistas?: Record<string, string>
   /** Datas (ISO) em que "Encerrar semestre" foi usado, em ordem. */
   semestres?: string[]
+  /** Trilha de vídeos (migração 036) — ausente em bancos demo antigos. */
+  trilhaPassos?: PassoTrilha[]
+  trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string }>
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -1493,11 +1501,29 @@ export class DemoApi implements ForroApi {
       turma: f.turma,
       suspende_desafios: f.suspende_desafios,
     })
+    if (f.reposicao && f.turma) {
+      this.db.events.push({
+        id: uuid(),
+        titulo: `Reposição · ${f.turma}`,
+        descricao: f.motivo.trim() || null,
+        turma: f.turma,
+        dia_semana: null,
+        data: f.reposicao.data,
+        hora: f.reposicao.hora || null,
+        reposicao_de: f.data,
+      })
+    }
     this.persist()
   }
 
   async deleteFeriado(id: string) {
-    this.db.feriados = this.db.feriados.filter((f) => f.id !== id)
+    const f = this.db.feriados.find((x) => x.id === id)
+    this.db.feriados = this.db.feriados.filter((x) => x.id !== id)
+    if (f?.turma) {
+      this.db.events = this.db.events.filter(
+        (e) => !(e.turma === f.turma && e.reposicao_de === f.data),
+      )
+    }
     this.persist()
   }
 
@@ -2011,6 +2037,92 @@ export class DemoApi implements ForroApi {
   }
 
   // ---- Turmas do semestre ----
+
+  private passosTrilha(): PassoTrilha[] {
+    if (!this.db.trilhaPassos) {
+      this.db.trilhaPassos = ['Base parada e marcação', 'Dois pra lá, dois pra cá', 'Caminhada', 'Giro simples da dama'].map(
+        (nome, i) => ({
+          id: uuid(), nivel: 'iniciante' as const, ordem: i + 1, nome,
+          video_frente: null, video_condutor: null, video_conduzida: null, dica: null, pode_chave: true,
+        }),
+      )
+    }
+    return this.db.trilhaPassos
+  }
+
+  async listPassosTrilha(): Promise<PassoTrilha[]> {
+    return ordenarPassos(this.passosTrilha())
+  }
+
+  async salvarPassoTrilha(p: PassoTrilhaInput) {
+    const lista = this.passosTrilha()
+    const linha = { ...p, nome: p.nome.trim(), dica: p.dica?.trim() || null }
+    if (p.id) {
+      const i = lista.findIndex((x) => x.id === p.id)
+      if (i < 0) throw new Error('Esse passo não existe mais')
+      lista[i] = { ...linha, id: p.id }
+    } else {
+      lista.push({ ...linha, id: uuid() })
+    }
+    this.persist()
+  }
+
+  async removerPassoTrilha(id: string) {
+    this.db.trilhaPassos = this.passosTrilha().filter((p) => p.id !== id)
+    this.db.trilhaLiberacoes = (this.db.trilhaLiberacoes ?? []).filter((l) => l.passo_id !== id)
+    this.persist()
+  }
+
+  async definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null) {
+    const t = this.db.turmas.find((x) => x.nome === turma)
+    if (!t) throw new Error('Turma não encontrada')
+    t.nivel = nivel
+    t.trilha_inicio = inicio
+    this.persist()
+  }
+
+  async minhasLiberacoes(): Promise<LiberacaoTrilha[]> {
+    const uid = this.uid()
+    return (this.db.trilhaLiberacoes ?? [])
+      .filter((l) => l.user_id === uid)
+      .map(({ passo_id, criado_em }) => ({ passo_id, criado_em }))
+  }
+
+  async liberarPassoComChave(passoId: string) {
+    // Espelha liberar_passo_com_chave (migração 036), com o mesmo teto.
+    const uid = this.uid()
+    const passo = this.passosTrilha().find((p) => p.id === passoId)
+    if (!passo) throw new Error('Esse passo não existe mais')
+    if (!passo.pode_chave) throw new Error('Esse passo só abre depois da aula')
+    if (!passo.video_frente) throw new Error('Esse passo ainda não tem vídeo')
+    const libs = (this.db.trilhaLiberacoes = this.db.trilhaLiberacoes ?? [])
+    if (libs.some((l) => l.user_id === uid && l.passo_id === passoId)) return
+    const desde = (await this.inicioSemestreAtual()) ?? ''
+    const corte = desde.slice(0, 10)
+    const presencas = new Set(
+      this.db.checkins
+        .filter((c) => c.user_id === uid && c.presenca_anulada !== true && c.criado_em >= desde)
+        .map((c) => diaDaNoite(new Date(c.criado_em))),
+    ).size
+    const noites = (await this.noitesComDupla(uid)).filter((d) => d >= corte).length
+    const novas = (await this.parceirosDe(uid)).filter((p) => p.primeira && p.primeira >= corte).length
+    const usadas = libs.filter((l) => l.user_id === uid && l.criado_em >= desde).length
+    if (presencas + noites + novas < PONTOS_POR_CHAVE * (usadas + 1)) {
+      throw new Error('Você ainda não tem chave')
+    }
+    libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString() })
+    this.persist()
+  }
+
+  async noitesComDupla(userId: string): Promise<string[]> {
+    return [
+      ...new Set(
+        (this.db.duplas ?? [])
+          .filter((d) => d.de_user === userId && d.confirmada)
+          .map((d) => d.data),
+      ),
+    ]
+  }
 
   async listTurmas(): Promise<Turma[]> {
     return [...this.db.turmas].sort((a, b) => a.nome.localeCompare(b.nome))

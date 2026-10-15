@@ -61,6 +61,10 @@ import type {
   SessaoDJ,
   Turma,
   TurmaMembro,
+  LiberacaoTrilha,
+  NivelTrilha,
+  PassoTrilha,
+  PassoTrilhaInput,
 } from './types'
 
 /**
@@ -1725,6 +1729,7 @@ export class SupabaseApi implements ForroApi {
       dia_semana: e.dia_semana as number | null,
       data: e.data as string | null,
       hora: e.hora ? horaCurta(e.hora) : null,
+      reposicao_de: (e.reposicao_de as string | null | undefined) ?? null,
     }))
   }
 
@@ -1769,10 +1774,29 @@ export class SupabaseApi implements ForroApi {
         suspende_desafios: f.suspende_desafios,
       }),
     )
+    if (f.reposicao && f.turma) {
+      // Sem a migração 036 a coluna não existe: o cancelamento já valeu,
+      // e a mensagem diz o que faltou.
+      const { error } = await this.sb.from('events').insert({
+        titulo: `Reposição · ${f.turma}`,
+        descricao: f.motivo.trim() || null,
+        turma: f.turma,
+        data: f.reposicao.data,
+        hora: f.reposicao.hora || null,
+        reposicao_de: f.data,
+      })
+      if (error) throw new Error('Aula cancelada, mas a reposição não foi salva: falta rodar a migração 036')
+    }
   }
 
   async deleteFeriado(id: string) {
+    const { data: f } = await this.sb.from('feriados').select('data, turma').eq('id', id).maybeSingle()
     ok(await this.sb.from('feriados').delete().eq('id', id))
+    if (f?.turma) {
+      // A reposição só existia por causa do cancelamento. Sem a coluna
+      // (migração 036 não rodada) não há o que apagar: ignora o erro.
+      await this.sb.from('events').delete().eq('turma', f.turma).eq('reposicao_de', f.data)
+    }
   }
 
   async listAberturas(): Promise<AberturaAntecipada[]> {
@@ -2158,6 +2182,59 @@ export class SupabaseApi implements ForroApi {
       if (ate) consulta = consulta.lte('data', ate.slice(0, 10))
       return consulta.order('id').range(inicio, fim)
     })
+  }
+
+  async listPassosTrilha(): Promise<PassoTrilha[]> {
+    const { data, error } = await this.sb
+      .from('trilha_passos')
+      .select('id, nivel, ordem, nome, video_frente, video_condutor, video_conduzida, dica, pode_chave')
+      .order('nivel')
+      .order('ordem')
+    if (error) return [] // sem a migração 036
+    return data as PassoTrilha[]
+  }
+
+  async salvarPassoTrilha(p: PassoTrilhaInput) {
+    const { id, ...campos } = p
+    const linha = { ...campos, nome: campos.nome.trim(), dica: campos.dica?.trim() || null }
+    ok(
+      id
+        ? await this.sb.from('trilha_passos').update(linha).eq('id', id)
+        : await this.sb.from('trilha_passos').insert(linha),
+    )
+  }
+
+  async removerPassoTrilha(id: string) {
+    ok(await this.sb.from('trilha_passos').delete().eq('id', id))
+  }
+
+  async definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null) {
+    const { error } = await this.sb.rpc('definir_trilha_da_turma', {
+      p_turma: turma,
+      p_nivel: nivel,
+      p_inicio: inicio,
+    })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async minhasLiberacoes(): Promise<LiberacaoTrilha[]> {
+    const uid = await this.requireUid()
+    const { data, error } = await this.sb
+      .from('trilha_liberacoes')
+      .select('passo_id, criado_em')
+      .eq('user_id', uid)
+    if (error) return []
+    return data as LiberacaoTrilha[]
+  }
+
+  async liberarPassoComChave(passoId: string) {
+    const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async noitesComDupla(userId: string): Promise<string[]> {
+    const linhas = await this.duplasConfirmadasDe(userId)
+    return [...new Set(linhas.map((l) => l.data))]
   }
 
   async confirmarPresenca(eventoId: string, data: string, vai: boolean) {
@@ -2559,8 +2636,13 @@ export class SupabaseApi implements ForroApi {
   // ---- Turmas do semestre ----
 
   async listTurmas(): Promise<Turma[]> {
-    const data = ok(await this.sb.from('turmas').select('id, nome').order('nome'))
-    return data as Turma[]
+    const data = ok(await this.sb.from('turmas').select('*').order('nome')) as Array<Record<string, unknown>>
+    return data.map((t) => ({
+      id: t.id as string,
+      nome: t.nome as string,
+      nivel: (t.nivel as NivelTrilha | null | undefined) ?? null,
+      trilha_inicio: (t.trilha_inicio as string | null | undefined) ?? null,
+    }))
   }
 
   async saveTurma(nome: string) {

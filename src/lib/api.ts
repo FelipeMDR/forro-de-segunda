@@ -44,6 +44,10 @@ import type {
   ResultadoLigarDJ,
   SessaoDJ,
   Turma,
+  LiberacaoTrilha,
+  NivelTrilha,
+  PassoTrilha,
+  PassoTrilhaInput,
 } from './types'
 
 /**
@@ -369,6 +373,21 @@ export interface ForroApi {
    * fecha o período no fim — é o recorte da Forródex presa a um desafio.
    */
   parceirosDe(userId: string, desde?: string, ate?: string): Promise<ParceiroDanca[]>
+
+  // ---- Trilha de vídeo-aulas (migração 036) ----
+  /** Todos os passos de todos os níveis (poucas dezenas de linhas). */
+  listPassosTrilha(): Promise<PassoTrilha[]>
+  /** Cria (sem `id`) ou atualiza um passo. Professores e organização. */
+  salvarPassoTrilha(p: PassoTrilhaInput): Promise<void>
+  removerPassoTrilha(id: string): Promise<void>
+  /** Nível e primeira aula da trilha de uma turma. */
+  definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null): Promise<void>
+  /** Passos que EU liberei com chave. */
+  minhasLiberacoes(): Promise<LiberacaoTrilha[]>
+  /** Gasta uma chave. O banco recusa sem saldo ("Você ainda não tem chave"). */
+  liberarPassoComChave(passoId: string): Promise<void>
+  /** Noites ("YYYY-MM-DD") com dupla confirmada de alguém, sem repetir. */
+  noitesComDupla(userId: string): Promise<string[]>
 
   // ---- Notificações ----
   /**
