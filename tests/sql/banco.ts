@@ -50,6 +50,8 @@ create function public.noite_do_checkin(quando timestamptz) returns date
 language sql immutable as $$
   select ((quando at time zone 'America/Sao_Paulo') - interval '5 hours')::date;
 $$;
+-- Como no Supabase: funções novas já nascem executáveis por anon/authenticated
+alter default privileges in schema public grant execute on functions to anon, authenticated;
 create table public.turmas (
   id uuid primary key default gen_random_uuid(), nome text not null unique
 );

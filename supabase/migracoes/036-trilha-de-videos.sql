@@ -120,7 +120,10 @@ language sql stable security definer set search_path = public as $$
   presencas as (
     select count(distinct noite_do_checkin(c.criado_em)) as n
     from checkins c, corte
-    where c.user_id = p_uid and not c.presenca_anulada and c.criado_em >= corte.t
+    -- Corta pela NOITE, como o app: encerrar o semestre no meio do forró
+    -- não pode tirar do banco a presença que o app já mostrou.
+    where c.user_id = p_uid and not c.presenca_anulada
+      and noite_do_checkin(c.criado_em) >= noite_do_checkin(corte.t)
   ),
   noites_dupla as (
     select count(distinct du.data) as n
@@ -140,7 +143,9 @@ language sql stable security definer set search_path = public as $$
   select (presencas.n + noites_dupla.n + novas.n)::int
   from presencas, noites_dupla, novas;
 $$;
-revoke all on function public.teto_pontos_trilha(uuid) from public;
+-- O Supabase dá EXECUTE a anon/authenticated em toda função nova; sem
+-- isto, qualquer um consultaria a presença de outra pessoa.
+revoke all on function public.teto_pontos_trilha(uuid) from public, anon, authenticated;
 
 create or replace function public.liberar_passo_com_chave(p_passo uuid)
 returns void

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   aulasDaTurma,
+  nivelInicial,
   cronogramaDaTurma,
   idDoYoutube,
   nivelDoAluno,
@@ -107,6 +108,22 @@ describe('aulasDaTurma', () => {
       { data: '2026-10-31', tipo: 'reposicao', motivo: null, reposicaoEm: null },
       { data: '2026-11-02', tipo: 'aula', motivo: null, reposicaoEm: null },
     ])
+  })
+
+  it('reposição de um dia sem aula da turma não conta (cancelamento num dia qualquer)', () => {
+    // Iniciante 01 tem aula às segundas; cancelaram uma quarta e "repuseram"
+    const r = aulasDaTurma(
+      'Iniciante 01', '2026-10-05', [aulaSeg, reposicao('2026-10-10', '2026-10-07')],
+      [feriado('2026-10-07', 'Iniciante 01')], '2026-10-12',
+    )
+    expect(r.map((a) => a.data)).toEqual(['2026-10-05', '2026-10-12'])
+  })
+
+  it('reposição que sobrou sem o cancelamento não conta', () => {
+    const r = aulasDaTurma(
+      'Iniciante 01', '2026-10-05', [aulaSeg, reposicao('2026-10-10', '2026-10-05')], [], '2026-10-12',
+    )
+    expect(r.map((a) => [a.data, a.tipo])).toEqual([['2026-10-05', 'aula'], ['2026-10-12', 'aula']])
   })
 
   it('evento de data única que não é reposição não conta como aula', () => {
@@ -246,5 +263,20 @@ describe('podeEditarTrilha', () => {
     expect(podeEditarTrilha({ papel: 'aluno', cargos: ['Diretor(a) de Ensino'], turmas_ensino: [] })).toBe(true)
     expect(podeEditarTrilha({ papel: 'aluno', cargos: [], turmas_ensino: ['Iniciante 01'] })).toBe(true)
     expect(podeEditarTrilha({ papel: 'aluno', cargos: ['Membro de RH'], turmas_ensino: [] })).toBe(false)
+  })
+})
+
+describe('nivelInicial', () => {
+  it('abre no nível do aluno quando ele tem passos', () => {
+    expect(nivelInicial(ctx({ minhasTurmas: ['Iniciante 01'] }))).toBe('iniciante')
+  })
+
+  it('nível do aluno sem passos: abre no primeiro que tem (revisão), não numa tela vazia', () => {
+    // Aluno do Intermediário, mas só o Iniciante tem passos
+    expect(nivelInicial(ctx({ minhasTurmas: ['Intermediário'] }))).toBe('iniciante')
+  })
+
+  it('sem nada para ver: null', () => {
+    expect(nivelInicial(ctx({ minhasTurmas: [] }))).toBeNull()
   })
 })

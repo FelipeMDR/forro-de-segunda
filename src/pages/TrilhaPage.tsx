@@ -7,6 +7,7 @@ import { formatDate } from '../lib/dates'
 import {
   NOME_NIVEL,
   nivelDoAluno,
+  nivelInicial,
   niveisVisiveis,
   situacaoDoNivel,
   type PassoComSituacao,
@@ -32,8 +33,8 @@ export function TrilhaPage() {
 
   const niveis = dados ? niveisVisiveis(dados.ctx) : []
   useEffect(() => {
-    if (dados && nivel === null) setNivel(nivelDoAluno(dados.ctx) ?? niveis[0] ?? null)
-  }, [dados, nivel, niveis])
+    if (dados && nivel === null) setNivel(nivelInicial(dados.ctx))
+  }, [dados, nivel])
 
   const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
   const meu = dados ? nivelDoAluno(dados.ctx) : null
@@ -57,6 +58,11 @@ export function TrilhaPage() {
         {dados && niveis.length === 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
             A trilha da sua turma ainda não foi configurada. Assim que os professores subirem os vídeos, eles aparecem aqui.
+          </p>
+        )}
+        {dados && meu && !dados.ctx.equipe && niveis.length > 0 && !niveis.includes(meu) && (
+          <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
+            Os vídeos do seu nível ainda não subiram. Enquanto isso, dá para revisar os níveis anteriores.
           </p>
         )}
         {niveis.length > 1 && nivel && (

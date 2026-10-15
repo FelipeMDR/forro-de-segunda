@@ -387,6 +387,10 @@ function FolhaCancelar({
   const [salvando, setSalvando] = useState(false)
   const [repor, setRepor] = useState<'nao' | 'sim'>('nao')
   const [reposicao, setReposicao] = useState({ data: '', hora: '' })
+  // Só dá para repor uma aula de verdade: o cancelamento aberto a partir
+  // da aula de uma turma (com data). No "Feriado ou dia sem forró" a data
+  // é livre e pode nem ser dia de aula da turma escolhida.
+  const podeRepor = form.turma !== null && Boolean(alvo?.data)
 
   useEffect(() => {
     if (!alvo) return
@@ -402,7 +406,7 @@ function FolhaCancelar({
       toast('Escolha a data', 'erro')
       return
     }
-    const comReposicao = repor === 'sim' && form.turma !== null
+    const comReposicao = podeRepor && repor === 'sim'
     if (comReposicao && !reposicao.data) {
       toast('Escolha o dia da reposição', 'erro')
       return
@@ -463,7 +467,7 @@ function FolhaCancelar({
             onChange={(e) => setForm({ ...form, motivo: e.target.value })}
           />
         </Campo>
-        {form.turma !== null && (
+        {podeRepor && (
           <Campo rotulo="A aula vai ser reposta?">
             <Segmentado
               opcoes={[
@@ -475,7 +479,7 @@ function FolhaCancelar({
             />
           </Campo>
         )}
-        {form.turma !== null && repor === 'sim' && (
+        {podeRepor && repor === 'sim' && (
           <div className="grid grid-cols-2 gap-2.5">
             <Campo rotulo="Dia da reposição">
               <input
@@ -499,7 +503,7 @@ function FolhaCancelar({
           <b className="text-ink">Trilha de vídeos: </b>
           {form.turma === null
             ? 'todas as turmas com aula nesse dia andam uma semana.'
-            : repor === 'sim'
+            : podeRepor && repor === 'sim'
               ? 'o passo desta aula vai para o dia da reposição, e nada mais muda. A reposição aparece na agenda da turma.'
               : 'os passos seguintes desta turma andam uma semana.'}
         </div>
@@ -516,7 +520,7 @@ function FolhaCancelar({
           <BotaoAcao tamanho="g" sombra={false} className="flex-[1.3]" disabled={salvando} onClick={() => void salvar()}>
             {salvando
               ? 'Salvando…'
-              : repor === 'sim' && form.turma !== null
+              : podeRepor && repor === 'sim'
                 ? 'Cancelar e marcar reposição'
                 : 'Cancelar e avisar'}
           </BotaoAcao>

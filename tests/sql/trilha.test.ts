@@ -121,6 +121,21 @@ describe('trilha — gastar chave', () => {
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
+  it('encerrar o semestre no meio da noite: a presença daquela noite vale nos dois lados', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    // Check-in às 19:30, semestre encerrado às 20:00 da mesma segunda (SP).
+    // O app conta a noite (corte pela data), então o banco também precisa.
+    await db.query(
+      `insert into checkins (user_id, criado_em) values ($1, '2026-10-05T19:30:00-03:00')`,
+      [IDS.a],
+    )
+    await db.query(`insert into semestres (encerrado_em) values ('2026-10-05T20:00:00-03:00')`)
+    await noites(db, IDS.a, ['2026-10-12', '2026-10-19'])
+    await liberar(db, IDS.a, await passo(db))
+    expect(await liberacoes(db, IDS.a)).toBe(1)
+  })
+
   it('ID de vídeo inválido é recusado pela tabela', async () => {
     const db = await bancoComMigracao()
     await expect(passo(db, { video: 'https://youtu.be/x' })).rejects.toThrow()
@@ -163,5 +178,18 @@ describe('trilha — quem edita', () => {
       `select nivel, trilha_inicio::text from turmas where nome = 'Iniciante 01'`,
     )
     expect(t.rows[0]).toEqual({ nivel: 'iniciante', trilha_inicio: '2026-10-05' })
+  })
+})
+
+describe('trilha — privilégios', () => {
+  it('ninguém logado chama teto_pontos_trilha direto (vazaria a presença dos outros)', async () => {
+    const db = await bancoComMigracao()
+    for (const papel of ['anon', 'authenticated']) {
+      const r = await db.query<{ pode: boolean }>(
+        `select has_function_privilege($1, 'public.teto_pontos_trilha(uuid)', 'execute') as pode`,
+        [papel],
+      )
+      expect(r.rows[0].pode).toBe(false)
+    }
   })
 })

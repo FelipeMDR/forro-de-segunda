@@ -131,13 +131,26 @@ export function aulasDaTurma(
     for (; d <= ate; d = somaDias(d, 7)) datas.add(d)
   }
 
+  const cancelamento = (data: string) =>
+    feriados.find((x) => x.data === data && (x.turma === null || x.turma === turma))
+
+  // Reposição só vale no lugar de uma aula DESTA turma que foi mesmo
+  // cancelada. Repor um dia sem aula, ou uma reposição que sobrou depois
+  // de desfazerem o cancelamento, puxaria a trilha inteira para frente.
   const reposicoes = eventos.filter(
-    (e) => e.turma === turma && e.data && e.reposicao_de && e.data >= inicio && e.data <= ate,
+    (e) =>
+      e.turma === turma &&
+      e.data &&
+      e.reposicao_de &&
+      e.data >= inicio &&
+      e.data <= ate &&
+      datas.has(e.reposicao_de) &&
+      cancelamento(e.reposicao_de),
   )
   const reposicaoDe = new Map(reposicoes.map((e) => [e.reposicao_de as string, e.data as string]))
 
   const aulas: AulaDaTurma[] = [...datas].map((data) => {
-    const f = feriados.find((x) => x.data === data && (x.turma === null || x.turma === turma))
+    const f = cancelamento(data)
     return f
       ? { data, tipo: 'cancelada', motivo: f.motivo, reposicaoEm: reposicaoDe.get(data) ?? null }
       : { data, tipo: 'aula', motivo: null, reposicaoEm: null }
@@ -233,6 +246,13 @@ export function niveisVisiveis(ctx: ContextoTrilha): NivelTrilha[] {
   const meu = nivelDoAluno(ctx)
   if (!meu) return []
   return comPassos.filter((n) => NIVEIS.indexOf(n) <= NIVEIS.indexOf(meu))
+}
+
+/** Aba em que a trilha abre: o nível do aluno, ou o primeiro com passos (revisão). */
+export function nivelInicial(ctx: ContextoTrilha): NivelTrilha | null {
+  const niveis = niveisVisiveis(ctx)
+  const meu = nivelDoAluno(ctx)
+  return meu && niveis.includes(meu) ? meu : (niveis[0] ?? null)
 }
 
 export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoComSituacao[] {
