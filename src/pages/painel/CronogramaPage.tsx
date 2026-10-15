@@ -6,12 +6,12 @@ import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../lib/dates'
 import { cronogramaDeTurma, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { AgendaEvent, Feriado, NivelTrilha, PassoTrilha, Turma } from '../../lib/types'
-import { Campo } from '../painel/contexto'
+import { Campo } from './contexto'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
 export function CronogramaPage() {
-  const { api, papel } = useAuth()
+  const { api } = useAuth()
   const toast = useToast()
   const [base, setBase] = useState<{ turmas: Turma[]; passos: PassoTrilha[]; eventos: AgendaEvent[]; feriados: Feriado[] } | null>(null)
   const [escolhida, setEscolhida] = useState<string | null>(null)
@@ -51,7 +51,7 @@ export function CronogramaPage() {
 
   return (
     <Tela>
-      <Cabecalho titulo="Cronograma" sobretitulo="Vídeo-aulas" fallback="/trilha/gerenciar" />
+      <Cabecalho titulo="Cronograma" sobretitulo="Vídeo-aulas" fallback="/organizador/videoaulas" />
       <div className="flex flex-col gap-3 px-4 pt-2 pb-8">
         <p className="px-1 text-sm text-ink2">Cada turma anda no seu ritmo. A trilha do nível é a mesma, só as datas mudam.</p>
         <div className="flex flex-wrap gap-2">
@@ -97,7 +97,7 @@ export function CronogramaPage() {
                   ? aulasNaAgenda.map((e) => `${DIAS[e.dia_semana!]} ${e.hora ?? ''}`.trim()).join(' · ')
                   : 'nenhuma aula semanal'}
               </span>
-              <Link to={papel === 'organizador' ? '/organizador/agenda' : '/agenda'} className="font-extrabold text-or-t">
+              <Link to="/organizador/agenda" className="font-extrabold text-or-t">
                 Abrir agenda
               </Link>
             </div>

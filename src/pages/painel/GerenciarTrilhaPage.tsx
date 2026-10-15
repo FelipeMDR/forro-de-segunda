@@ -19,7 +19,7 @@ export function GerenciarTrilhaPage() {
 
   return (
     <Tela>
-      <Cabecalho titulo="Vídeo-aulas" sobretitulo="Trilha" fallback="/perfil" />
+      <Cabecalho titulo="Vídeo-aulas" sobretitulo="Painel" fallback="/organizador" />
       <div className="flex flex-col gap-3 px-4 pt-2">
         <p className="px-1 text-sm text-ink2">Uma trilha por nível. As datas ficam no cronograma de cada turma.</p>
         <CartaoAtalho
@@ -27,7 +27,7 @@ export function GerenciarTrilhaPage() {
           cor="#DE5300"
           titulo="Cronogramas das turmas"
           descricao="Nível, primeira aula e datas de cada passo"
-          onClick={() => navigate('/trilha/gerenciar/cronograma')}
+          onClick={() => navigate('/organizador/videoaulas/cronograma')}
         />
         <Segmentado
           opcoes={NIVEIS.map((n) => ({ valor: n, rotulo: NOME_NIVEL[n] }))}
@@ -42,7 +42,7 @@ export function GerenciarTrilhaPage() {
             <button
               key={p.id}
               type="button"
-              onClick={() => navigate(`/trilha/gerenciar/passo/${p.id}`)}
+              onClick={() => navigate(`/organizador/videoaulas/passo/${p.id}`)}
               className={`flex min-h-[60px] w-full items-center gap-3 px-3.5 py-3 text-left ${i > 0 ? 'border-t border-linha' : ''}`}
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-chip font-extrabold">{i + 1}</span>
@@ -55,7 +55,7 @@ export function GerenciarTrilhaPage() {
             </button>
           ))}
         </div>
-        <BotaoAcao bloco onClick={() => navigate(`/trilha/gerenciar/passo/novo?nivel=${nivel}`)}>
+        <BotaoAcao bloco onClick={() => navigate(`/organizador/videoaulas/passo/novo?nivel=${nivel}`)}>
           Novo passo
         </BotaoAcao>
       </div>

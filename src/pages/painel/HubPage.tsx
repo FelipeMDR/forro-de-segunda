@@ -33,7 +33,7 @@ export function PainelHome() {
           cor="#0391D5"
           titulo="Vídeo-aulas"
           descricao="Trilhas por nível · cronograma das turmas"
-          onClick={() => navigate('/trilha/gerenciar')}
+          onClick={() => navigate('/organizador/videoaulas')}
         />
         <CartaoAtalho
           icone="medalha"

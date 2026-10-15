@@ -5,7 +5,7 @@ import { useApi } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { idDoYoutube, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { NivelTrilha, PassoTrilhaInput } from '../../lib/types'
-import { Campo, Dica } from '../painel/contexto'
+import { Campo, Dica } from './contexto'
 
 const VAZIO: PassoTrilhaInput = {
   nivel: 'iniciante', ordem: 1, nome: '', video_frente: null, video_condutor: null,
@@ -37,7 +37,7 @@ export function EditarPassoPage() {
       const p = todos.find((x) => x.id === id)
       if (!p) {
         toast('Esse passo não existe mais', 'erro')
-        navigate('/trilha/gerenciar', { replace: true })
+        navigate('/organizador/videoaulas', { replace: true })
         return
       }
       setForm(p)
@@ -67,7 +67,7 @@ export function EditarPassoPage() {
     try {
       await api.salvarPassoTrilha({ ...form, ...ids })
       toast('Passo salvo')
-      navigate('/trilha/gerenciar')
+      navigate('/organizador/videoaulas')
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -99,7 +99,7 @@ export function EditarPassoPage() {
 
   return (
     <Tela>
-      <Cabecalho titulo={novo ? 'Novo passo' : 'Editar passo'} fallback="/trilha/gerenciar" />
+      <Cabecalho titulo={novo ? 'Novo passo' : 'Editar passo'} fallback="/organizador/videoaulas" />
       <div className="flex flex-col gap-4 px-4 pt-2 pb-8">
         <Campo rotulo="Nome do passo">
           <input className="input" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
@@ -165,7 +165,7 @@ export function EditarPassoPage() {
         ok="Remover"
         onVoltar={() => setRemovendo(false)}
         onOk={() => {
-          void api.removerPassoTrilha(form.id!).then(() => navigate('/trilha/gerenciar'))
+          void api.removerPassoTrilha(form.id!).then(() => navigate('/organizador/videoaulas'))
         }}
       />
     </Tela>

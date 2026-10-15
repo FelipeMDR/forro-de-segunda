@@ -16,7 +16,6 @@ import { computeBadges } from '../lib/badges'
 import { carregarParceiros } from '../lib/forrodex'
 import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
-import { podeEditarTrilha } from '../lib/trilha'
 import { useTema } from '../lib/tema'
 import type { Badge, CheckinFavorito } from '../lib/types'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
@@ -248,12 +247,6 @@ export function ProfilePage() {
           Trilha de passos
           <Icone nome="avancar" tamanho={20} className="text-ink3" />
         </button>
-        {profile && podeEditarTrilha({ papel, cargos: profile.cargos, turmas_ensino: profile.turmas_ensino }) && (
-          <button type="button" onClick={() => navigate('/trilha/gerenciar')} className={linha}>
-            Gerenciar vídeo-aulas
-            <Icone nome="avancar" tamanho={20} className="text-ink3" />
-          </button>
-        )}
         <button type="button" onClick={() => navigate('/perfil/conta')} className={linha}>
           Minha conta
           <Icone nome="avancar" tamanho={20} className="text-ink3" />

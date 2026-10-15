@@ -6,10 +6,9 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { BuscarPage } from './pages/BuscarPage'
 import { PassoPage } from './pages/PassoPage'
-import { CronogramaPage } from './pages/trilha/CronogramaPage'
-import { EditarPassoPage } from './pages/trilha/EditarPassoPage'
-import { GerenciarTrilhaPage } from './pages/trilha/GerenciarTrilhaPage'
-import { SoEquipeTrilha } from './pages/trilha/SoEquipeTrilha'
+import { CronogramaPage } from './pages/painel/CronogramaPage'
+import { EditarPassoPage } from './pages/painel/EditarPassoPage'
+import { GerenciarTrilhaPage } from './pages/painel/GerenciarTrilhaPage'
 import { TrilhaPage } from './pages/TrilhaPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
@@ -83,11 +82,6 @@ export default function App() {
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/salao" element={<SalaoPage />} />
               <Route path="/trilha" element={<TrilhaPage />} />
-              <Route path="/trilha/gerenciar" element={<SoEquipeTrilha />}>
-                <Route index element={<GerenciarTrilhaPage />} />
-                <Route path="passo/:id" element={<EditarPassoPage />} />
-                <Route path="cronograma" element={<CronogramaPage />} />
-              </Route>
               <Route path="/trilha/:id" element={<PassoPage />} />
               <Route path="/checkin" element={<CheckinPage />} />
               <Route path="/desafios" element={<ChallengesPage />} />
@@ -118,6 +112,9 @@ export default function App() {
                 <Route path="distintivos/novo" element={<NovoDistintivoPage />} />
                 <Route path="frequencia" element={<FrequenciaPage />} />
                 <Route path="denuncias" element={<DenunciasPage />} />
+                <Route path="videoaulas" element={<GerenciarTrilhaPage />} />
+                <Route path="videoaulas/passo/:id" element={<EditarPassoPage />} />
+                <Route path="videoaulas/cronograma" element={<CronogramaPage />} />
               </Route>
               <Route path="/dj" element={<DJPage />} />
               <Route path="/musica" element={<MusicaPage />} />
