@@ -207,6 +207,10 @@ precisa desinstalar nem reinstalar nada.
 
 Se a mudança mexer no banco, rode o SQL no Supabase **antes** do push.
 
+Migrações novas que ainda precisam ser rodadas:
+
+- `supabase/migracoes/036-trilha-de-videos.sql`: trilha de vídeo-aulas (passos, chaves, nível da turma, reposição de aula). Sem ela, o app mostra "A trilha ainda não foi configurada", e a reposição no cancelamento avisa que falta a migração. Depois de rodar, use "Reload schema cache".
+
 ## Dois cuidados de manutenção
 
 - **Keep-alive:** o Supabase gratuito pausa o projeto após 7 dias sem
