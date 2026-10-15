@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FolhaChave } from '../components/FolhaChave'
+import { FolhaChave, FolhaRegrasChaves } from '../components/FolhaChave'
 import { Icone } from '../components/Icone'
 import { Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
@@ -39,6 +39,7 @@ export function TrilhaPage() {
   const voltar = useVoltar('/')
   const [nivel, setNivel] = useState<NivelTrilha | null>(null)
   const [alvo, setAlvo] = useState<PassoComSituacao | null>(null)
+  const [regrasAbertas, setRegrasAbertas] = useState(false)
   const [praticados] = useState(lerPraticados)
 
   useEffect(() => {
@@ -73,10 +74,16 @@ export function TrilhaPage() {
           <Icone nome="voltar" className="h-6 w-6" />
         </button>
         {saldo && (
-          <span className="mr-2 flex h-11 items-center gap-2 rounded-full bg-preto px-3.5 text-sm font-extrabold text-branco">
+          <button
+            type="button"
+            onClick={() => setRegrasAbertas(true)}
+            aria-label={`Você tem ${saldo.disponiveis} ${saldo.disponiveis === 1 ? 'chave' : 'chaves'}. Ver como funcionam`}
+            className="mr-2 flex h-11 items-center gap-2 rounded-full bg-preto px-3.5 text-sm font-extrabold text-branco"
+          >
             <Icone nome="chave" className="h-[18px] w-[18px] text-brasa-400" />
             {saldo.disponiveis} {saldo.disponiveis === 1 ? 'chave' : 'chaves'}
-          </span>
+            <Icone nome="info" className="h-4 w-4 text-[#c3c8cb]" />
+          </button>
         )}
       </div>
 
@@ -201,6 +208,14 @@ export function TrilhaPage() {
         )}
       </div>
       {saldo && <FolhaChave alvo={alvo} saldo={saldo} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
+      {saldo && (
+        <FolhaRegrasChaves
+          aberta={regrasAbertas}
+          saldo={saldo}
+          antecedenciaDias={dados?.ctx.regras?.antecedencia_dias ?? 7}
+          onFechar={() => setRegrasAbertas(false)}
+        />
+      )}
     </Tela>
   )
 }

@@ -33,8 +33,6 @@ export function FolhaChave({
   }, [alvo])
 
   const temChave = saldo.disponiveis > 0
-  const porChave = saldo.pontosPorChave
-  const pontosNaVez = porChave - saldo.faltam
 
   const liberar = async () => {
     if (!alvo) return
@@ -91,33 +89,7 @@ export function FolhaChave({
             )}
           </div>
 
-          <div className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
-            <span className="text-sm font-extrabold">Como ganhar chaves</span>
-            {GANHOS.map(([titulo, desc]) => (
-              <div key={titulo} className="flex items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-brasa-300 font-extrabold text-or-t">
-                  +1
-                </span>
-                <span className="flex flex-col text-sm">
-                  <b>{titulo}</b>
-                  <span className="text-xs text-ink2">{desc}</span>
-                </span>
-              </div>
-            ))}
-            <div className="flex flex-col gap-1.5 border-t border-linha pt-2.5">
-              <div className="flex justify-between text-[13px] font-bold text-ink2">
-                <span>
-                  {porChave} {porChave === 1 ? 'ponto' : 'pontos'} = 1 chave
-                </span>
-                <span>
-                  {pontosNaVez} de {porChave}
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-chip">
-                <div className="h-full rounded-full bg-brasa-500" style={{ width: `${(pontosNaVez / porChave) * 100}%` }} />
-              </div>
-            </div>
-          </div>
+          <ComoGanharChaves saldo={saldo} />
 
           <div className="flex flex-col gap-2">
             <BotaoAcao cor="preto" bloco sombra={false} disabled={!temChave || salvando} onClick={() => void liberar()}>
@@ -133,6 +105,101 @@ export function FolhaChave({
           </div>
         </div>
       )}
+    </Folha>
+  )
+}
+
+/** Como se ganha ponto e quanto falta para a próxima chave (folhas da trilha). */
+export function ComoGanharChaves({ saldo }: { saldo: SaldoChaves }) {
+  const porChave = saldo.pontosPorChave
+  const pontosNaVez = porChave - saldo.faltam
+  return (
+    <div className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
+      <span className="text-sm font-extrabold">Como ganhar chaves</span>
+      {GANHOS.map(([titulo, desc]) => (
+        <div key={titulo} className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-brasa-300 font-extrabold text-or-t">
+            +1
+          </span>
+          <span className="flex flex-col text-sm">
+            <b>{titulo}</b>
+            <span className="text-xs text-ink2">{desc}</span>
+          </span>
+        </div>
+      ))}
+      <div className="flex flex-col gap-1.5 border-t border-linha pt-2.5">
+        <div className="flex justify-between text-[13px] font-bold text-ink2">
+          <span>
+            {porChave} {porChave === 1 ? 'ponto' : 'pontos'} = 1 chave
+          </span>
+          <span>
+            {pontosNaVez} de {porChave}
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-chip">
+          <div className="h-full rounded-full bg-brasa-500" style={{ width: `${(pontosNaVez / porChave) * 100}%` }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Toque no contador de chaves: o saldo e as regras, sem gastar nada. */
+export function FolhaRegrasChaves({
+  aberta,
+  saldo,
+  antecedenciaDias,
+  onFechar,
+}: {
+  aberta: boolean
+  saldo: SaldoChaves
+  antecedenciaDias: number
+  onFechar: () => void
+}) {
+  const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+  return (
+    <Folha aberta={aberta} onFechar={onFechar}>
+      <div className="flex flex-col gap-4 px-5 pb-8">
+        <div className="flex flex-col items-center gap-2.5 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-preto text-brasa-400">
+            <Icone nome="chave" className="h-8 w-8" />
+          </span>
+          <h2 className="text-2xl font-extrabold leading-tight">
+            Você tem {plural(saldo.disponiveis, 'chave', 'chaves')}
+          </h2>
+          <p className="text-[15px] leading-snug text-ink2">
+            Cada chave libera o próximo passo da sua trilha até{' '}
+            {plural(antecedenciaDias, 'dia', 'dias')} antes da aula da turma.
+          </p>
+        </div>
+
+        <ComoGanharChaves saldo={saldo} />
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[
+            [saldo.pontos, saldo.pontos === 1 ? 'ponto no semestre' : 'pontos no semestre'],
+            [saldo.ganhas, saldo.ganhas === 1 ? 'chave ganha' : 'chaves ganhas'],
+            [saldo.usadas, saldo.usadas === 1 ? 'chave usada' : 'chaves usadas'],
+          ].map(([n, rotulo]) => (
+            <div key={String(rotulo)} className="flex flex-col gap-0.5 rounded-2xl bg-chip px-2 py-3">
+              <span className="text-xl font-extrabold leading-none">{n}</span>
+              <span className="text-[11px] leading-tight text-ink2">{rotulo}</span>
+            </div>
+          ))}
+        </div>
+
+        <ul className="flex flex-col gap-2 rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
+          <li>
+            A chave abre só o <b className="text-ink">próximo passo</b>, nunca um nível inteiro. Assim ninguém queima a largada.
+          </li>
+          <li>Os pontos contam desde o início do semestre e zeram quando ele termina.</li>
+          <li>O passo liberado continua aberto para você, mesmo depois.</li>
+        </ul>
+
+        <BotaoSuave tamanho="g" onClick={onFechar}>
+          Entendi
+        </BotaoSuave>
+      </div>
     </Folha>
   )
 }
