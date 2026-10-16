@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { Icone } from '../components/Icone'
 import { ErrorState } from '../components/ErrorState'
 import { Spinner } from '../components/Spinner'
 import { Cabecalho } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { ocorrenciasEvento, toISODate, type OcorrenciaAgenda } from '../lib/dates'
-import type { AgendaEvent, ConfirmacaoPresenca, Feriado } from '../lib/types'
+import { diaDaNoite, ocorrenciasEvento, toISODate, type OcorrenciaAgenda } from '../lib/dates'
+import { passoDaAula } from '../lib/trilha'
+import type { AgendaEvent, ConfirmacaoPresenca, Feriado, PassoTrilha, Turma } from '../lib/types'
 import { useLembrado } from '../lib/memoriaTelas'
 
 interface Item extends OcorrenciaAgenda {
@@ -49,6 +52,11 @@ export function AgendaPage() {
     [],
   )
   const [ocupado, setOcupado] = useState<string | null>(null)
+  // Trilha de vídeos: o passo de cada aula (sem a migração 036, nada aparece)
+  const [trilha, setTrilha] = useLembrado<{ passos: PassoTrilha[]; turmas: Turma[] }>('agenda:trilha', {
+    passos: [],
+    turmas: [],
+  })
   const [erro, setErro] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
@@ -60,6 +68,11 @@ export function AgendaPage() {
       ])
       setEventos(e)
       setFeriados(f)
+      const [passos, turmas] = await Promise.all([
+        api.listPassosTrilha().catch(() => [] as PassoTrilha[]),
+        api.listTurmas().catch(() => [] as Turma[]),
+      ])
+      setTrilha({ passos, turmas })
     } catch (e) {
       setErro((e as Error).message)
     }
@@ -185,6 +198,12 @@ export function AgendaPage() {
                   ]
                     .filter(Boolean)
                     .join(' · ')
+                  const passo =
+                    !o.cancelada && eventos
+                      ? passoDaAula(o.evento, toISODate(o.quando), { ...trilha, eventos, feriados })
+                      : null
+                  // Aula que já aconteceu: o vídeo abriu para a turma
+                  const passoAberto = passo && toISODate(o.quando) <= diaDaNoite(agora)
                   return (
                     <div
                       key={chave}
@@ -210,6 +229,21 @@ export function AgendaPage() {
                           {sub && (
                             <span className="text-sm leading-snug text-ink3">{sub}</span>
                           )}
+                          {passo &&
+                            (passoAberto ? (
+                              <Link
+                                to={`/trilha/${passo.id}`}
+                                className="mt-0.5 flex items-center gap-1.5 text-sm font-extrabold text-or-t"
+                              >
+                                <Icone nome="play" preenchido className="h-3.5 w-3.5" />
+                                Passo: {passo.nome}
+                              </Link>
+                            ) : (
+                              <span className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-ink2">
+                                <Icone nome="cadeado" className="h-3.5 w-3.5" />
+                                Passo: {passo.nome}
+                              </span>
+                            ))}
                         </div>
                         {o.evento.data && !o.cancelada && !ehHoje && (
                           <span className="shrink-0 rounded-lg border-[1.5px] border-preto bg-verde-500 px-2 py-[3px] text-xs font-extrabold text-preto">

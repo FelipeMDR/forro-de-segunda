@@ -9,6 +9,7 @@ import {
   idDoYoutube,
   nivelDoAluno,
   niveisVisiveis,
+  passoDaAula,
   podeEditarTrilha,
   REGRAS_PADRAO,
   saldoDeChaves,
@@ -363,5 +364,38 @@ describe('YouTube: miniatura e player', () => {
 
   it('player aceita comandos (velocidade) pela API do iframe', () => {
     expect(urlDoEmbed(V)).toContain('enablejsapi=1')
+  })
+})
+
+describe('passoDaAula (Agenda)', () => {
+  const passos = [1, 2, 3, 4, 5].map((n) => passo(n))
+  const base = { turmas, passos, feriados: [] as Feriado[] }
+
+  it('aula semanal da turma mostra o passo daquela data', () => {
+    const eventos = [aulaSeg]
+    expect(passoDaAula(aulaSeg, '2026-10-12', { ...base, eventos })?.id).toBe('p2')
+    expect(passoDaAula(aulaSeg, '2026-10-26', { ...base, eventos })?.id).toBe('p4')
+  })
+
+  it('aula cancelada não tem passo; a reposição tem, e a trilha não atrasa', () => {
+    const rep = reposicao('2026-10-31', '2026-10-26')
+    const ctxAg = { ...base, eventos: [aulaSeg, rep], feriados: [feriado('2026-10-26', 'Iniciante 01')] }
+    expect(passoDaAula(aulaSeg, '2026-10-26', ctxAg)).toBeNull()
+    expect(passoDaAula(rep, '2026-10-31', ctxAg)?.id).toBe('p4')
+    expect(passoDaAula(aulaSeg, '2026-11-02', ctxAg)?.id).toBe('p5')
+  })
+
+  it('evento sem turma, de turma sem trilha, ou de data única que não é reposição: nada', () => {
+    const geral = { ...aulaSeg, id: 'g', turma: null }
+    const festa: AgendaEvent = { ...aulaSeg, id: 'f', dia_semana: null, data: '2026-10-12', reposicao_de: null }
+    const semTrilha = { ...aulaSeg, id: 's', turma: 'Turma sem nível' }
+    const eventos = [aulaSeg, geral, festa, semTrilha]
+    expect(passoDaAula(geral, '2026-10-12', { ...base, eventos })).toBeNull()
+    expect(passoDaAula(festa, '2026-10-12', { ...base, eventos })).toBeNull()
+    expect(passoDaAula(semTrilha, '2026-10-12', { ...base, eventos })).toBeNull()
+  })
+
+  it('depois que a trilha acaba, a aula não tem passo', () => {
+    expect(passoDaAula(aulaSeg, '2026-11-30', { ...base, eventos: [aulaSeg] })).toBeNull()
   })
 })

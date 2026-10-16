@@ -218,6 +218,27 @@ export function cronogramaDeTurma(
   return linhas.slice(0, ultima + 1)
 }
 
+/**
+ * O passo ensinado numa aula da Agenda (`evento` na data `data`), pelo
+ * mesmo cronograma da trilha: aula cancelada não tem passo, reposição tem.
+ * Só vale para a aula semanal da turma e para a reposição; evento sem
+ * turma ou de data única comum (Forró na Rep) não ensina passo.
+ */
+export function passoDaAula(
+  evento: AgendaEvent,
+  data: string,
+  base: { turmas: Turma[]; passos: PassoTrilha[]; eventos: AgendaEvent[]; feriados: Feriado[] },
+): PassoTrilha | null {
+  if (!evento.turma) return null
+  if (evento.data && !evento.reposicao_de) return null
+  const turma = base.turmas.find((t) => t.nome === evento.turma)
+  if (!turma) return null
+  const linha = cronogramaDeTurma(turma, base.passos, base.eventos, base.feriados).find(
+    (l) => l.aula.data === data && l.aula.tipo !== 'cancelada',
+  )
+  return linha?.passo ?? null
+}
+
 // ---- Situação para o aluno ----
 
 export interface ContextoTrilha {

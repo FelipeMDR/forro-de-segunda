@@ -32,10 +32,12 @@ import {
   type AgendaEvent,
   type Challenge,
   type FeriadoInput,
+  PassoTrilha,
 } from '../../lib/types'
 import { nomesModalidades, statusDoDesafio } from '../ChallengesPage'
 import { Campo, Dica, usePainel } from './contexto'
 import { useLembrado } from '../../lib/memoriaTelas'
+import { passoDaAula } from '../../lib/trilha'
 
 type Aba = 'prox' | 'eventos' | 'desafios'
 
@@ -104,6 +106,12 @@ export function AgendaPainelPage() {
   const [abrindo, setAbrindo] = useState(false)
   const [excluir, setExcluir] = useState<{ tipo: 'evento' | 'desafio' | 'abertura' | 'feriado'; id: string; titulo: string } | null>(null)
   const [editando, setEditando] = useState<Challenge | 'novo' | null>(null)
+
+  // Trilha de vídeos: o passo de cada aula (sem a migração 036, nada aparece)
+  const [passos, setPassos] = useState<PassoTrilha[]>([])
+  useEffect(() => {
+    void api.listPassosTrilha().then(setPassos).catch(() => setPassos([]))
+  }, [api])
 
   const carregarEventos = useCallback(async () => {
     setEventos(await api.listEvents())
@@ -212,6 +220,12 @@ export function AgendaPainelPage() {
                         ? `Cancelada${o.motivoCancelamento ? ` · ${o.motivoCancelamento}` : ''}`
                         : (o.evento.turma ?? 'Todas as turmas')}
                     </span>
+                    {!o.cancelada && eventos && (() => {
+                      const passo = passoDaAula(o.evento, toISODate(o.quando), { turmas, passos, eventos, feriados })
+                      return passo ? (
+                        <span className="truncate text-[13px] font-bold text-ink2">Passo: {passo.nome}</span>
+                      ) : null
+                    })()}
                   </div>
                   <button
                     type="button"
