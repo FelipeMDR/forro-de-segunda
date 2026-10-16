@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BotaoAcao, Cabecalho, ChipEscolha, Tela } from '../../components/ui'
+import { BotaoAcao, Cabecalho, ChipEscolha, Confirmar, Tela } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { diaDaNoite } from '../../lib/dates'
+import { diaDaNoite, formatDate } from '../../lib/dates'
 import { linhaCronograma, type TomLinha } from '../../lib/textosTrilha'
 import { cronogramaDeTurma, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { AgendaEvent, Feriado, NivelTrilha, PassoTrilha, Turma } from '../../lib/types'
@@ -39,6 +39,7 @@ export function CronogramaPage() {
   const [base, setBase] = useState<{ turmas: Turma[]; passos: PassoTrilha[]; eventos: AgendaEvent[]; feriados: Feriado[] } | null>(null)
   const [escolhida, setEscolhida] = useState<string | null>(null)
   const [edicao, setEdicao] = useState<{ nivel: NivelTrilha | ''; inicio: string }>({ nivel: '', inicio: '' })
+  const [desfazendo, setDesfazendo] = useState<Feriado | null>(null)
 
   const carregar = useCallback(async () => {
     const [turmas, passos, eventos, feriados] = await Promise.all([
@@ -63,6 +64,23 @@ export function CronogramaPage() {
   // A próxima aula que ainda vai acontecer (a de hoje já abriu o vídeo)
   const proxima = linhas.find((l) => l.passo && l.aula.tipo !== 'cancelada' && l.aula.data > hoje)
   const aulasNaAgenda = base.eventos.filter((e) => e.turma === escolhida && e.dia_semana !== null && !e.data)
+
+  // A linha cancelada vem de um feriado da Agenda (da turma ou de todas)
+  const feriadoDaLinha = (data: string) =>
+    base.feriados.find((f) => f.data === data && (f.turma === null || f.turma === escolhida)) ?? null
+
+  const desfazerCancelamento = async () => {
+    if (!desfazendo) return
+    try {
+      // A reposição da aula (se houve) sai junto com o cancelamento
+      await api.deleteFeriado(desfazendo.id)
+      await carregar()
+      toast(`${desfazendo.turma ? `Aula de ${desfazendo.turma}` : 'O dia'} volta a valer`)
+      setDesfazendo(null)
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    }
+  }
 
   const salvar = async () => {
     if (!turma) return
@@ -156,6 +174,15 @@ export function CronogramaPage() {
                   </b>
                   <span className={`text-xs font-bold ${COR_TEXTO[tom]}`}>{texto}</span>
                 </span>
+                {l.aula.tipo === 'cancelada' && feriadoDaLinha(l.aula.data) && (
+                  <button
+                    type="button"
+                    onClick={() => setDesfazendo(feriadoDaLinha(l.aula.data))}
+                    className="h-9 shrink-0 rounded-xl border-[1.5px] border-linha bg-chip px-3 text-[13px] font-extrabold text-ink"
+                  >
+                    Desfazer
+                  </button>
+                )}
               </div>
             )
           })}
@@ -165,6 +192,18 @@ export function CronogramaPage() {
           Para mudar uma data, cancele a aula na <b className="text-ink">Agenda</b>. Sem reposição, os passos seguintes andam uma semana. Com reposição, o passo vai para o dia marcado e nada mais muda.
         </p>
       </div>
+      <Confirmar
+        aberto={desfazendo !== null}
+        titulo="Desfazer o cancelamento?"
+        texto={
+          desfazendo?.turma
+            ? `A aula de ${desfazendo.turma} em ${formatDate(desfazendo.data)} volta a valer e a trilha volta uma semana.`
+            : `O dia ${desfazendo ? formatDate(desfazendo.data) : ''} volta a valer para todas as turmas${desfazendo?.suspende_desafios ? ', e os desafios contam de novo nesse dia' : ''}.`
+        }
+        ok="Desfazer"
+        onOk={() => void desfazerCancelamento()}
+        onVoltar={() => setDesfazendo(null)}
+      />
     </Tela>
   )
 }
