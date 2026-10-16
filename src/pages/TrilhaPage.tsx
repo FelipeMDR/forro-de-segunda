@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FolhaChave, FolhaRegrasChaves } from '../components/FolhaChave'
 import { Icone } from '../components/Icone'
-import { Segmentado, Tela, useVoltar } from '../components/ui'
+import { Interruptor, Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
 import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
@@ -36,13 +36,18 @@ function Numero({ valor, rotulo }: { valor: string | number; rotulo: string }) {
 }
 
 export function TrilhaPage() {
-  const { dados, erro, liberar } = useTrilha()
+  const { dados, erro, liberar, comoAluno, verComoAluno } = useTrilha()
   const voltar = useVoltar('/')
   const [nivel, setNivel] = useState<NivelTrilha | null>(null)
   const [alvo, setAlvo] = useState<PassoComSituacao | null>(null)
   const [regrasAbertas, setRegrasAbertas] = useState(false)
   const [praticados] = useState(lerPraticados)
 
+  // Ao ligar/desligar "ver como aluno", a aba volta para o nível de quem vê
+  const equipe = dados?.ctx.equipe
+  useEffect(() => {
+    setNivel(null)
+  }, [equipe])
   useEffect(() => {
     if (dados && nivel === null) setNivel(nivelInicial(dados.ctx))
   }, [dados, nivel])
@@ -97,6 +102,27 @@ export function TrilhaPage() {
       </div>
 
       <div className="flex flex-col gap-3 px-4">
+        {dados?.equipeReal && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={comoAluno}
+            onClick={() => {
+              verComoAluno(!comoAluno)
+            }}
+            className="flex min-h-[56px] items-center justify-between gap-3 rounded-2xl border border-linha bg-sf px-4 py-2 text-left"
+          >
+            <span className="flex flex-col">
+              <span className="text-[15px] font-extrabold">Ver como aluno</span>
+              <span className="text-xs text-ink2">
+                {comoAluno
+                  ? 'Você está vendo como um aluno da sua turma: cadeados, chaves e preços.'
+                  : 'Como equipe, você vê tudo aberto. Ligue para ver o que o aluno vê.'}
+              </span>
+            </span>
+            <Interruptor ligado={comoAluno} />
+          </button>
+        )}
         {erro && <p className="text-sm text-or-t">{erro}</p>}
 
         {saldo && lista.length > 0 && (

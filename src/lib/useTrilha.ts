@@ -3,12 +3,15 @@ import { useAuth } from '../context/AuthContext'
 import { diaDaNoite } from './dates'
 import { podeEditarTrilha, REGRAS_PADRAO, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
 import type { Challenge, PassoTrilha, PerfilResumo } from './types'
+import { equipeEfetiva, lerVerComoAluno, salvarVerComoAluno } from './verComoAluno'
 
 export interface DadosTrilha {
   ctx: ContextoTrilha
   saldo: SaldoChaves
   /** Foto e nome dos professores dos passos, por id. */
   professores: Map<string, PerfilResumo>
+  /** Pode editar a trilha (organização/professores), mesmo vendo como aluno. */
+  equipeReal: boolean
   /** O desafio principal (Forródex) de onde vêm os pontos; null = nenhum. */
   desafio: { titulo: string; presenca: number; parcerias: number } | null
 }
@@ -27,6 +30,7 @@ export function useTrilha() {
   const { api, userId, profile, papel } = useAuth()
   const [dados, setDados] = useState<DadosTrilha | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [comoAluno, setComoAluno] = useState(lerVerComoAluno)
 
   const carregar = useCallback(async () => {
     if (!userId || !profile) return
@@ -49,7 +53,9 @@ export function useTrilha() {
           ? api.pontosNoDesafioDe(principal, userId)
           : Promise.resolve({ presenca: 0, parcerias: 0 }),
       ])
+      const equipeReal = podeEditarTrilha({ papel, cargos: profile.cargos, turmas_ensino: profile.turmas_ensino })
       setDados({
+        equipeReal,
         professores: new Map(perfis.map((p) => [p.id, p])),
         desafio: principal ? { titulo: principal.titulo, ...pontos } : null,
         ctx: {
@@ -60,7 +66,7 @@ export function useTrilha() {
           feriados,
           liberadas: new Set(liberacoes.map((l) => l.passo_id)),
           hoje: diaDaNoite(new Date()),
-          equipe: podeEditarTrilha({ papel, cargos: profile.cargos, turmas_ensino: profile.turmas_ensino }),
+          equipe: equipeEfetiva(equipeReal, comoAluno),
           regras,
         },
         saldo: saldoDeChaves({
@@ -76,7 +82,7 @@ export function useTrilha() {
     } catch (e) {
       setErro((e as Error).message)
     }
-  }, [api, userId, profile, papel])
+  }, [api, userId, profile, papel, comoAluno])
 
   useEffect(() => {
     void carregar()
@@ -90,5 +96,10 @@ export function useTrilha() {
     [api, carregar],
   )
 
-  return { dados, erro, recarregar: carregar, liberar }
+  const verComoAluno = useCallback((ligado: boolean) => {
+    salvarVerComoAluno(ligado)
+    setComoAluno(ligado)
+  }, [])
+
+  return { dados, erro, recarregar: carregar, liberar, comoAluno, verComoAluno }
 }
