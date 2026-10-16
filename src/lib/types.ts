@@ -794,10 +794,12 @@ export interface RegrasTrilha {
   peso_parceria: number
   /** Preço do 1º, 2º, 3º… passo à frente no próprio nível; o último é o teto. */
   preco_degraus: number[]
-  /** Preço por passo do nível logo acima. */
+  /** Preço do 1º passo do nível logo acima. */
   preco_um_nivel: number
-  /** Preço por passo de dois níveis acima. */
+  /** Preço do 1º passo de dois níveis acima. */
   preco_dois_niveis: number
+  /** Nos níveis de cima, quanto cada passo custa a mais que o anterior. */
+  preco_aumento_nivel: number
 }
 
 /** O mínimo de um perfil para mostrar foto e nome. */

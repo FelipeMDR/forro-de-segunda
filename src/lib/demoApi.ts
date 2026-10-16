@@ -2174,7 +2174,8 @@ export class DemoApi implements ForroApi {
       r.preco_degraus.length > 10 ||
       !r.preco_degraus.every((x) => faixa(x, 1, 100)) ||
       !faixa(r.preco_um_nivel, 1, 100) ||
-      !faixa(r.preco_dois_niveis, 1, 100)
+      !faixa(r.preco_dois_niveis, 1, 100) ||
+      !faixa(r.preco_aumento_nivel, 0, 20)
     ) {
       throw new Error('Valores fora da faixa permitida')
     }

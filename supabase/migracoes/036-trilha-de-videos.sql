@@ -126,7 +126,10 @@ alter table public.trilha_regras
   -- dali em diante (teto)
   add column if not exists preco_degraus int[] not null default '{1,2,3,4,5}',
   add column if not exists preco_um_nivel int not null default 8 check (preco_um_nivel between 1 and 100),
-  add column if not exists preco_dois_niveis int not null default 12 check (preco_dois_niveis between 1 and 100);
+  add column if not exists preco_dois_niveis int not null default 12 check (preco_dois_niveis between 1 and 100),
+  -- Nos níveis de cima, cada passo custa este tanto a mais que o anterior
+  -- (as aulas têm progressão: a última do nível mais alto é a mais cara)
+  add column if not exists preco_aumento_nivel int not null default 1 check (preco_aumento_nivel between 0 and 20);
 insert into public.trilha_regras (id) values (true) on conflict (id) do nothing;
 
 alter table public.trilha_regras enable row level security;
@@ -136,13 +139,15 @@ create policy "trilha_regras_select" on public.trilha_regras
 
 drop function if exists public.salvar_regras_trilha(int, int);
 drop function if exists public.salvar_regras_trilha(int);
+drop function if exists public.salvar_regras_trilha(int, int, int, int[], int, int);
 create or replace function public.salvar_regras_trilha(
   p_pontos int,
   p_peso_presenca int,
   p_peso_parceria int,
   p_degraus int[],
   p_um_nivel int,
-  p_dois_niveis int
+  p_dois_niveis int,
+  p_aumento int
 )
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -161,6 +166,7 @@ begin
       preco_degraus = p_degraus,
       preco_um_nivel = p_um_nivel,
       preco_dois_niveis = p_dois_niveis,
+      preco_aumento_nivel = p_aumento,
       atualizado_em = now()
   where id;
 end;

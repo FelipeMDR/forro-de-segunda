@@ -14,6 +14,7 @@ type Form = {
   degraus: string[]
   umNivel: string
   doisNiveis: string
+  aumento: string
 }
 
 const inteiro = (v: string, de: number, ate: number) => {
@@ -42,6 +43,7 @@ export function RegrasChavesPage() {
         degraus,
         umNivel: String(r.preco_um_nivel),
         doisNiveis: String(r.preco_dois_niveis),
+        aumento: String(r.preco_aumento_nivel),
       })
     })
   }, [api])
@@ -55,7 +57,8 @@ export function RegrasChavesPage() {
     const degraus = form.degraus.map((d) => inteiro(d, 1, 100))
     const umNivel = inteiro(form.umNivel, 1, 100)
     const doisNiveis = inteiro(form.doisNiveis, 1, 100)
-    if (pontos === null || presenca === null || parceria === null || umNivel === null || doisNiveis === null) return null
+    const aumento = inteiro(form.aumento, 0, 20)
+    if (pontos === null || presenca === null || parceria === null || umNivel === null || doisNiveis === null || aumento === null) return null
     if (degraus.some((d) => d === null)) return null
     return {
       pontos_por_chave: pontos,
@@ -64,6 +67,7 @@ export function RegrasChavesPage() {
       preco_degraus: degraus as number[],
       preco_um_nivel: umNivel,
       preco_dois_niveis: doisNiveis,
+      preco_aumento_nivel: aumento,
     }
   }
   const r = regras()
@@ -129,15 +133,27 @@ export function RegrasChavesPage() {
               </Campo>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Campo rotulo="Um nível acima">{numero(form.umNivel, (v) => setForm({ ...form, umNivel: v }), 100, 1)}</Campo>
-            <Campo rotulo="Dois níveis acima">{numero(form.doisNiveis, (v) => setForm({ ...form, doisNiveis: v }), 100, 1)}</Campo>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
+          <span className="text-sm font-extrabold">Preço nos níveis de cima</span>
+          <div className="grid grid-cols-3 gap-2.5">
+            <Campo rotulo="1º passo, um acima">{numero(form.umNivel, (v) => setForm({ ...form, umNivel: v }), 100, 1)}</Campo>
+            <Campo rotulo="1º passo, dois acima">{numero(form.doisNiveis, (v) => setForm({ ...form, doisNiveis: v }), 100, 1)}</Campo>
+            <Campo rotulo="+ por passo">{numero(form.aumento, (v) => setForm({ ...form, aumento: v }), 20)}</Campo>
           </div>
+          {r && (
+            <span className="text-xs text-ink2">
+              Ex.: um aluno do Iniciante paga {r.preco_um_nivel} no 1º passo do Intermediário e{' '}
+              {Math.min(100, r.preco_um_nivel + 14 * r.preco_aumento_nivel)} no 15º; {r.preco_dois_niveis} no 1º do Avançado e{' '}
+              {Math.min(100, r.preco_dois_niveis + 11 * r.preco_aumento_nivel)} no 12º.
+            </span>
+          )}
         </section>
 
         <Dica>
           O aluno compra qualquer passo à frente, sem precisar dos anteriores. No próprio nível, o preço depende da distância
-          da turma e para no último degrau; nos níveis de cima, é fixo por passo. Quando a turma avança, o preço cai.
+          da turma e para no último degrau; nos níveis de cima, sobe a cada aula daquele nível. Quando a turma avança, o preço cai.
         </Dica>
         <BotaoAcao cor="preto" bloco disabled={salvando} onClick={() => void salvar()}>
           {salvando ? 'Salvando…' : 'Salvar regras'}

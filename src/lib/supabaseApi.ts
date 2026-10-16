@@ -2284,6 +2284,7 @@ export class SupabaseApi implements ForroApi {
       preco_degraus: r.preco_degraus?.length ? r.preco_degraus : REGRAS_PADRAO.preco_degraus,
       preco_um_nivel: r.preco_um_nivel ?? REGRAS_PADRAO.preco_um_nivel,
       preco_dois_niveis: r.preco_dois_niveis ?? REGRAS_PADRAO.preco_dois_niveis,
+      preco_aumento_nivel: r.preco_aumento_nivel ?? REGRAS_PADRAO.preco_aumento_nivel,
     }
   }
 
@@ -2295,6 +2296,7 @@ export class SupabaseApi implements ForroApi {
       p_degraus: r.preco_degraus,
       p_um_nivel: r.preco_um_nivel,
       p_dois_niveis: r.preco_dois_niveis,
+      p_aumento: r.preco_aumento_nivel,
     })
     if (error) throw new Error(traduz(error.message))
   }

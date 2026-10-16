@@ -197,10 +197,16 @@ describe('situacaoDoNivel', () => {
   })
 
   it('a tabela vem das regras da organização', () => {
-    const regras = { ...REGRAS_PADRAO, preco_degraus: [2, 4], preco_um_nivel: 10 }
-    const c = ctx({ regras, passos: [1, 2, 3, 4, 5, 6].map((n) => passo(n)).concat([passo(1, { id: 'i1', nivel: 'intermediario' })]) })
+    const regras = { ...REGRAS_PADRAO, preco_degraus: [2, 4], preco_um_nivel: 10, preco_aumento_nivel: 3 }
+    const c = ctx({
+      regras,
+      passos: [1, 2, 3, 4, 5, 6].map((n) => passo(n)).concat([
+        passo(1, { id: 'i1', nivel: 'intermediario' }),
+        passo(2, { id: 'i2', nivel: 'intermediario' }),
+      ]),
+    })
     expect(situacaoDoNivel('iniciante', c).map((p) => p.custo)).toEqual([null, null, null, 2, 4, 4])
-    expect(situacaoDoNivel('intermediario', c)[0].custo).toBe(10)
+    expect(situacaoDoNivel('intermediario', c).map((p) => p.custo)).toEqual([10, 13])
   })
 
   it('sem limite de dias: o próximo passo vira "chave" mesmo semanas antes', () => {
@@ -232,7 +238,7 @@ describe('situacaoDoNivel', () => {
     expect(situacaoDoNivel('iniciante', ctx({ passos }))[3].estado).toBe('bloqueado')
   })
 
-  it('passos dos níveis de cima também ficam à venda, com preço fixo por nível (8 e 12)', () => {
+  it('passos dos níveis de cima também ficam à venda, começando em 8 e 12 e subindo a cada passo', () => {
     // Iniciante com 4 passos (p4 é o 1º à frente da turma) e 2 do Intermediário
     const c = ctx({
       passos: [1, 2, 3, 4].map((n) => passo(n)).concat([
@@ -241,12 +247,15 @@ describe('situacaoDoNivel', () => {
       ]),
     })
     const inter = situacaoDoNivel('intermediario', c)
-    // Nível de cima tem preço fixo por passo (8), seja qual for a posição
+    // Nível de cima: entrada 8 e +1 a cada passo daquele nível
     expect(inter[0]).toMatchObject({ estado: 'chave', custo: 8, data: null })
-    expect(inter[1]).toMatchObject({ estado: 'chave', custo: 8 })
+    expect(inter[1]).toMatchObject({ estado: 'chave', custo: 9 })
     expect(niveisVisiveis(c)).toEqual(['iniciante', 'intermediario'])
-    const av = situacaoDoNivel('avancado', ctx({ passos: c.passos.concat([passo(1, { id: 'a1', nivel: 'avancado' })]) }))
-    expect(av[0]).toMatchObject({ estado: 'chave', custo: 12 })
+    const av = situacaoDoNivel(
+      'avancado',
+      ctx({ passos: c.passos.concat([passo(1, { id: 'a1', nivel: 'avancado' }), passo(2, { id: 'a2', nivel: 'avancado' })]) }),
+    )
+    expect(av.map((p) => p.custo)).toEqual([12, 13])
   })
 
   it('nível abaixo do aluno fica todo aberto (revisão); acima, todo fechado', () => {

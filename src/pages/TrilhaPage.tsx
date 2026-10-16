@@ -216,7 +216,7 @@ export function TrilhaPage() {
 
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. No seu nível custa {degrausEmTexto(regras.preco_degraus)} chaves pela distância da turma; um nível acima, {regras.preco_um_nivel}; dois acima, {regras.preco_dois_niveis}.
+            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. No seu nível custa {degrausEmTexto(regras.preco_degraus)} chaves pela distância da turma; um nível acima, a partir de {regras.preco_um_nivel}; dois acima, a partir de {regras.preco_dois_niveis}, subindo a cada aula.
           </p>
         )}
       </div>

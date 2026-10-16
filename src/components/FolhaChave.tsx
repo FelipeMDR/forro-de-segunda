@@ -210,7 +210,7 @@ export function FolhaRegrasChaves({
             Você tem {plural(saldo.disponiveis, 'chave', 'chaves')}
           </h2>
           <p className="text-[15px] leading-snug text-ink2">
-            No seu nível, os passos à frente da turma custam {degrausEmTexto(regras.preco_degraus)} chaves. Um nível acima, {regras.preco_um_nivel} por passo; dois acima, {regras.preco_dois_niveis}.
+            No seu nível, os passos à frente da turma custam {degrausEmTexto(regras.preco_degraus)} chaves. Um nível acima, a partir de {regras.preco_um_nivel}; dois acima, a partir de {regras.preco_dois_niveis}, subindo {regras.preco_aumento_nivel} a cada aula.
           </p>
         </div>
 

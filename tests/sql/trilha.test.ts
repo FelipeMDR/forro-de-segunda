@@ -246,22 +246,25 @@ describe('trilha — quem edita', () => {
 })
 
 describe('trilha — regras das chaves', () => {
-  const PADRAO = { pontos: 10, presenca: 3, parceria: 1, degraus: [1, 2, 3, 4, 5], umNivel: 8, doisNiveis: 12 }
+  const PADRAO = { pontos: 10, presenca: 3, parceria: 1, degraus: [1, 2, 3, 4, 5], umNivel: 8, doisNiveis: 12, aumento: 1 }
   async function regras(db: PGlite, uid: string, r: Partial<typeof PADRAO> = {}) {
     const x = { ...PADRAO, ...r }
     await comoUsuario(db, uid)
-    await db.query(`select salvar_regras_trilha($1, $2, $3, $4, $5, $6)`, [
-      x.pontos, x.presenca, x.parceria, x.degraus, x.umNivel, x.doisNiveis,
+    await db.query(`select salvar_regras_trilha($1, $2, $3, $4, $5, $6, $7)`, [
+      x.pontos, x.presenca, x.parceria, x.degraus, x.umNivel, x.doisNiveis, x.aumento,
     ])
   }
 
-  it('padrão: 3 por presença, 1 por parceria, 10 pontos por chave, preços 1-2-3-4-5, 8 e 12', async () => {
+  it('padrão: 3 por presença, 1 por parceria, 10 pontos por chave, preços 1-2-3-4-5, 8 e 12 (+1 por passo)', async () => {
     const db = await bancoVazio()
     const r = await db.query(
-      `select pontos_por_chave, peso_presenca, peso_parceria, preco_degraus, preco_um_nivel, preco_dois_niveis from trilha_regras`,
+      `select pontos_por_chave, peso_presenca, peso_parceria, preco_degraus, preco_um_nivel, preco_dois_niveis, preco_aumento_nivel from trilha_regras`,
     )
     expect(r.rows).toEqual([
-      { pontos_por_chave: 10, peso_presenca: 3, peso_parceria: 1, preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12 },
+      {
+        pontos_por_chave: 10, peso_presenca: 3, peso_parceria: 1, preco_degraus: [1, 2, 3, 4, 5],
+        preco_um_nivel: 8, preco_dois_niveis: 12, preco_aumento_nivel: 1,
+      },
     ])
   })
 
@@ -306,6 +309,7 @@ describe('trilha — regras das chaves', () => {
     await expect(regras(db, IDS.org, { degraus: [] })).rejects.toThrow()
     await expect(regras(db, IDS.org, { degraus: [1, 0, 3] })).rejects.toThrow()
     await expect(regras(db, IDS.org, { umNivel: 0 })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { aumento: 21 })).rejects.toThrow()
   })
 })
 
