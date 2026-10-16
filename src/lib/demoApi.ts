@@ -77,6 +77,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  PerfilResumo,
   RegrasTrilha,
 } from './types'
 
@@ -2045,7 +2046,7 @@ export class DemoApi implements ForroApi {
       this.db.trilhaPassos = ['Base parada e marcação', 'Dois pra lá, dois pra cá', 'Caminhada', 'Giro simples da dama'].map(
         (nome, i) => ({
           id: uuid(), nivel: 'iniciante' as const, ordem: i + 1, nome,
-          video_frente: null, video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
+          video_frente: null, video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
         }),
       )
     }
@@ -2053,13 +2054,13 @@ export class DemoApi implements ForroApi {
   }
 
   async listPassosTrilha(): Promise<PassoTrilha[]> {
-    // Bancos demo de antes do campo `professores`
-    return ordenarPassos(this.passosTrilha()).map((p) => ({ ...p, professores: p.professores ?? null }))
+    // Bancos demo de antes do campo `professores_ids`
+    return ordenarPassos(this.passosTrilha()).map((p) => ({ ...p, professores_ids: p.professores_ids ?? [] }))
   }
 
   async salvarPassoTrilha(p: PassoTrilhaInput) {
     const lista = this.passosTrilha()
-    const linha = { ...p, nome: p.nome.trim(), dica: p.dica?.trim() || null, professores: p.professores?.trim() || null }
+    const linha = { ...p, nome: p.nome.trim(), dica: p.dica?.trim() || null, professores_ids: [...p.professores_ids] }
     if (p.id) {
       const i = lista.findIndex((x) => x.id === p.id)
       if (i < 0) throw new Error('Esse passo não existe mais')
@@ -2121,6 +2122,12 @@ export class DemoApi implements ForroApi {
     }
     libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString(), custo })
     this.persist()
+  }
+
+  async perfisResumo(ids: string[]): Promise<PerfilResumo[]> {
+    return this.db.profiles
+      .filter((p) => ids.includes(p.id))
+      .map((p) => ({ id: p.id, nome: p.nome, avatar_url: p.avatar_url }))
   }
 
   async regrasTrilha(): Promise<RegrasTrilha> {

@@ -22,8 +22,14 @@ export function quandoLibera(s: PassoComSituacao, hoje: string): string {
   return quando
 }
 
-/** Por que o passo está aberto para o aluno. */
-export function comoAbriu(s: PassoComSituacao): string {
+/** "Prof. Ana, Prof. Bia e Prof. João" (só o primeiro nome). */
+export function nomesProfessores(nomes: string[]): string {
+  const p = nomes.map((n) => `Prof. ${n.trim().split(/\s+/)[0]}`)
+  return p.length <= 1 ? (p[0] ?? '') : `${p.slice(0, -1).join(', ')} e ${p[p.length - 1]}`
+}
+
+/** Por que o passo está aberto para o aluno, e quem ensinou. */
+export function comoAbriu(s: PassoComSituacao, professores: string[] = []): string {
   const texto =
     s.motivo === 'chave'
       ? 'Liberado com chave'
@@ -32,7 +38,8 @@ export function comoAbriu(s: PassoComSituacao): string {
         : s.data
           ? `Ensinado na aula de ${formatDate(s.data)}`
           : 'Aberto'
-  return s.passo.professores ? `${texto} · ${s.passo.professores}` : texto
+  const quem = nomesProfessores(professores)
+  return quem ? `${texto} · ${quem}` : texto
 }
 
 export type TomLinha = 'feito' | 'proxima' | 'normal' | 'cancelada' | 'reposicao'

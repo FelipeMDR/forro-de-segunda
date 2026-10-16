@@ -160,12 +160,15 @@ describe('trilha — gastar chave', () => {
     await expect(liberar(db, IDS.a, p, 0)).rejects.toThrow('Preço de chave inválido')
   })
 
-  it('passo guarda o nome de quem ensinou', async () => {
+  it('passo guarda os perfis de quem ensinou (vazio por padrão)', async () => {
     const db = await bancoComMigracao()
+    await pessoa(db, IDS.prof, 'Prof', { cargo: 'Professor(a)' })
     const id = await passo(db)
-    await db.query(`update trilha_passos set professores = 'Prof. Ana' where id = $1`, [id])
-    const r = await db.query<{ professores: string }>(`select professores from trilha_passos where id = $1`, [id])
-    expect(r.rows[0].professores).toBe('Prof. Ana')
+    const antes = await db.query<{ ids: string[] }>(`select professores_ids as ids from trilha_passos where id = $1`, [id])
+    expect(antes.rows[0].ids).toEqual([])
+    await db.query(`update trilha_passos set professores_ids = array[$2::uuid] where id = $1`, [id, IDS.prof])
+    const depois = await db.query<{ ids: string[] }>(`select professores_ids as ids from trilha_passos where id = $1`, [id])
+    expect(depois.rows[0].ids).toEqual([IDS.prof])
   })
 
   it('ID de vídeo inválido é recusado pela tabela', async () => {

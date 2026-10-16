@@ -8,7 +8,7 @@ import {
   situacaoDoNivel,
   type PassoComSituacao,
 } from '../lib/trilha'
-import { useTrilha } from '../lib/useTrilha'
+import { professoresDo, useTrilha } from '../lib/useTrilha'
 import { FolhaChave } from './FolhaChave'
 import { Icone } from './Icone'
 
@@ -61,7 +61,7 @@ export function CartaoTrilha() {
           </span>
           <span className="flex min-w-0 flex-col gap-1">
             <b className="text-base leading-tight">{atual.passo.nome}</b>
-            <span className="text-[13px] text-ink2">{comoAbriu(atual)}</span>
+            <span className="text-[13px] text-ink2">{comoAbriu(atual, professoresDo(atual.passo, dados).map((p) => p.nome))}</span>
             <span className="flex items-center gap-1 text-xs font-extrabold text-gr-t">
               <Icone nome="check" className="h-3.5 w-3.5" />
               Liberado

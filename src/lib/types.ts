@@ -771,8 +771,8 @@ export interface PassoTrilha {
   video_condutor: string | null
   video_conduzida: string | null
   dica: string | null
-  /** Quem ensinou, como o professor escreveu ("Prof. Ana e Prof. João"). */
-  professores: string | null
+  /** Perfis de quem ensinou o passo (foto e nome aparecem no vídeo). */
+  professores_ids: string[]
   pode_chave: boolean
 }
 
@@ -781,6 +781,13 @@ export type PassoTrilhaInput = Omit<PassoTrilha, 'id'> & { id?: string }
 /** Regras das chaves, editáveis pela organização (tabela `trilha_regras`). */
 export interface RegrasTrilha {
   pontos_por_chave: number
+}
+
+/** O mínimo de um perfil para mostrar foto e nome. */
+export interface PerfilResumo {
+  id: string
+  nome: string
+  avatar_url: string | null
 }
 
 export interface LiberacaoTrilha {

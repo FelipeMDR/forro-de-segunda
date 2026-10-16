@@ -48,6 +48,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  PerfilResumo,
   RegrasTrilha,
 } from './types'
 
@@ -392,6 +393,8 @@ export interface ForroApi {
   liberarPassoComChave(passoId: string, custo: number): Promise<void>
   /** Noites ("YYYY-MM-DD") com dupla confirmada de alguém, sem repetir. */
   noitesComDupla(userId: string): Promise<string[]>
+  /** Nome e foto de algumas pessoas (professores dos passos). */
+  perfisResumo(ids: string[]): Promise<PerfilResumo[]>
   /** Regras das chaves (padrão se a migração 036 não rodou). */
   regrasTrilha(): Promise<RegrasTrilha>
   /** Só a organização. */

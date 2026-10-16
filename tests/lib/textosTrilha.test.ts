@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { comoAbriu, linhaCronograma, quandoLibera } from '../../src/lib/textosTrilha'
+import { comoAbriu, linhaCronograma, nomesProfessores, quandoLibera } from '../../src/lib/textosTrilha'
 import type { LinhaCronograma, PassoComSituacao } from '../../src/lib/trilha'
 
 const s = (extra: Partial<PassoComSituacao>): PassoComSituacao => ({
   passo: {
     id: 'p1', nivel: 'iniciante', ordem: 1, nome: 'Giro', video_frente: 'dQw4w9WgXcQ',
-    video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
+    video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
   },
   numero: 1,
   estado: 'bloqueado',
@@ -41,12 +41,12 @@ describe('quandoLibera', () => {
 })
 
 describe('comoAbriu', () => {
-  it('junta o nome de quem ensinou, quando o professor preencheu', () => {
+  it('junta o primeiro nome de quem ensinou', () => {
     const comProf = s({ estado: 'aberto', motivo: 'data', data: '2026-10-12' })
-    comProf.passo = { ...comProf.passo, professores: 'Prof. Ana e Prof. João' }
-    expect(comoAbriu(comProf)).toMatch(/^Ensinado na aula de 12.* · Prof\. Ana e Prof\. João$/)
-    const revisao = { ...comProf, motivo: 'revisao' as const }
-    expect(comoAbriu(revisao)).toBe('Revisão do nível anterior · Prof. Ana e Prof. João')
+    const nomes = ['Ana Paula Souza', 'João do Acordeon']
+    expect(comoAbriu(comProf, nomes)).toMatch(/^Ensinado na aula de 12.* · Prof\. Ana e Prof\. João$/)
+    expect(comoAbriu({ ...comProf, motivo: 'revisao' }, ['Ana'])).toBe('Revisão do nível anterior · Prof. Ana')
+    expect(comoAbriu(comProf, [])).toMatch(/^Ensinado na aula de 12[^·]*$/)
   })
 
 
@@ -83,5 +83,14 @@ describe('linhaCronograma', () => {
       texto: 'Finados · trilha andou uma semana', tom: 'cancelada',
     })
     expect(linhaCronograma(linha('2026-10-31', 'reposicao'), '2026-10-20', false).tom).toBe('reposicao')
+  })
+})
+
+describe('nomesProfessores', () => {
+  it('primeiro nome com "Prof.", juntando com vírgula e "e"', () => {
+    expect(nomesProfessores([])).toBe('')
+    expect(nomesProfessores(['Ana Paula'])).toBe('Prof. Ana')
+    expect(nomesProfessores(['Ana', 'João'])).toBe('Prof. Ana e Prof. João')
+    expect(nomesProfessores(['Ana', 'Bia', 'João'])).toBe('Prof. Ana, Prof. Bia e Prof. João')
   })
 })

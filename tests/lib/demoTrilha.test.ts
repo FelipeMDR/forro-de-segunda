@@ -37,16 +37,19 @@ describe('DemoApi — trilha de vídeos', () => {
   }
 
   it('salva, lista em ordem e remove passos', async () => {
-    const { api } = await novaApi()
+    const { api, uid } = await novaApi()
     const antes = (await api.listPassosTrilha()).length
     await api.salvarPassoTrilha({
       nivel: 'avancado', ordem: 2, nome: 'Sacada', video_frente: 'dQw4w9WgXcQ',
-      video_condutor: null, video_conduzida: null, dica: null, professores: '  Prof. Ana  ', pode_chave: true,
+      video_condutor: null, video_conduzida: null, dica: null, professores_ids: [uid], pode_chave: true,
     })
     const lista = await api.listPassosTrilha()
     expect(lista).toHaveLength(antes + 1)
     const novo = lista.find((p) => p.nome === 'Sacada')!
-    expect(novo.professores).toBe('Prof. Ana')
+    expect(novo.professores_ids).toEqual([uid])
+    const [prof] = await api.perfisResumo([uid])
+    expect(prof).toMatchObject({ id: uid, nome: expect.any(String) })
+    expect(prof).toHaveProperty('avatar_url')
     await api.removerPassoTrilha(novo.id)
     expect(await api.listPassosTrilha()).toHaveLength(antes)
   })
@@ -55,7 +58,7 @@ describe('DemoApi — trilha de vídeos', () => {
     const { api, banco, uid } = await novaApi()
     await api.salvarPassoTrilha({
       nivel: 'iniciante', ordem: 99, nome: 'Teste', video_frente: 'dQw4w9WgXcQ',
-      video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
+      video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
     })
     const p = (await api.listPassosTrilha()).find((x) => x.nome === 'Teste')!
     await expect(api.liberarPassoComChave(p.id, 1)).rejects.toThrow('Você ainda não tem chaves suficientes')
@@ -75,7 +78,7 @@ describe('DemoApi — trilha de vídeos', () => {
     await api.signInTelefone('11 98888-0001', 'forro123')
     await api.salvarPassoTrilha({
       nivel: 'iniciante', ordem: 98, nome: 'Dois pontos', video_frente: 'dQw4w9WgXcQ',
-      video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
+      video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
     })
     const p = (await api.listPassosTrilha()).find((x) => x.nome === 'Dois pontos')!
     for (const d of ['2026-10-05', '2026-10-12']) {
@@ -90,7 +93,7 @@ describe('DemoApi — trilha de vídeos', () => {
     for (const nome of ['Custo um', 'Custo dois']) {
       await api.salvarPassoTrilha({
         nivel: 'iniciante', ordem: 90, nome, video_frente: 'dQw4w9WgXcQ',
-        video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
+        video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
       })
     }
     const lista = await api.listPassosTrilha()

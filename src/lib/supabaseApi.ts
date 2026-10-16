@@ -66,6 +66,7 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  PerfilResumo,
   RegrasTrilha,
 } from './types'
 
@@ -2189,14 +2190,14 @@ export class SupabaseApi implements ForroApi {
   async listPassosTrilha(): Promise<PassoTrilha[]> {
     const { data, error } = await this.sb
       .from('trilha_passos')
-      // '*': sem a coluna `professores` (036 antiga) a trilha continua aparecendo
+      // '*': sem a coluna `professores_ids` (036 antiga) a trilha continua aparecendo
       .select('*')
       .order('nivel')
       .order('ordem')
     if (error) return [] // sem a migração 036
     return (data as Array<PassoTrilha & { criado_em?: string }>).map(({ criado_em: _, ...p }) => ({
       ...p,
-      professores: p.professores ?? null,
+      professores_ids: p.professores_ids ?? [],
     }))
   }
 
@@ -2206,7 +2207,6 @@ export class SupabaseApi implements ForroApi {
       ...campos,
       nome: campos.nome.trim(),
       dica: campos.dica?.trim() || null,
-      professores: campos.professores?.trim() || null,
     }
     ok(
       id
@@ -2246,6 +2246,12 @@ export class SupabaseApi implements ForroApi {
   async liberarPassoComChave(passoId: string, custo: number) {
     const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId, p_custo: custo })
     if (error) throw new Error(traduz(error.message))
+  }
+
+  async perfisResumo(ids: string[]): Promise<PerfilResumo[]> {
+    if (ids.length === 0) return []
+    const data = ok(await this.sb.from('profiles').select('id, nome, avatar_url').in('id', ids))
+    return data as PerfilResumo[]
   }
 
   async regrasTrilha(): Promise<RegrasTrilha> {

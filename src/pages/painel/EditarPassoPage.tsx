@@ -5,11 +5,13 @@ import { useApi } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { idDoYoutube, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { NivelTrilha, PassoTrilhaInput } from '../../lib/types'
-import { Campo, Dica } from './contexto'
+import { Avatar } from '../../components/Avatar'
+import { Icone } from '../../components/Icone'
+import { Campo, Dica, EscolherPessoa, usePainel } from './contexto'
 
 const VAZIO: PassoTrilhaInput = {
   nivel: 'iniciante', ordem: 1, nome: '', video_frente: null, video_condutor: null,
-  video_conduzida: null, dica: null, professores: null, pode_chave: true,
+  video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
 }
 
 type CampoVideo = 'video_frente' | 'video_condutor' | 'video_conduzida'
@@ -25,6 +27,8 @@ export function EditarPassoPage() {
   const [links, setLinks] = useState<Record<CampoVideo, string>>({ video_frente: '', video_condutor: '', video_conduzida: '' })
   const [salvando, setSalvando] = useState(false)
   const [removendo, setRemovendo] = useState(false)
+  const [escolhendo, setEscolhendo] = useState(false)
+  const { perfis } = usePainel()
 
   useEffect(() => {
     void api.listPassosTrilha().then((todos) => {
@@ -104,13 +108,37 @@ export function EditarPassoPage() {
         <Campo rotulo="Nome do passo">
           <input className="input" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
         </Campo>
-        <Campo rotulo="Professores" dica="Aparece para o aluno junto do vídeo. Opcional.">
-          <input
-            className="input"
-            placeholder="Ex.: Prof. Ana e Prof. João"
-            value={form.professores ?? ''}
-            onChange={(e) => setForm({ ...form, professores: e.target.value })}
-          />
+        <Campo rotulo="Quem ensinou" dica="Foto e nome aparecem para o aluno junto do vídeo.">
+          <div className="flex flex-wrap gap-2">
+            {form.professores_ids.map((id) => {
+              const p = perfis.find((x) => x.id === id)
+              return (
+                <span
+                  key={id}
+                  className="flex min-h-11 items-center gap-2 rounded-full border border-linha bg-sf py-1 pr-1 pl-1"
+                >
+                  <Avatar nome={p?.nome ?? '?'} url={p?.avatar_url ?? null} tamanho={32} borda={false} />
+                  <span className="text-sm font-extrabold">{p?.nome ?? 'Pessoa removida'}</span>
+                  <button
+                    type="button"
+                    aria-label={`Tirar ${p?.nome ?? 'pessoa'}`}
+                    onClick={() => setForm({ ...form, professores_ids: form.professores_ids.filter((x) => x !== id) })}
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-ink3"
+                  >
+                    <Icone nome="fechar" className="h-4 w-4" />
+                  </button>
+                </span>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setEscolhendo(true)}
+              className="flex min-h-11 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-linha px-4 text-sm font-extrabold text-ink2"
+            >
+              <Icone nome="mais" className="h-4 w-4" />
+              {form.professores_ids.length ? 'Outro professor' : 'Escolher professor'}
+            </button>
+          </div>
         </Campo>
         <div className="grid grid-cols-2 gap-2.5">
           <Campo rotulo="Nível">
@@ -166,6 +194,16 @@ export function EditarPassoPage() {
           </BotaoSuave>
         )}
       </div>
+      <EscolherPessoa
+        aberta={escolhendo}
+        titulo="Quem ensinou este passo?"
+        excluir={form.professores_ids}
+        onEscolher={(p) => {
+          setForm({ ...form, professores_ids: [...form.professores_ids, p.id] })
+          setEscolhendo(false)
+        }}
+        onFechar={() => setEscolhendo(false)}
+      />
       <Confirmar
         aberto={removendo}
         titulo="Remover este passo?"

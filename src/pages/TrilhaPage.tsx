@@ -15,7 +15,7 @@ import {
   type PassoComSituacao,
 } from '../lib/trilha'
 import type { NivelTrilha } from '../lib/types'
-import { useTrilha } from '../lib/useTrilha'
+import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Visual = 'praticado' | 'aberto' | 'chave' | 'bloqueado'
 
@@ -60,7 +60,8 @@ export function TrilhaPage() {
   const detalhe = (s: PassoComSituacao): string => {
     if (s.estado !== 'aberto') return quandoLibera(s, dados!.ctx.hoje)
     if (!s.passo.video_frente) return 'Vídeo em breve'
-    return praticados.has(s.passo.id) ? `${comoAbriu(s)} · praticado` : comoAbriu(s)
+    const texto = comoAbriu(s, professoresDo(s.passo, dados!).map((p) => p.nome))
+    return praticados.has(s.passo.id) ? `${texto} · praticado` : texto
   }
 
   return (

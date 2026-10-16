@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Avatar } from '../components/Avatar'
 import { Icone } from '../components/Icone'
 import { Cabecalho, Segmentado, Tela, useVoltar } from '../components/ui'
 import { alternarPraticado, lerPraticados } from '../lib/praticados'
 import { comoAbriu } from '../lib/textosTrilha'
 import { NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
-import { useTrilha } from '../lib/useTrilha'
+import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Angulo = 'frente' | 'condutor' | 'conduzida'
 
@@ -104,6 +105,27 @@ export function PassoPage() {
           <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.01em]">{s.passo.nome}</h1>
           <span className="text-sm text-ink2">{comoAbriu(s)}</span>
         </div>
+
+        {dados && professoresDo(s.passo, dados).length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-extrabold uppercase tracking-[.06em] text-ink3">Quem ensinou</span>
+            <div className="flex flex-wrap gap-2">
+              {professoresDo(s.passo, dados).map((p) => (
+                <Link
+                  key={p.id}
+                  to={`/perfil/${p.id}`}
+                  className="flex min-h-11 items-center gap-2.5 rounded-full border border-linha bg-sf py-1.5 pr-4 pl-1.5"
+                >
+                  <Avatar nome={p.nome} url={p.avatar_url} tamanho={36} borda={false} />
+                  <span className="flex flex-col leading-tight">
+                    <span className="text-[11px] font-bold uppercase tracking-[.05em] text-ink3">Professor(a)</span>
+                    <span className="text-[15px] font-extrabold">{p.nome}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {angulos.length > 1 && (
           <div className="flex flex-col gap-2">

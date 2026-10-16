@@ -3,11 +3,18 @@ import { useAuth } from '../context/AuthContext'
 import { diaDaNoite, diasSuspensos, mapaAberturas } from './dates'
 import { datasDePresenca } from './presenca'
 import { podeEditarTrilha, REGRAS_PADRAO, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
-import type { AberturaAntecipada, Challenge, ParceiroDanca } from './types'
+import type { AberturaAntecipada, Challenge, ParceiroDanca, PassoTrilha, PerfilResumo } from './types'
 
 export interface DadosTrilha {
   ctx: ContextoTrilha
   saldo: SaldoChaves
+  /** Foto e nome dos professores dos passos, por id. */
+  professores: Map<string, PerfilResumo>
+}
+
+/** Os professores de um passo, na ordem em que foram escolhidos. */
+export function professoresDo(passo: PassoTrilha, dados: DadosTrilha): PerfilResumo[] {
+  return passo.professores_ids.flatMap((id) => dados.professores.get(id) ?? [])
 }
 
 /**
@@ -43,7 +50,11 @@ export function useTrilha() {
         suspensos: diasSuspensos(feriados),
         aberturas: mapaAberturas(aberturas),
       }).map((d) => diaDaNoite(d))
+      // Uma consulta só, com quem aparece como professor em algum passo
+      const ids = [...new Set(passos.flatMap((p) => p.professores_ids))]
+      const perfis = await api.perfisResumo(ids).catch(() => [] as PerfilResumo[])
       setDados({
+        professores: new Map(perfis.map((p) => [p.id, p])),
         ctx: {
           passos,
           turmas,
