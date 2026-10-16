@@ -26,15 +26,6 @@ const ICONE: Record<Visual, { fundo: string; nome: 'check' | 'play' | 'chave' | 
   bloqueado: { fundo: 'bg-chip text-ink3', nome: 'cadeado' },
 }
 
-function Numero({ valor, rotulo }: { valor: string | number; rotulo: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 rounded-2xl border border-linha bg-sf p-3">
-      <span className="text-[22px] font-extrabold leading-none">{valor}</span>
-      <span className="text-xs text-ink2">{rotulo}</span>
-    </div>
-  )
-}
-
 export function TrilhaPage() {
   const { dados, erro, liberar, comoAluno, verComoAluno } = useTrilha()
   const voltar = useVoltar('/')
@@ -55,8 +46,6 @@ export function TrilhaPage() {
   const niveis = dados ? niveisVisiveis(dados.ctx) : []
   const meu = dados ? nivelDoAluno(dados.ctx) : null
   const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
-  const abertos = lista.filter((s) => s.estado === 'aberto')
-  const feitos = abertos.filter((s) => praticados.has(s.passo.id)).length
   const saldo = dados?.saldo
 
   const visual = (s: PassoComSituacao): Visual =>
@@ -124,14 +113,6 @@ export function TrilhaPage() {
           </button>
         )}
         {erro && <p className="text-sm text-or-t">{erro}</p>}
-
-        {saldo && lista.length > 0 && (
-          <div className="grid grid-cols-3 gap-2">
-            <Numero valor={abertos.length} rotulo={abertos.length === 1 ? 'passo liberado' : 'passos liberados'} />
-            <Numero valor={feitos} rotulo={feitos === 1 ? 'praticado' : 'praticados'} />
-            <Numero valor={`${saldo.pontosPorChave - saldo.faltam}/${saldo.pontosPorChave}`} rotulo="pontos p/ chave" />
-          </div>
-        )}
 
         {dados && niveis.length === 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
