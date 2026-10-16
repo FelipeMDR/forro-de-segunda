@@ -45,7 +45,7 @@ export function HojePage() {
     null,
   )
   const [eventos, setEventos] = useLembrado<AgendaEvent[]>('agenda:eventos', [])
-  const [posicao, setPosicao] = useLembrado<{ desafio: Challenge; pos: number } | null>(
+  const [posicao, setPosicao] = useLembrado<{ desafio: Challenge; pos: number | null } | null>(
     'hoje:posicao',
     null,
   )
@@ -106,6 +106,9 @@ export function HojePage() {
   ).length
 
   useEffect(() => {
+    // Antes da lista de desafios chegar, "nenhum desafio" ainda não é
+    // verdade: apagar a colocação guardada faria o card piscar
+    if (!noite.desafiosCarregados) return
     if (!meuDesafio || !userId) {
       setPosicao(null)
       return
@@ -115,13 +118,14 @@ export function HojePage() {
       .getRanking(meuDesafio, meuDesafio.modalidades[0])
       .then((r) => {
         const eu = colocacoes(r).find((c) => c.entrada.user_id === userId)
-        if (vivo) setPosicao(eu ? { desafio: meuDesafio, pos: eu.posicao } : null)
+        // pos null = ainda fora do ranking (o card mostra o troféu)
+        if (vivo) setPosicao({ desafio: meuDesafio, pos: eu?.posicao ?? null })
       })
       .catch(() => {})
     return () => {
       vivo = false
     }
-  }, [api, meuDesafio, userId, noite.situacao])
+  }, [api, meuDesafio, userId, noite.situacao, noite.desafiosCarregados])
 
   // Próximo compromisso nas minhas turmas (as que estudo e as que ensino)
   const proximo = useMemo<OcorrenciaAgenda | null>(() => {
@@ -136,6 +140,14 @@ export function HojePage() {
       ) ?? null
     )
   }, [eventos, noite.feriados, noite.agora, profile])
+
+  // O card do desafio só muda de cara quando sabe o que mostrar: sem
+  // isso, abria como "Desafios" com troféu e virava o desafio da pessoa
+  // logo depois. A colocação guardada só vale se for do mesmo desafio.
+  const desafioDoCard = noite.desafiosCarregados ? meuDesafio : (posicao?.desafio ?? null)
+  const rankingDoCard =
+    posicao && desafioDoCard && posicao.desafio.id === desafioDoCard.id ? posicao : null
+  const cardDesafioPronto = noite.desafiosCarregados || posicao !== null
 
   const souDJdaSessao = sessao?.dj_user_id === userId
   const mostrarDJ = podeSerDJ === true || souDJdaSessao
@@ -221,18 +233,26 @@ export function HojePage() {
             className="flex min-h-[132px] flex-col gap-2.5 rounded-[22px] border border-linha bg-sf p-4 text-ink"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-preto bg-verde-500 text-[17px] font-extrabold text-preto">
-              {posicao ? `${posicao.pos}º` : <Icone nome="trofeu" tamanho={20} />}
+              {rankingDoCard?.pos != null
+                ? `${rankingDoCard.pos}º`
+                : (rankingDoCard || (cardDesafioPronto && !desafioDoCard)) && (
+                    <Icone nome="trofeu" tamanho={20} />
+                  )}
             </span>
-            <span className="text-[17px] font-extrabold leading-tight">
-              {posicao ? posicao.desafio.titulo : 'Desafios'}
-            </span>
-            <span className="text-[13px] text-ink3">
-              {posicao
-                ? `na ${defModalidade(posicao.desafio.modalidades[0]).nome} · ${faltam(posicao.desafio)}`
-                : rolando > 0
-                  ? `${rolando} rolando agora`
-                  : 'Veja o que vem por aí'}
-            </span>
+            {cardDesafioPronto && (
+              <>
+                <span className="text-[17px] font-extrabold leading-tight">
+                  {desafioDoCard ? desafioDoCard.titulo : 'Desafios'}
+                </span>
+                <span className="text-[13px] text-ink3">
+                  {desafioDoCard
+                    ? `na ${defModalidade(desafioDoCard.modalidades[0]).nome} · ${faltam(desafioDoCard)}`
+                    : rolando > 0
+                      ? `${rolando} rolando agora`
+                      : 'Veja o que vem por aí'}
+                </span>
+              </>
+            )}
           </Link>
         </div>
 

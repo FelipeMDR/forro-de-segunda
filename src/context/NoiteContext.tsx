@@ -56,6 +56,8 @@ interface EstadoNoite {
   noite: string
   agora: Date
   desafios: Challenge[]
+  /** A lista de desafios já chegou (antes disso, `desafios` vazio não quer dizer "nenhum"). */
+  desafiosCarregados: boolean
   feriados: Feriado[]
   aberturas: AberturaAntecipada[]
   meusCheckins: Date[]
@@ -103,6 +105,7 @@ export function NoiteProvider({ children }: { children: ReactNode }) {
   const [aberturas, setAberturas] = useState<AberturaAntecipada[]>([])
   const [meusCheckins, setMeusCheckins] = useState<Date[]>([])
   const [carregado, setCarregado] = useState(false)
+  const [desafiosCarregados, setDesafiosCarregados] = useState(false)
   const [agora, setAgora] = useState(() => new Date())
   /** Sobe a cada recarga pedida; refaz as consultas. */
   const [versao, setVersao] = useState(0)
@@ -124,6 +127,7 @@ export function NoiteProvider({ children }: { children: ReactNode }) {
     ]).then(([d, f, a]) => {
       if (!vivo) return
       setDesafios(d)
+      setDesafiosCarregados(true)
       setFeriados(f)
       setAberturas(a)
     })
@@ -262,6 +266,7 @@ export function NoiteProvider({ children }: { children: ReactNode }) {
       noite,
       agora,
       desafios,
+      desafiosCarregados,
       feriados,
       aberturas,
       meusCheckins,
@@ -273,7 +278,7 @@ export function NoiteProvider({ children }: { children: ReactNode }) {
       linhas,
       recarregar,
     }
-  }, [agora, aberturas, carregado, desafios, feriados, meusCheckins, recarregar])
+  }, [agora, aberturas, carregado, desafios, desafiosCarregados, feriados, meusCheckins, recarregar])
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
 }
