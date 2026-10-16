@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../lib/dates'
+import { chaves } from '../lib/textosTrilha'
 import type { PassoComSituacao, SaldoChaves } from '../lib/trilha'
 import { Icone } from './Icone'
 import { BotaoAcao, BotaoSuave, Folha } from './ui'
@@ -22,7 +23,7 @@ export function FolhaChave({
   alvo: PassoComSituacao | null
   saldo: SaldoChaves
   onFechar: () => void
-  onLiberar: (passoId: string) => Promise<void>
+  onLiberar: (passoId: string, custo: number) => Promise<void>
 }) {
   const toast = useToast()
   const [salvando, setSalvando] = useState(false)
@@ -32,13 +33,17 @@ export function FolhaChave({
     if (alvo) setLiberado(null)
   }, [alvo])
 
-  const temChave = saldo.disponiveis > 0
+  const custo = alvo?.custo ?? 1
+  const temChave = saldo.disponiveis >= custo
+  // Pontos que ainda faltam para pagar este passo
+  const livres = saldo.pontos - saldo.usadas * saldo.pontosPorChave
+  const faltamPontos = Math.max(0, custo * saldo.pontosPorChave - livres)
 
   const liberar = async () => {
     if (!alvo) return
     setSalvando(true)
     try {
-      await onLiberar(alvo.passo.id)
+      await onLiberar(alvo.passo.id, custo)
       setLiberado(alvo)
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -78,13 +83,19 @@ export function FolhaChave({
               <Icone nome="chave" className="h-8 w-8" />
             </span>
             <h2 className="text-2xl font-extrabold leading-tight">Liberar “{alvo?.passo.nome}” agora?</h2>
+            {alvo && !alvo.data && (
+              <p className="text-[15px] leading-snug text-ink2">
+                É um passo do nível seguinte. Custa {chaves(custo)}
+                {temChave ? `, das suas ${saldo.disponiveis}.` : `, e você tem ${saldo.disponiveis}.`}
+              </p>
+            )}
             {alvo?.data && (
               <p className="text-[15px] leading-snug text-ink2">
                 {/* A data abreviada já termina em ponto ("20 de out.") */}
                 A turma vê esse passo em {formatDate(alvo.data)}{' '}
                 {temChave
-                  ? `Você usa 1 das suas ${saldo.disponiveis} ${saldo.disponiveis === 1 ? 'chave' : 'chaves'} e assiste antes.`
-                  : 'Você ainda não tem chave.'}
+                  ? `Custa ${chaves(custo)}, das suas ${saldo.disponiveis}, e você assiste antes.`
+                  : `Custa ${chaves(custo)}, e você tem ${saldo.disponiveis}.`}
               </p>
             )}
           </div>
@@ -93,7 +104,7 @@ export function FolhaChave({
 
           <div className="flex flex-col gap-2">
             <BotaoAcao cor="preto" bloco sombra={false} disabled={!temChave || salvando} onClick={() => void liberar()}>
-              {salvando ? 'Liberando…' : temChave ? 'Usar 1 chave' : `Faltam ${saldo.faltam} pontos`}
+              {salvando ? 'Liberando…' : temChave ? `Usar ${chaves(custo)}` : `Faltam ${faltamPontos} pontos`}
             </BotaoAcao>
             <button
               type="button"
@@ -148,12 +159,10 @@ export function ComoGanharChaves({ saldo }: { saldo: SaldoChaves }) {
 export function FolhaRegrasChaves({
   aberta,
   saldo,
-  antecedenciaDias,
   onFechar,
 }: {
   aberta: boolean
   saldo: SaldoChaves
-  antecedenciaDias: number
   onFechar: () => void
 }) {
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
@@ -168,8 +177,7 @@ export function FolhaRegrasChaves({
             Você tem {plural(saldo.disponiveis, 'chave', 'chaves')}
           </h2>
           <p className="text-[15px] leading-snug text-ink2">
-            Cada chave libera o próximo passo da sua trilha até{' '}
-            {plural(antecedenciaDias, 'dia', 'dias')} antes da aula da turma.
+            O primeiro passo que a sua turma ainda não viu custa 1 chave. Cada passo depois dele custa o dobro: 2, 4, 8…
           </p>
         </div>
 
@@ -190,8 +198,9 @@ export function FolhaRegrasChaves({
 
         <ul className="flex flex-col gap-2 rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
           <li>
-            A chave abre só o <b className="text-ink">próximo passo</b>, nunca um nível inteiro. Assim ninguém queima a largada.
+            A compra é sempre <b className="text-ink">na ordem</b>: para chegar a um passo, compre os de antes. Quando a turma avança, o preço cai.
           </li>
+          <li>Depois do último passo do seu nível, dá para seguir comprando os do nível seguinte, ainda pelo dobro.</li>
           <li>Os pontos contam desde o início do semestre e zeram quando ele termina.</li>
           <li>O passo liberado continua aberto para você, mesmo depois.</li>
         </ul>

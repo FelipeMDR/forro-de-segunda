@@ -38,7 +38,7 @@ export function GerenciarTrilhaPage() {
           titulo="Regras das chaves"
           descricao={
             regras
-              ? `${regras.pontos_por_chave} pontos = 1 chave · até ${regras.antecedencia_dias} dias antes`
+              ? `${regras.pontos_por_chave} pontos = 1 chave · cada passo à frente custa o dobro`
               : 'Pontos por chave e antecedência'
           }
           onClick={() => navigate('/organizador/videoaulas/regras')}

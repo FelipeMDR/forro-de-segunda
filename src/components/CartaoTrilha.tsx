@@ -83,11 +83,11 @@ export function CartaoTrilha() {
             <button
               type="button"
               onClick={() => setAlvo(proximo)}
-              aria-label={`Liberar com chave. Você tem ${saldo.disponiveis}`}
+              aria-label={`Liberar por ${proximo.custo ?? 1}. Você tem ${saldo.disponiveis}`}
               className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-preto px-3.5 text-[13px] font-extrabold text-branco"
             >
               <Icone nome="chave" className="h-4 w-4 text-brasa-400" />
-              {saldo.disponiveis}
+              {proximo.custo ?? 1}
             </button>
           )}
         </div>

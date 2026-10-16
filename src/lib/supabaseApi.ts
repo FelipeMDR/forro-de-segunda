@@ -2223,21 +2223,26 @@ export class SupabaseApi implements ForroApi {
     const uid = await this.requireUid()
     const { data, error } = await this.sb
       .from('trilha_liberacoes')
-      .select('passo_id, criado_em')
+      .select('*')
       .eq('user_id', uid)
     if (error) return []
-    return data as LiberacaoTrilha[]
+    // Antes da coluna `custo` (036 antiga), toda chave custava 1
+    return (data as Array<Partial<LiberacaoTrilha>>).map((l) => ({
+      passo_id: l.passo_id as string,
+      criado_em: l.criado_em as string,
+      custo: l.custo ?? 1,
+    }))
   }
 
-  async liberarPassoComChave(passoId: string) {
-    const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId })
+  async liberarPassoComChave(passoId: string, custo: number) {
+    const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId, p_custo: custo })
     if (error) throw new Error(traduz(error.message))
   }
 
   async regrasTrilha(): Promise<RegrasTrilha> {
     const { data, error } = await this.sb
       .from('trilha_regras')
-      .select('pontos_por_chave, antecedencia_dias')
+      .select('pontos_por_chave')
       .maybeSingle()
     if (error || !data) return { ...REGRAS_PADRAO } // sem a migração 036
     return data as RegrasTrilha
@@ -2246,7 +2251,6 @@ export class SupabaseApi implements ForroApi {
   async salvarRegrasTrilha(r: RegrasTrilha) {
     const { error } = await this.sb.rpc('salvar_regras_trilha', {
       p_pontos: r.pontos_por_chave,
-      p_dias: r.antecedencia_dias,
     })
     if (error) throw new Error(traduz(error.message))
   }

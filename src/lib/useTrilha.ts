@@ -60,7 +60,10 @@ export function useTrilha() {
           noitesComDupla: noitesDupla,
           parceiros,
           desde,
-          usadas: liberacoes.filter((l) => !desde || l.criado_em >= desde).length,
+          // Chaves gastas = soma dos preços pagos (1, 2, 4…)
+          usadas: liberacoes
+            .filter((l) => !desde || l.criado_em >= desde)
+            .reduce((soma, l) => soma + l.custo, 0),
           pontosPorChave: regras.pontos_por_chave,
         }),
       })
@@ -75,8 +78,8 @@ export function useTrilha() {
   }, [carregar])
 
   const liberar = useCallback(
-    async (passoId: string) => {
-      await api.liberarPassoComChave(passoId)
+    async (passoId: string, custo: number) => {
+      await api.liberarPassoComChave(passoId, custo)
       await carregar()
     },
     [api, carregar],

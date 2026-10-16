@@ -173,7 +173,7 @@ interface DB {
   semestres?: string[]
   /** Trilha de vídeos (migração 036) — ausente em bancos demo antigos. */
   trilhaPassos?: PassoTrilha[]
-  trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string }>
+  trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string; custo?: number }>
   trilhaRegras?: RegrasTrilha
   alunos: AlunoCadastrado[]
   turmas: Turma[]
@@ -2087,12 +2087,15 @@ export class DemoApi implements ForroApi {
     const uid = this.uid()
     return (this.db.trilhaLiberacoes ?? [])
       .filter((l) => l.user_id === uid)
-      .map(({ passo_id, criado_em }) => ({ passo_id, criado_em }))
+      .map(({ passo_id, criado_em, custo }) => ({ passo_id, criado_em, custo: custo ?? 1 }))
   }
 
-  async liberarPassoComChave(passoId: string) {
+  async liberarPassoComChave(passoId: string, custo: number) {
     // Espelha liberar_passo_com_chave (migração 036), com o mesmo teto.
     const uid = this.uid()
+    if (!Number.isInteger(custo) || custo < 1 || custo > 1024 || (custo & (custo - 1)) !== 0) {
+      throw new Error('Preço de chave inválido')
+    }
     const passo = this.passosTrilha().find((p) => p.id === passoId)
     if (!passo) throw new Error('Esse passo não existe mais')
     if (!passo.pode_chave) throw new Error('Esse passo só abre depois da aula')
@@ -2108,12 +2111,14 @@ export class DemoApi implements ForroApi {
     ).size
     const noites = (await this.noitesComDupla(uid)).filter((d) => d >= corte).length
     const novas = (await this.parceirosDe(uid)).filter((p) => p.primeira && p.primeira >= corte).length
-    const usadas = libs.filter((l) => l.user_id === uid && l.criado_em >= desde).length
+    const usadas = libs
+      .filter((l) => l.user_id === uid && l.criado_em >= desde)
+      .reduce((soma, l) => soma + (l.custo ?? 1), 0)
     const { pontos_por_chave } = await this.regrasTrilha()
-    if (presencas + noites + novas < pontos_por_chave * (usadas + 1)) {
-      throw new Error('Você ainda não tem chave')
+    if (presencas + noites + novas < pontos_por_chave * (usadas + custo)) {
+      throw new Error('Você ainda não tem chaves suficientes')
     }
-    libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString() })
+    libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString(), custo })
     this.persist()
   }
 
@@ -2126,10 +2131,10 @@ export class DemoApi implements ForroApi {
     if (this.db.roles[this.uid()] !== 'organizador') {
       throw new Error('Só a organização muda as regras das chaves')
     }
-    if (r.pontos_por_chave < 1 || r.pontos_por_chave > 20 || r.antecedencia_dias < 0 || r.antecedencia_dias > 30) {
-      throw new Error('Pontos de 1 a 20 e antecedência de 0 a 30 dias')
+    if (!Number.isInteger(r.pontos_por_chave) || r.pontos_por_chave < 1 || r.pontos_por_chave > 20) {
+      throw new Error('Pontos por chave: de 1 a 20')
     }
-    this.db.trilhaRegras = { pontos_por_chave: r.pontos_por_chave, antecedencia_dias: r.antecedencia_dias }
+    this.db.trilhaRegras = { pontos_por_chave: r.pontos_por_chave }
     this.persist()
   }
 

@@ -11,6 +11,7 @@ const s = (extra: Partial<PassoComSituacao>): PassoComSituacao => ({
   estado: 'bloqueado',
   motivo: null,
   data: '2026-10-26',
+  custo: null,
   ...extra,
 })
 
@@ -21,8 +22,17 @@ describe('quandoLibera', () => {
     expect(quandoLibera(s({}), '2026-10-26')).toBe('Libera hoje')
   })
 
-  it('passo de chave lembra que dá para adiantar', () => {
-    expect(quandoLibera(s({ estado: 'chave' }), '2026-10-20')).toBe('Libera em 6 dias, ou agora com 1 chave')
+  it('passo de chave lembra que dá para adiantar, pelo preço dele', () => {
+    expect(quandoLibera(s({ estado: 'chave', custo: 1 }), '2026-10-20')).toBe('Libera em 6 dias, ou agora com 1 chave')
+    expect(quandoLibera(s({ estado: 'chave', custo: 4 }), '2026-10-20')).toBe('Libera em 6 dias, ou agora com 4 chaves')
+  })
+
+  it('passo do nível seguinte (sem data) à venda', () => {
+    expect(quandoLibera(s({ estado: 'chave', custo: 8, data: null }), '2026-10-20')).toBe('Próximo nível · 8 chaves')
+  })
+
+  it('passo fechado mostra quanto vai custar quando chegar a vez', () => {
+    expect(quandoLibera(s({ custo: 2 }), '2026-10-20')).toBe('Libera em 6 dias · depois por 2 chaves')
   })
 
   it('sem data: abre com a turma', () => {

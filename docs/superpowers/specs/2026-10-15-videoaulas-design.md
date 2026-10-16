@@ -17,15 +17,16 @@ Os alunos pedem um lugar para rever os passos ensinados em aula. Liberar tudo de
    - Sem reposição, os passos seguintes andam uma semana. Com reposição, o passo vai para o dia da reposição e o resto não muda.
 5. **Quando um passo abre para o aluno:**
    - **aberto:** a data dele chegou em **alguma** turma do aluno daquele nível; ou foi liberado com chave; ou o nível é **menor** que o maior nível das turmas do aluno (revisão); ou a pessoa pode editar a trilha (professores e organização veem tudo);
-   - **chave:** é o **primeiro** passo ainda fechado do nível do aluno, tem `pode_chave`, tem vídeo e abre em no máximo **7 dias**;
+   - **chave:** é o **primeiro** passo da fila de compra ainda não comprado, tem `pode_chave` e tem vídeo. Não há limite de dias. A fila é o resto do nível do aluno (o que a turma ainda não viu) seguido dos níveis acima;
    - **bloqueado:** todo o resto, com a data prevista quando houver.
 6. **Chaves** (por semestre, desde o último "Encerrar semestre"):
    - **+1 presença:** cada noite de presença válida (`datasDePresenca`, a mesma regra do perfil);
    - **+1 parceria:** cada noite com pelo menos uma dupla confirmada (no máximo 1 por noite);
    - **+1 nova parceria:** cada pessoa com quem a primeira dupla confirmada caiu neste semestre.
-   - **3 pontos = 1 chave** e até **7 dias** antes, por padrão. A organização muda os dois números pelo painel (tabela `trilha_regras`, uma linha). "Só o próximo passo" é fixo.
-   - Saldo = chaves ganhas − liberações feitas no semestre.
-7. **Gastar chave** é uma função no banco (`liberar_passo_com_chave`). Ela recusa se o aluno não tem saldo. O saldo é contado por cima: noites com check-in não anulado em vez da presença por janela. Assim o banco nunca recusa uma chave que o app mostra, e ninguém ganha chaves forjando chamadas.
+   - **3 pontos = 1 chave** por padrão; a organização muda pelo painel (tabela `trilha_regras`, uma linha).
+   - **Custo em dobro:** o 1º passo da fila custa 1 chave, o 2º custa 2, o 3º custa 4… contando a partir da turma (o preço não muda quando o aluno compra o anterior e cai quando a turma avança). Vale igual para iniciante, intermediário e avançado. A compra é sempre na ordem e, depois do último passo do nível, segue no nível seguinte.
+   - Saldo = chaves ganhas − soma dos preços pagos no semestre (`trilha_liberacoes.custo`).
+7. **Gastar chave** é uma função no banco (`liberar_passo_com_chave(passo, custo)`). O preço vem do app, que é onde mora o calendário; o banco confere que é 1, 2, 4… e que o aluno tem chaves para pagar. Ela recusa se o aluno não tem saldo. O saldo é contado por cima: noites com check-in não anulado em vez da presença por janela. Assim o banco nunca recusa uma chave que o app mostra, e ninguém ganha chaves forjando chamadas.
 8. **Quem edita:** a gestão (passos, cronogramas e regras das chaves) fica só no Painel da organização, em `/organizador/videoaulas`, pelo celular. Professores e quem dá aula veem a trilha toda aberta, mas não editam pelo app.
 9. **Cancelar aula na Agenda** ganha a escolha "Sem reposição" ou "Repor em outro dia" (data e hora), com o aviso do efeito na trilha. Só existe quando o cancelamento é de uma turma específica.
 

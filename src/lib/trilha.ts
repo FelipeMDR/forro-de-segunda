@@ -31,12 +31,10 @@ export const NOME_NIVEL: Record<NivelTrilha, string> = {
 }
 
 export const PONTOS_POR_CHAVE = 3
-export const ANTECEDENCIA_CHAVE_DIAS = 7
 
 /** Valem enquanto a organização não mudar (ou sem a migração 036). */
 export const REGRAS_PADRAO: RegrasTrilha = {
   pontos_por_chave: PONTOS_POR_CHAVE,
-  antecedencia_dias: ANTECEDENCIA_CHAVE_DIAS,
 }
 
 const CARGOS_TRILHA = ['Professor(a)', 'Diretor(a) de Ensino']
@@ -246,6 +244,8 @@ export interface PassoComSituacao {
   motivo: 'data' | 'chave' | 'revisao' | 'equipe' | null
   /** Quando abre (ou abriu) para o aluno; null se não há data. */
   data: string | null
+  /** Chaves para comprar este passo agora (1, 2, 4…); null se não está à venda. */
+  custo: number | null
 }
 
 export function nivelDoAluno(ctx: ContextoTrilha): NivelTrilha | null {
@@ -258,13 +258,75 @@ export function nivelDoAluno(ctx: ContextoTrilha): NivelTrilha | null {
   return maior >= 0 ? NIVEIS[maior] : null
 }
 
-/** Abas da trilha: o nível do aluno e os de baixo (revisão), só os que têm passos. */
+/** Data mais cedo, entre as turmas do aluno nesse nível, de cada passo. */
+function datasDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): Map<string, string> {
+  const datas = new Map<string, string>()
+  for (const t of ctx.turmas) {
+    if (t.nivel !== nivel || !ctx.minhasTurmas.includes(t.nome)) continue
+    for (const l of cronogramaDeTurma(t, ctx.passos, ctx.eventos, ctx.feriados)) {
+      if (!l.passo) continue
+      const atual = datas.get(l.passo.id)
+      if (!atual || l.aula.data < atual) datas.set(l.passo.id, l.aula.data)
+    }
+  }
+  return datas
+}
+
+interface ItemFila {
+  passo: PassoTrilha
+  custo: number
+}
+
+/**
+ * Passos à frente da turma, na ordem em que o aluno pode comprar: o resto
+ * do nível dele e, depois, os níveis acima. O 1º custa 1 chave, o 2º 2,
+ * o 3º 4… — contando a partir da turma, então o preço não muda quando o
+ * aluno compra o anterior, e cai quando a turma avança.
+ */
+function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
+  const meu = nivelDoAluno(ctx)
+  if (!meu || ctx.equipe) return []
+  const doMeu = ordenarPassos(ctx.passos.filter((p) => p.nivel === meu))
+  // Nível sem passos ainda: nada de pular direto para o de cima
+  if (doMeu.length === 0) return []
+  const datas = datasDoNivel(meu, ctx)
+  const fila = doMeu.filter((p) => {
+    const d = datas.get(p.id)
+    return !(d && d <= ctx.hoje)
+  })
+  for (const n of NIVEIS.slice(NIVEIS.indexOf(meu) + 1)) {
+    fila.push(...ordenarPassos(ctx.passos.filter((p) => p.nivel === n)))
+  }
+  return fila.map((passo, i) => ({ passo, custo: 2 ** i }))
+}
+
+/** O único passo à venda: o primeiro da fila ainda não comprado. Ninguém pula a fila. */
+function passoAVenda(ctx: ContextoTrilha, fila: ItemFila[]): ItemFila | null {
+  const item = fila.find((f) => !ctx.liberadas.has(f.passo.id))
+  if (!item || !item.passo.pode_chave || !item.passo.video_frente) return null
+  // No nível do aluno, só com a turma no cronograma (sem data, a trilha não foi configurada)
+  if (item.passo.nivel === nivelDoAluno(ctx) && !datasDoNivel(item.passo.nivel, ctx).has(item.passo.id)) {
+    return null
+  }
+  return item
+}
+
+/**
+ * Abas da trilha: o nível do aluno e os de baixo (revisão), mais um nível
+ * de cima quando ele já comprou passo lá ou quando chegou a vez de comprar.
+ */
 export function niveisVisiveis(ctx: ContextoTrilha): NivelTrilha[] {
   const comPassos = NIVEIS.filter((n) => ctx.passos.some((p) => p.nivel === n))
   if (ctx.equipe) return comPassos
   const meu = nivelDoAluno(ctx)
   if (!meu) return []
-  return comPassos.filter((n) => NIVEIS.indexOf(n) <= NIVEIS.indexOf(meu))
+  const venda = passoAVenda(ctx, filaDeCompra(ctx))
+  return comPassos.filter(
+    (n) =>
+      NIVEIS.indexOf(n) <= NIVEIS.indexOf(meu) ||
+      venda?.passo.nivel === n ||
+      ctx.passos.some((p) => p.nivel === n && ctx.liberadas.has(p.id)),
+  )
 }
 
 /** Aba em que a trilha abre: o nível do aluno, ou o primeiro com passos (revisão). */
@@ -276,45 +338,27 @@ export function nivelInicial(ctx: ContextoTrilha): NivelTrilha | null {
 
 export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoComSituacao[] {
   const passos = ordenarPassos(ctx.passos.filter((p) => p.nivel === nivel))
-
-  // Data mais cedo entre as turmas do aluno neste nível
-  const datas = new Map<string, string>()
-  for (const t of ctx.turmas) {
-    if (t.nivel !== nivel || !ctx.minhasTurmas.includes(t.nome)) continue
-    for (const l of cronogramaDeTurma(t, ctx.passos, ctx.eventos, ctx.feriados)) {
-      if (!l.passo) continue
-      const atual = datas.get(l.passo.id)
-      if (!atual || l.aula.data < atual) datas.set(l.passo.id, l.aula.data)
-    }
-  }
-
+  const datas = datasDoNivel(nivel, ctx)
   const meu = nivelDoAluno(ctx)
   const abaixo = meu !== null && NIVEIS.indexOf(nivel) < NIVEIS.indexOf(meu)
+  const fila = filaDeCompra(ctx)
+  const custos = new Map(fila.map((f) => [f.passo.id, f.custo]))
+  const venda = passoAVenda(ctx, fila)
 
-  const lista = passos.map((passo, i): PassoComSituacao => {
-    const data = datas.get(passo.id) ?? null
-    const base = { passo, numero: i + 1, data }
-    if (ctx.equipe) return { ...base, estado: 'aberto', motivo: 'equipe' }
+  return passos.map((passo, i): PassoComSituacao => {
+    const data = nivel === meu ? (datas.get(passo.id) ?? null) : null
+    const base = { passo, numero: i + 1, data, custo: null }
+    if (ctx.equipe) return { ...base, data: datas.get(passo.id) ?? null, estado: 'aberto', motivo: 'equipe' }
     if (abaixo) return { ...base, estado: 'aberto', motivo: 'revisao' }
-    if (nivel !== meu) return { ...base, estado: 'bloqueado', motivo: null, data: null }
     if (data && data <= ctx.hoje) return { ...base, estado: 'aberto', motivo: 'data' }
     if (ctx.liberadas.has(passo.id)) return { ...base, estado: 'aberto', motivo: 'chave' }
-    return { ...base, estado: 'bloqueado', motivo: null }
+    return {
+      ...base,
+      estado: venda?.passo.id === passo.id ? 'chave' : 'bloqueado',
+      motivo: null,
+      custo: custos.get(passo.id) ?? null,
+    }
   })
-
-  // Só o PRIMEIRO fechado pode virar "chave": ninguém pula a fila.
-  const primeiro = lista.find((s) => s.estado === 'bloqueado')
-  if (
-    primeiro &&
-    nivel === meu &&
-    primeiro.passo.pode_chave &&
-    primeiro.passo.video_frente &&
-    primeiro.data &&
-    primeiro.data <= somaDias(ctx.hoje, (ctx.regras ?? REGRAS_PADRAO).antecedencia_dias)
-  ) {
-    primeiro.estado = 'chave'
-  }
-  return lista
 }
 
 // ---- Chaves ----

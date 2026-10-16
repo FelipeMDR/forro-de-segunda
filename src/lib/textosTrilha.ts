@@ -1,12 +1,25 @@
 import { formatDate } from './dates'
 import { diasAte, type LinhaCronograma, type PassoComSituacao } from './trilha'
 
-/** "Libera em 5 dias, ou agora com 1 chave" */
+export function chaves(n: number): string {
+  return `${n} ${n === 1 ? 'chave' : 'chaves'}`
+}
+
+/** "Libera em 5 dias, ou agora com 2 chaves" */
 export function quandoLibera(s: PassoComSituacao, hoje: string): string {
-  if (!s.data) return 'Abre com a turma'
-  const n = diasAte(hoje, s.data)
-  const quando = n <= 0 ? 'Libera hoje' : n === 1 ? 'Libera amanhã' : `Libera em ${n} dias`
-  return s.estado === 'chave' ? `${quando}, ou agora com 1 chave` : quando
+  let quando: string
+  if (s.data) {
+    const n = diasAte(hoje, s.data)
+    quando = n <= 0 ? 'Libera hoje' : n === 1 ? 'Libera amanhã' : `Libera em ${n} dias`
+  } else {
+    // Sem data e com preço: passo do nível seguinte, que a turma não vai ver
+    quando = s.custo ? 'Próximo nível' : 'Abre com a turma'
+  }
+  if (s.estado === 'chave' && s.custo) {
+    return s.data ? `${quando}, ou agora com ${chaves(s.custo)}` : `${quando} · ${chaves(s.custo)}`
+  }
+  if (s.custo) return `${quando} · depois por ${chaves(s.custo)}`
+  return quando
 }
 
 /** Por que o passo está aberto para o aluno. */

@@ -385,8 +385,11 @@ export interface ForroApi {
   definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null): Promise<void>
   /** Passos que EU liberei com chave. */
   minhasLiberacoes(): Promise<LiberacaoTrilha[]>
-  /** Gasta uma chave. O banco recusa sem saldo ("Você ainda não tem chave"). */
-  liberarPassoComChave(passoId: string): Promise<void>
+  /**
+   * Gasta `custo` chaves (1, 2, 4… conforme o passo está à frente da
+   * turma, ver `situacaoDoNivel`). O banco recusa sem saldo.
+   */
+  liberarPassoComChave(passoId: string, custo: number): Promise<void>
   /** Noites ("YYYY-MM-DD") com dupla confirmada de alguém, sem repetir. */
   noitesComDupla(userId: string): Promise<string[]>
   /** Regras das chaves (padrão se a migração 036 não rodou). */

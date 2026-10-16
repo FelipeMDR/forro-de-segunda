@@ -779,10 +779,11 @@ export type PassoTrilhaInput = Omit<PassoTrilha, 'id'> & { id?: string }
 /** Regras das chaves, editáveis pela organização (tabela `trilha_regras`). */
 export interface RegrasTrilha {
   pontos_por_chave: number
-  antecedencia_dias: number
 }
 
 export interface LiberacaoTrilha {
   passo_id: string
   criado_em: string
+  /** Chaves pagas (1, 2, 4…). */
+  custo: number
 }

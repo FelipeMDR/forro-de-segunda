@@ -6,6 +6,7 @@ import { Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
 import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
+  NIVEIS,
   NOME_NIVEL,
   nivelDoAluno,
   nivelInicial,
@@ -122,7 +123,10 @@ export function TrilhaPage() {
           <Segmentado
             opcoes={niveis.map((n) => ({
               valor: n,
-              rotulo: n !== meu && !dados?.ctx.equipe ? `${NOME_NIVEL[n]} · revisão` : NOME_NIVEL[n],
+              rotulo:
+                meu && !dados?.ctx.equipe && NIVEIS.indexOf(n) < NIVEIS.indexOf(meu)
+                  ? `${NOME_NIVEL[n]} · revisão`
+                  : NOME_NIVEL[n],
             }))}
             valor={nivel}
             onChange={setNivel}
@@ -167,7 +171,7 @@ export function TrilhaPage() {
                     </span>
                     {s.estado === 'chave' && (
                       <span className="shrink-0 rounded-full border-[1.5px] border-brasa-500 px-3 py-1.5 text-[13px] font-extrabold text-or-t">
-                        Liberar
+                        Liberar · {s.custo ?? 1}
                       </span>
                     )}
                     {s.estado === 'aberto' && s.passo.video_frente && (
@@ -202,8 +206,7 @@ export function TrilhaPage() {
 
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Chaves só abrem o <b className="text-ink">próximo passo</b> da trilha, até{' '}
-            {dados?.ctx.regras?.antecedencia_dias ?? 7} dias antes da turma. Assim ninguém queima a largada.
+            O próximo passo custa 1 chave e cada um depois dele custa <b className="text-ink">o dobro</b>. Compre na ordem; quando a turma avança, o preço cai.
           </p>
         )}
       </div>
@@ -212,7 +215,6 @@ export function TrilhaPage() {
         <FolhaRegrasChaves
           aberta={regrasAbertas}
           saldo={saldo}
-          antecedenciaDias={dados?.ctx.regras?.antecedencia_dias ?? 7}
           onFechar={() => setRegrasAbertas(false)}
         />
       )}

@@ -33,9 +33,9 @@ async function dupla(db: PGlite, a: string, b: string, data: string) {
   )
 }
 
-async function liberar(db: PGlite, uid: string, passoId: string) {
+async function liberar(db: PGlite, uid: string, passoId: string, custo = 1) {
   await comoUsuario(db, uid)
-  await db.query(`select liberar_passo_com_chave($1)`, [passoId])
+  await db.query(`select liberar_passo_com_chave($1, $2)`, [passoId, custo])
 }
 
 async function liberacoes(db: PGlite, uid: string) {
@@ -47,7 +47,7 @@ describe('trilha — gastar chave', () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.a, 'Ana')
     const p = await passo(db)
-    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chave')
+    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
   it('3 noites de check-in valem 1 chave, e só 1', async () => {
@@ -57,7 +57,7 @@ describe('trilha — gastar chave', () => {
     const p1 = await passo(db, { ordem: 1 })
     const p2 = await passo(db, { ordem: 2 })
     await liberar(db, IDS.a, p1)
-    await expect(liberar(db, IDS.a, p2)).rejects.toThrow('Você ainda não tem chave')
+    await expect(liberar(db, IDS.a, p2)).rejects.toThrow('Você ainda não tem chaves suficientes')
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
@@ -66,7 +66,7 @@ describe('trilha — gastar chave', () => {
     await pessoa(db, IDS.a, 'Ana')
     await noites(db, IDS.a, ['2026-10-05', '2026-10-05', '2026-10-12'])
     await noites(db, IDS.a, ['2026-10-19'], true)
-    await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chave')
+    await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
   it('noite com dupla e parceria nova somam pontos', async () => {
@@ -84,7 +84,7 @@ describe('trilha — gastar chave', () => {
     await pessoa(db, IDS.a, 'Ana')
     await noites(db, IDS.a, ['2026-03-02', '2026-03-09', '2026-03-16'])
     await db.query(`insert into semestres (encerrado_em) values ('2026-07-01T12:00:00Z')`)
-    await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chave')
+    await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
   it('liberar o mesmo passo de novo não gasta outra chave', async () => {
@@ -136,6 +136,30 @@ describe('trilha — gastar chave', () => {
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
+  it('passo mais à frente custa o dobro: 2 chaves pedem o dobro de pontos', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19'])
+    const p1 = await passo(db, { ordem: 1 })
+    const p2 = await passo(db, { ordem: 2 })
+    await expect(liberar(db, IDS.a, p2, 2)).rejects.toThrow('Você ainda não tem chaves suficientes')
+    await noites(db, IDS.a, ['2026-10-26', '2026-11-02', '2026-11-09'])
+    await liberar(db, IDS.a, p2, 2)
+    // As 2 chaves (6 pontos) foram gastas: não sobra para mais nada
+    await expect(liberar(db, IDS.a, p1, 1)).rejects.toThrow('Você ainda não tem chaves suficientes')
+    const r = await db.query<{ custo: number }>(`select custo from trilha_liberacoes where user_id = $1`, [IDS.a])
+    expect(r.rows).toEqual([{ custo: 2 }])
+  })
+
+  it('preço de chave fora da sequência 1, 2, 4, 8… é recusado', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02', '2026-11-09'])
+    const p = await passo(db)
+    await expect(liberar(db, IDS.a, p, 3)).rejects.toThrow('Preço de chave inválido')
+    await expect(liberar(db, IDS.a, p, 0)).rejects.toThrow('Preço de chave inválido')
+  })
+
   it('ID de vídeo inválido é recusado pela tabela', async () => {
     const db = await bancoComMigracao()
     await expect(passo(db, { video: 'https://youtu.be/x' })).rejects.toThrow()
@@ -182,15 +206,15 @@ describe('trilha — quem edita', () => {
 })
 
 describe('trilha — regras das chaves', () => {
-  async function regras(db: PGlite, uid: string, pontos: number, dias: number) {
+  async function regras(db: PGlite, uid: string, pontos: number) {
     await comoUsuario(db, uid)
-    await db.query(`select salvar_regras_trilha($1, $2)`, [pontos, dias])
+    await db.query(`select salvar_regras_trilha($1)`, [pontos])
   }
 
-  it('começa com 3 pontos por chave e 7 dias', async () => {
+  it('começa com 3 pontos por chave', async () => {
     const db = await bancoComMigracao()
-    const r = await db.query(`select pontos_por_chave, antecedencia_dias from trilha_regras`)
-    expect(r.rows).toEqual([{ pontos_por_chave: 3, antecedencia_dias: 7 }])
+    const r = await db.query(`select pontos_por_chave from trilha_regras`)
+    expect(r.rows).toEqual([{ pontos_por_chave: 3 }])
   })
 
   it('organização muda os pontos por chave, e o gasto passa a seguir a regra nova', async () => {
@@ -199,8 +223,8 @@ describe('trilha — regras das chaves', () => {
     await pessoa(db, IDS.a, 'Ana')
     await noites(db, IDS.a, ['2026-10-05', '2026-10-12'])
     const p = await passo(db)
-    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chave')
-    await regras(db, IDS.org, 2, 7)
+    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chaves suficientes')
+    await regras(db, IDS.org, 2)
     await liberar(db, IDS.a, p)
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
@@ -209,15 +233,15 @@ describe('trilha — regras das chaves', () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.a, 'Ana')
     await pessoa(db, IDS.prof, 'Prof', { cargo: 'Professor(a)' })
-    await expect(regras(db, IDS.a, 1, 30)).rejects.toThrow('Só a organização muda as regras das chaves')
-    await expect(regras(db, IDS.prof, 1, 30)).rejects.toThrow('Só a organização muda as regras das chaves')
+    await expect(regras(db, IDS.a, 1)).rejects.toThrow('Só a organização muda as regras das chaves')
+    await expect(regras(db, IDS.prof, 1)).rejects.toThrow('Só a organização muda as regras das chaves')
   })
 
   it('recusa valores fora da faixa', async () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.org, 'Org', { organizador: true })
-    await expect(regras(db, IDS.org, 0, 7)).rejects.toThrow()
-    await expect(regras(db, IDS.org, 3, 31)).rejects.toThrow()
+    await expect(regras(db, IDS.org, 0)).rejects.toThrow()
+    await expect(regras(db, IDS.org, 21)).rejects.toThrow()
   })
 })
 

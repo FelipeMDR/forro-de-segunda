@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BotaoAcao, Cabecalho, Tela } from '../../components/ui'
 import { useApi } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import type { RegrasTrilha } from '../../lib/types'
+import { chaves } from '../../lib/textosTrilha'
 import { Campo, Dica } from './contexto'
 
 const GANHOS = [
@@ -12,37 +12,29 @@ const GANHOS = [
 ] as const
 
 /**
- * Regras das chaves da trilha de vídeos. "Só o próximo passo" não é
- * editável: é o que impede o aluno de queimar a largada.
+ * Regras das chaves da trilha de vídeos. Só os pontos por chave são
+ * editáveis: o custo em dobro de cada passo à frente é fixo, porque é ele
+ * que segura quem quer queimar a largada.
  */
 export function RegrasChavesPage() {
   const api = useApi()
   const toast = useToast()
-  const [form, setForm] = useState<{ pontos: string; dias: string } | null>(null)
+  const [pontos, setPontos] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
-    void api.regrasTrilha().then((r) =>
-      setForm({ pontos: String(r.pontos_por_chave), dias: String(r.antecedencia_dias) }),
-    )
+    void api.regrasTrilha().then((r) => setPontos(String(r.pontos_por_chave)))
   }, [api])
 
-  if (!form) return null
+  if (pontos === null) return null
+  const porChave = Number(pontos)
+  const valido = Number.isInteger(porChave) && porChave >= 1 && porChave <= 20
 
   const salvar = async () => {
-    const regras: RegrasTrilha = {
-      pontos_por_chave: Number(form.pontos),
-      antecedencia_dias: Number(form.dias),
-    }
-    if (!Number.isInteger(regras.pontos_por_chave) || regras.pontos_por_chave < 1 || regras.pontos_por_chave > 20) {
-      return toast('Pontos por chave: de 1 a 20', 'erro')
-    }
-    if (!Number.isInteger(regras.antecedencia_dias) || regras.antecedencia_dias < 0 || regras.antecedencia_dias > 30) {
-      return toast('Antecedência: de 0 a 30 dias', 'erro')
-    }
+    if (!valido) return toast('Pontos por chave: de 1 a 20', 'erro')
     setSalvando(true)
     try {
-      await api.salvarRegrasTrilha(regras)
+      await api.salvarRegrasTrilha({ pontos_por_chave: porChave })
       toast('Regras salvas. Valem na hora para todo mundo.')
     } catch (e) {
       toast((e as Error).message, 'erro')
@@ -63,32 +55,37 @@ export function RegrasChavesPage() {
             </span>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Campo rotulo="Pontos por chave">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={20}
-              className="input"
-              value={form.pontos}
-              onChange={(e) => setForm({ ...form, pontos: e.target.value })}
-            />
-          </Campo>
-          <Campo rotulo="Dias antes da turma">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={30}
-              className="input"
-              value={form.dias}
-              onChange={(e) => setForm({ ...form, dias: e.target.value })}
-            />
-          </Campo>
+
+        <Campo rotulo="Pontos por chave">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            className="input"
+            value={pontos}
+            onChange={(e) => setPontos(e.target.value)}
+          />
+        </Campo>
+
+        <div className="flex flex-col gap-2 rounded-[18px] border border-linha bg-sf p-4">
+          <span className="text-sm font-extrabold">Quanto custa adiantar</span>
+          {[1, 2, 3, 4].map((n) => {
+            const custo = 2 ** (n - 1)
+            return (
+              <div key={n} className="flex justify-between text-sm">
+                <span className="text-ink2">{n}º passo à frente da turma</span>
+                <b>
+                  {chaves(custo)}
+                  {valido && <span className="font-normal text-ink3"> · {custo * porChave} pontos</span>}
+                </b>
+              </div>
+            )
+          })}
         </div>
+
         <Dica>
-          A chave sempre abre só o <b>próximo passo</b> da trilha do aluno. Os dias dizem quanto antes da aula da turma ela pode ser usada (0 = só no dia).
+          O custo dobra a cada passo à frente da turma e não muda por nível. A compra é sempre na ordem, e depois do último passo do nível o aluno segue para o nível seguinte.
         </Dica>
         <BotaoAcao cor="preto" bloco disabled={salvando} onClick={() => void salvar()}>
           {salvando ? 'Salvando…' : 'Salvar regras'}

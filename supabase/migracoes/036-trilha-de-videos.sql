@@ -45,6 +45,10 @@ create table if not exists public.trilha_liberacoes (
   criado_em timestamptz not null default now(),
   primary key (user_id, passo_id)
 );
+-- Quantas chaves o passo custou: 1 para o primeiro que a turma ainda não
+-- viu, 2 para o seguinte, 4, 8… (quem já rodou a 036 antes ganha a coluna)
+alter table public.trilha_liberacoes
+  add column if not exists custo int not null default 1 check (custo >= 1);
 
 create or replace function public.pode_editar_trilha()
 returns boolean
@@ -99,12 +103,11 @@ end;
 $$;
 
 -- Regras das chaves, editáveis pela organização no painel. Uma linha só
--- (id sempre true). "Só o próximo passo" NÃO é regra editável: é o que
--- impede o aluno de queimar a largada.
+-- (id sempre true). O custo em dobro de cada passo mais à frente NÃO é
+-- editável: é o que segura quem quer queimar a largada.
 create table if not exists public.trilha_regras (
   id boolean primary key default true check (id),
   pontos_por_chave int not null default 3 check (pontos_por_chave between 1 and 20),
-  antecedencia_dias int not null default 7 check (antecedencia_dias between 0 and 30),
   atualizado_em timestamptz not null default now()
 );
 insert into public.trilha_regras (id) values (true) on conflict (id) do nothing;
@@ -114,7 +117,8 @@ drop policy if exists "trilha_regras_select" on public.trilha_regras;
 create policy "trilha_regras_select" on public.trilha_regras
   for select to authenticated using (true);
 
-create or replace function public.salvar_regras_trilha(p_pontos int, p_dias int)
+drop function if exists public.salvar_regras_trilha(int, int);
+create or replace function public.salvar_regras_trilha(p_pontos int)
 returns void
 language plpgsql security definer set search_path = public as $$
 begin
@@ -122,7 +126,7 @@ begin
     raise exception 'Só a organização muda as regras das chaves';
   end if;
   update trilha_regras
-  set pontos_por_chave = p_pontos, antecedencia_dias = p_dias, atualizado_em = now()
+  set pontos_por_chave = p_pontos, atualizado_em = now()
   where id;
 end;
 $$;
@@ -176,7 +180,15 @@ $$;
 -- isto, qualquer um consultaria a presença de outra pessoa.
 revoke all on function public.teto_pontos_trilha(uuid) from public, anon, authenticated;
 
-create or replace function public.liberar_passo_com_chave(p_passo uuid)
+/**
+ * Gasta `p_custo` chaves num passo. O PREÇO (1, 2, 4… conforme o passo
+ * está à frente da turma) é calculado no app, que é onde mora o
+ * calendário da trilha; aqui só se confere que é um preço possível e que
+ * o aluno tem chaves para pagar. Como a trava é de tela (vídeo não
+ * listado), isso basta.
+ */
+drop function if exists public.liberar_passo_com_chave(uuid);
+create or replace function public.liberar_passo_com_chave(p_passo uuid, p_custo int default 1)
 returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -187,6 +199,9 @@ declare
 begin
   if v_uid is null then
     raise exception 'Você precisa entrar primeiro';
+  end if;
+  if p_custo is null or p_custo < 1 or p_custo > 1024 or (p_custo & (p_custo - 1)) <> 0 then
+    raise exception 'Preço de chave inválido';
   end if;
   -- Dois toques seguidos não gastam a mesma chave duas vezes.
   perform pg_advisory_xact_lock(hashtext('trilha:' || v_uid::text));
@@ -205,15 +220,15 @@ begin
     return;
   end if;
 
-  select count(*) into v_usadas
+  select coalesce(sum(custo), 0) into v_usadas
   from trilha_liberacoes
   where user_id = v_uid and criado_em >= inicio_semestre_trilha();
 
   select pontos_por_chave into v_pontos from trilha_regras where id;
-  if teto_pontos_trilha(v_uid) < coalesce(v_pontos, 3) * (v_usadas + 1) then
-    raise exception 'Você ainda não tem chave';
+  if teto_pontos_trilha(v_uid) < coalesce(v_pontos, 3) * (v_usadas + p_custo) then
+    raise exception 'Você ainda não tem chaves suficientes';
   end if;
 
-  insert into trilha_liberacoes (user_id, passo_id) values (v_uid, p_passo);
+  insert into trilha_liberacoes (user_id, passo_id, custo) values (v_uid, p_passo, p_custo);
 end;
 $$;

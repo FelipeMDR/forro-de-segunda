@@ -168,17 +168,30 @@ describe('cronogramaDaTurma', () => {
 })
 
 describe('situacaoDoNivel', () => {
-  it('abre na data da aula; o primeiro fechado em até 7 dias vira "chave"', () => {
+  it('abre na data da aula; cada passo à frente da turma custa o dobro (1, 2, 4…)', () => {
     const s = situacaoDoNivel('iniciante', ctx())
     expect(s.map((p) => p.estado)).toEqual(['aberto', 'aberto', 'aberto', 'chave', 'bloqueado', 'bloqueado'])
+    expect(s.map((p) => p.custo)).toEqual([null, null, null, 1, 2, 4])
     expect(s[3].data).toBe('2026-10-26')
     expect(s[4].data).toBe('2026-11-02')
   })
 
-  it('liberado com chave abre, e o seguinte longe demais não vira "chave"', () => {
+  it('comprado com chave abre, e o seguinte vira "chave" pelo dobro', () => {
     const s = situacaoDoNivel('iniciante', ctx({ liberadas: new Set(['p4']) }))
     expect(s[3]).toMatchObject({ estado: 'aberto', motivo: 'chave' })
-    expect(s[4].estado).toBe('bloqueado')
+    expect(s[4]).toMatchObject({ estado: 'chave', custo: 2 })
+    expect(s[5]).toMatchObject({ estado: 'bloqueado', custo: 4 })
+  })
+
+  it('sem limite de dias: o próximo passo vira "chave" mesmo semanas antes', () => {
+    const s = situacaoDoNivel('iniciante', ctx({ hoje: '2026-09-20' }))
+    expect(s[0]).toMatchObject({ estado: 'chave', custo: 1, data: '2026-10-05' })
+  })
+
+  it('quando a turma avança, o preço cai', () => {
+    // Em 02/11 a turma já viu p4 e p5: p6 passa a custar 1
+    const s = situacaoDoNivel('iniciante', ctx({ hoje: '2026-11-02' }))
+    expect(s[5]).toMatchObject({ estado: 'chave', custo: 1 })
   })
 
   it('aluno em duas turmas do nível: vale a data mais cedo', () => {
@@ -194,15 +207,32 @@ describe('situacaoDoNivel', () => {
     expect(s[4].estado).toBe('bloqueado')
   })
 
-  it('antecedência menor que a padrão: o próximo passo ainda não vira "chave"', () => {
-    // hoje 20/10, p4 em 26/10: com 7 dias vira "chave", com 3 dias não
-    const s = situacaoDoNivel('iniciante', ctx({ regras: { pontos_por_chave: 3, antecedencia_dias: 3 } }))
-    expect(s[3].estado).toBe('bloqueado')
-  })
-
   it('passo sem vídeo não vira "chave"', () => {
     const passos = [1, 2, 3, 4].map((n) => passo(n, n === 4 ? { video_frente: null } : {}))
     expect(situacaoDoNivel('iniciante', ctx({ passos }))[3].estado).toBe('bloqueado')
+  })
+
+  it('depois do próprio nível, a compra continua no seguinte, ainda dobrando', () => {
+    // Iniciante com 4 passos (p4 é o 1º à frente da turma) e 2 do Intermediário
+    const c = ctx({
+      passos: [1, 2, 3, 4].map((n) => passo(n)).concat([
+        passo(1, { id: 'i1', nivel: 'intermediario' }),
+        passo(2, { id: 'i2', nivel: 'intermediario' }),
+      ]),
+      liberadas: new Set(['p4']),
+    })
+    const inter = situacaoDoNivel('intermediario', c)
+    expect(inter[0]).toMatchObject({ estado: 'chave', custo: 2, data: null })
+    expect(inter[1]).toMatchObject({ estado: 'bloqueado', custo: 4 })
+    expect(niveisVisiveis(c)).toEqual(['iniciante', 'intermediario'])
+  })
+
+  it('nível seguinte só aparece quando chega a vez dele', () => {
+    const c = ctx({
+      passos: [1, 2, 3, 4].map((n) => passo(n)).concat([passo(1, { id: 'i1', nivel: 'intermediario' })]),
+    })
+    expect(situacaoDoNivel('intermediario', c)[0]).toMatchObject({ estado: 'bloqueado', custo: 2 })
+    expect(niveisVisiveis(c)).toEqual(['iniciante'])
   })
 
   it('nível abaixo do aluno fica todo aberto (revisão); acima, todo fechado', () => {
