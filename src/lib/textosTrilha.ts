@@ -24,9 +24,15 @@ export function quandoLibera(s: PassoComSituacao, hoje: string): string {
 
 /** Por que o passo está aberto para o aluno. */
 export function comoAbriu(s: PassoComSituacao): string {
-  if (s.motivo === 'chave') return 'Liberado com chave'
-  if (s.motivo === 'revisao') return 'Revisão do nível anterior'
-  return s.data ? `Ensinado na aula de ${formatDate(s.data)}` : 'Aberto'
+  const texto =
+    s.motivo === 'chave'
+      ? 'Liberado com chave'
+      : s.motivo === 'revisao'
+        ? 'Revisão do nível anterior'
+        : s.data
+          ? `Ensinado na aula de ${formatDate(s.data)}`
+          : 'Aberto'
+  return s.passo.professores ? `${texto} · ${s.passo.professores}` : texto
 }
 
 export type TomLinha = 'feito' | 'proxima' | 'normal' | 'cancelada' | 'reposicao'

@@ -771,6 +771,8 @@ export interface PassoTrilha {
   video_condutor: string | null
   video_conduzida: string | null
   dica: string | null
+  /** Quem ensinou, como o professor escreveu ("Prof. Ana e Prof. João"). */
+  professores: string | null
   pode_chave: boolean
 }
 

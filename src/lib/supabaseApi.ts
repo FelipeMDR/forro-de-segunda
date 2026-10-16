@@ -2189,16 +2189,25 @@ export class SupabaseApi implements ForroApi {
   async listPassosTrilha(): Promise<PassoTrilha[]> {
     const { data, error } = await this.sb
       .from('trilha_passos')
-      .select('id, nivel, ordem, nome, video_frente, video_condutor, video_conduzida, dica, pode_chave')
+      // '*': sem a coluna `professores` (036 antiga) a trilha continua aparecendo
+      .select('*')
       .order('nivel')
       .order('ordem')
     if (error) return [] // sem a migração 036
-    return data as PassoTrilha[]
+    return (data as Array<PassoTrilha & { criado_em?: string }>).map(({ criado_em: _, ...p }) => ({
+      ...p,
+      professores: p.professores ?? null,
+    }))
   }
 
   async salvarPassoTrilha(p: PassoTrilhaInput) {
     const { id, ...campos } = p
-    const linha = { ...campos, nome: campos.nome.trim(), dica: campos.dica?.trim() || null }
+    const linha = {
+      ...campos,
+      nome: campos.nome.trim(),
+      dica: campos.dica?.trim() || null,
+      professores: campos.professores?.trim() || null,
+    }
     ok(
       id
         ? await this.sb.from('trilha_passos').update(linha).eq('id', id)

@@ -2045,7 +2045,7 @@ export class DemoApi implements ForroApi {
       this.db.trilhaPassos = ['Base parada e marcação', 'Dois pra lá, dois pra cá', 'Caminhada', 'Giro simples da dama'].map(
         (nome, i) => ({
           id: uuid(), nivel: 'iniciante' as const, ordem: i + 1, nome,
-          video_frente: null, video_condutor: null, video_conduzida: null, dica: null, pode_chave: true,
+          video_frente: null, video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
         }),
       )
     }
@@ -2053,12 +2053,13 @@ export class DemoApi implements ForroApi {
   }
 
   async listPassosTrilha(): Promise<PassoTrilha[]> {
-    return ordenarPassos(this.passosTrilha())
+    // Bancos demo de antes do campo `professores`
+    return ordenarPassos(this.passosTrilha()).map((p) => ({ ...p, professores: p.professores ?? null }))
   }
 
   async salvarPassoTrilha(p: PassoTrilhaInput) {
     const lista = this.passosTrilha()
-    const linha = { ...p, nome: p.nome.trim(), dica: p.dica?.trim() || null }
+    const linha = { ...p, nome: p.nome.trim(), dica: p.dica?.trim() || null, professores: p.professores?.trim() || null }
     if (p.id) {
       const i = lista.findIndex((x) => x.id === p.id)
       if (i < 0) throw new Error('Esse passo não existe mais')

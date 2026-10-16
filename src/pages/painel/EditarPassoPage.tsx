@@ -9,7 +9,7 @@ import { Campo, Dica } from './contexto'
 
 const VAZIO: PassoTrilhaInput = {
   nivel: 'iniciante', ordem: 1, nome: '', video_frente: null, video_condutor: null,
-  video_conduzida: null, dica: null, pode_chave: true,
+  video_conduzida: null, dica: null, professores: null, pode_chave: true,
 }
 
 type CampoVideo = 'video_frente' | 'video_condutor' | 'video_conduzida'
@@ -103,6 +103,14 @@ export function EditarPassoPage() {
       <div className="flex flex-col gap-4 px-4 pt-2 pb-8">
         <Campo rotulo="Nome do passo">
           <input className="input" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+        </Campo>
+        <Campo rotulo="Professores" dica="Aparece para o aluno junto do vídeo. Opcional.">
+          <input
+            className="input"
+            placeholder="Ex.: Prof. Ana e Prof. João"
+            value={form.professores ?? ''}
+            onChange={(e) => setForm({ ...form, professores: e.target.value })}
+          />
         </Campo>
         <div className="grid grid-cols-2 gap-2.5">
           <Campo rotulo="Nível">

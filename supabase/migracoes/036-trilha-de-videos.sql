@@ -37,6 +37,9 @@ create table if not exists public.trilha_passos (
   criado_em timestamptz not null default now()
 );
 create index if not exists trilha_passos_nivel_idx on public.trilha_passos (nivel, ordem);
+-- Quem ensinou o passo, como o professor quiser escrever ("Prof. Ana e Prof. João").
+-- Coluna à parte para quem já rodou a 036 antes.
+alter table public.trilha_passos add column if not exists professores text;
 
 -- Chaves gastas. Apagar o passo devolve a chave (cascade).
 create table if not exists public.trilha_liberacoes (

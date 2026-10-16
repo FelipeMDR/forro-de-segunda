@@ -5,7 +5,7 @@ import type { LinhaCronograma, PassoComSituacao } from '../../src/lib/trilha'
 const s = (extra: Partial<PassoComSituacao>): PassoComSituacao => ({
   passo: {
     id: 'p1', nivel: 'iniciante', ordem: 1, nome: 'Giro', video_frente: 'dQw4w9WgXcQ',
-    video_condutor: null, video_conduzida: null, dica: null, pode_chave: true,
+    video_condutor: null, video_conduzida: null, dica: null, professores: null, pode_chave: true,
   },
   numero: 1,
   estado: 'bloqueado',
@@ -41,6 +41,15 @@ describe('quandoLibera', () => {
 })
 
 describe('comoAbriu', () => {
+  it('junta o nome de quem ensinou, quando o professor preencheu', () => {
+    const comProf = s({ estado: 'aberto', motivo: 'data', data: '2026-10-12' })
+    comProf.passo = { ...comProf.passo, professores: 'Prof. Ana e Prof. João' }
+    expect(comoAbriu(comProf)).toMatch(/^Ensinado na aula de 12.* · Prof\. Ana e Prof\. João$/)
+    const revisao = { ...comProf, motivo: 'revisao' as const }
+    expect(comoAbriu(revisao)).toBe('Revisão do nível anterior · Prof. Ana e Prof. João')
+  })
+
+
   it('diz por que o passo está aberto', () => {
     expect(comoAbriu(s({ estado: 'aberto', motivo: 'chave' }))).toBe('Liberado com chave')
     expect(comoAbriu(s({ estado: 'aberto', motivo: 'revisao' }))).toBe('Revisão do nível anterior')
