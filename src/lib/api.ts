@@ -391,8 +391,12 @@ export interface ForroApi {
    * turma, ver `situacaoDoNivel`). O banco recusa sem saldo.
    */
   liberarPassoComChave(passoId: string, custo: number): Promise<void>
-  /** Noites ("YYYY-MM-DD") com dupla confirmada de alguém, sem repetir. */
-  noitesComDupla(userId: string): Promise<string[]>
+  /**
+   * Pontos de uma pessoa num desafio, com as MESMAS regras do ranking:
+   * `presenca` = noites que valeram, `parcerias` = soma das cartas da
+   * Forródex no desafio. É o que vira chave na trilha de vídeos.
+   */
+  pontosNoDesafioDe(challenge: Challenge, userId: string): Promise<{ presenca: number; parcerias: number }>
   /** Nome e foto de algumas pessoas (professores dos passos). */
   perfisResumo(ids: string[]): Promise<PerfilResumo[]>
   /** Regras das chaves (padrão se a migração 036 não rodou). */

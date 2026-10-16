@@ -7,21 +7,25 @@ import type { PassoComSituacao, SaldoChaves } from '../lib/trilha'
 import { Icone } from './Icone'
 import { BotaoAcao, BotaoSuave, Folha } from './ui'
 
+/** O desafio principal (Forródex), de onde saem os pontos das chaves. */
+export type DesafioDasChaves = { titulo: string; presenca: number; parcerias: number } | null
+
 const GANHOS = [
-  ['Presença', 'Cada noite com check-in válido'],
-  ['Parceria', 'Noite com dupla confirmada (1 por noite)'],
-  ['Nova parceria', 'Primeira dança com alguém no Forródex'],
+  ['+1', 'Presença', 'Cada noite que valeu no desafio'],
+  ['+1 a 4', 'Parceria', 'Cada carta da Forródex vale pelo nível dela'],
 ] as const
 
 /** "Liberar com chave": confirma, gasta a chave e mostra o passo aberto. */
 export function FolhaChave({
   alvo,
   saldo,
+  desafio,
   onFechar,
   onLiberar,
 }: {
   alvo: PassoComSituacao | null
   saldo: SaldoChaves
+  desafio: DesafioDasChaves
   onFechar: () => void
   onLiberar: (passoId: string, custo: number) => Promise<void>
 }) {
@@ -100,7 +104,7 @@ export function FolhaChave({
             )}
           </div>
 
-          <ComoGanharChaves saldo={saldo} />
+          <ComoGanharChaves saldo={saldo} desafio={desafio} />
 
           <div className="flex flex-col gap-2">
             <BotaoAcao cor="preto" bloco sombra={false} disabled={!temChave || salvando} onClick={() => void liberar()}>
@@ -121,16 +125,26 @@ export function FolhaChave({
 }
 
 /** Como se ganha ponto e quanto falta para a próxima chave (folhas da trilha). */
-export function ComoGanharChaves({ saldo }: { saldo: SaldoChaves }) {
+export function ComoGanharChaves({ saldo, desafio }: { saldo: SaldoChaves; desafio: DesafioDasChaves }) {
   const porChave = saldo.pontosPorChave
   const pontosNaVez = porChave - saldo.faltam
+  if (!desafio) {
+    return (
+      <p className="rounded-[18px] border border-linha bg-sf p-4 text-sm leading-snug text-ink2">
+        <b className="text-ink">Nenhum desafio principal agora.</b> Os pontos das chaves são os do desafio com a Forródex ligada; quando a organização ligar um, eles voltam a contar.
+      </p>
+    )
+  }
   return (
     <div className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
-      <span className="text-sm font-extrabold">Como ganhar chaves</span>
-      {GANHOS.map(([titulo, desc]) => (
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-extrabold">Como ganhar chaves</span>
+        <span className="text-xs text-ink2">Os mesmos pontos do desafio {desafio.titulo}</span>
+      </span>
+      {GANHOS.map(([valor, titulo, desc]) => (
         <div key={titulo} className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-brasa-300 font-extrabold text-or-t">
-            +1
+          <span className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[10px] bg-brasa-300 px-1.5 text-[13px] font-extrabold text-or-t">
+            {valor}
           </span>
           <span className="flex flex-col text-sm">
             <b>{titulo}</b>
@@ -159,10 +173,12 @@ export function ComoGanharChaves({ saldo }: { saldo: SaldoChaves }) {
 export function FolhaRegrasChaves({
   aberta,
   saldo,
+  desafio,
   onFechar,
 }: {
   aberta: boolean
   saldo: SaldoChaves
+  desafio: DesafioDasChaves
   onFechar: () => void
 }) {
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
@@ -181,12 +197,12 @@ export function FolhaRegrasChaves({
           </p>
         </div>
 
-        <ComoGanharChaves saldo={saldo} />
+        <ComoGanharChaves saldo={saldo} desafio={desafio} />
 
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
-            [saldo.pontos, saldo.pontos === 1 ? 'ponto no semestre' : 'pontos no semestre'],
-            [saldo.ganhas, saldo.ganhas === 1 ? 'chave ganha' : 'chaves ganhas'],
+            [desafio?.presenca ?? 0, 'de presença'],
+            [desafio?.parcerias ?? 0, 'de parceria'],
             [saldo.usadas, saldo.usadas === 1 ? 'chave usada' : 'chaves usadas'],
           ].map(([n, rotulo]) => (
             <div key={String(rotulo)} className="flex flex-col gap-0.5 rounded-2xl bg-chip px-2 py-3">
@@ -201,7 +217,7 @@ export function FolhaRegrasChaves({
             A compra é sempre <b className="text-ink">na ordem</b>: para chegar a um passo, compre os de antes. Quando a turma avança, o preço cai.
           </li>
           <li>Depois do último passo do seu nível, dá para seguir comprando os do nível seguinte, ainda pelo dobro.</li>
-          <li>Os pontos contam desde o início do semestre e zeram quando ele termina.</li>
+          <li>Quando um novo desafio principal começa, os pontos e as chaves recomeçam com ele.</li>
           <li>O passo liberado continua aberto para você, mesmo depois.</li>
         </ul>
 

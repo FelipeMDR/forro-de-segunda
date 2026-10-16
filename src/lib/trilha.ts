@@ -4,7 +4,6 @@ import type {
   NivelTrilha,
   Papel,
   RegrasTrilha,
-  ParceiroDanca,
   PassoTrilha,
   Turma,
 } from './types'
@@ -363,15 +362,17 @@ export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoC
 
 // ---- Chaves ----
 
+/**
+ * Os pontos das chaves são os MESMOS do desafio principal (o que tem a
+ * Forródex ligada): Presença + Parcerias, como no ranking. Assim o aluno
+ * vê um número só, e treinar para o desafio é treinar para a trilha.
+ */
 export interface EntradaChaves {
-  /** Dias da noite com presença válida (`datasDePresenca` + `diaDaNoite`). */
-  presencas: string[]
-  /** Noites ("YYYY-MM-DD") com dupla confirmada. */
-  noitesComDupla: string[]
-  parceiros: ParceiroDanca[]
-  /** Início do semestre (ISO) ou null. */
-  desde: string | null
-  /** Chaves gastas no semestre. */
+  /** Noites que valeram no desafio principal. */
+  presenca: number
+  /** Soma das cartas da Forródex no desafio (1 a 4 cada). */
+  parcerias: number
+  /** Chaves gastas desde o início do desafio (soma dos preços). */
   usadas: number
   /** Regra da organização; sem ela, 3. */
   pontosPorChave?: number
@@ -388,11 +389,7 @@ export interface SaldoChaves {
 }
 
 export function saldoDeChaves(e: EntradaChaves): SaldoChaves {
-  const corte = e.desde ? e.desde.slice(0, 10) : ''
-  const presencas = new Set(e.presencas.filter((d) => d >= corte)).size
-  const noites = new Set(e.noitesComDupla.filter((d) => d >= corte)).size
-  const novas = e.parceiros.filter((p) => p.primeira && p.primeira >= corte).length
-  const pontos = presencas + noites + novas
+  const pontos = e.presenca + e.parcerias
   const porChave = e.pontosPorChave ?? PONTOS_POR_CHAVE
   const ganhas = Math.floor(pontos / porChave)
   return {

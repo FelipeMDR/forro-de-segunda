@@ -2248,6 +2248,16 @@ export class SupabaseApi implements ForroApi {
     if (error) throw new Error(traduz(error.message))
   }
 
+  async pontosNoDesafioDe(challenge: Challenge, userId: string) {
+    // Mesmo caminho do getRanking, só para uma pessoa
+    const janelasPor = await this.janelasValidasPorMembro(challenge, [userId])
+    const parcerias = await this.pontosDeParcerias(challenge, [userId], janelasPor)
+    return {
+      presenca: janelasPor.get(userId)?.size ?? 0,
+      parcerias: parcerias.get(userId) ?? 0,
+    }
+  }
+
   async perfisResumo(ids: string[]): Promise<PerfilResumo[]> {
     if (ids.length === 0) return []
     const data = ok(await this.sb.from('profiles').select('id, nome, avatar_url').in('id', ids))
@@ -2268,11 +2278,6 @@ export class SupabaseApi implements ForroApi {
       p_pontos: r.pontos_por_chave,
     })
     if (error) throw new Error(traduz(error.message))
-  }
-
-  async noitesComDupla(userId: string): Promise<string[]> {
-    const linhas = await this.duplasConfirmadasDe(userId)
-    return [...new Set(linhas.map((l) => l.data))]
   }
 
   async confirmarPresenca(eventoId: string, data: string, vai: boolean) {

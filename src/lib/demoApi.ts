@@ -18,7 +18,7 @@ import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
-import { ordenarPassos, REGRAS_PADRAO } from './trilha'
+import { ordenarPassos, REGRAS_PADRAO, somaDias } from './trilha'
 import { compactarNotificacoes } from './notificacoes'
 import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
@@ -1437,22 +1437,8 @@ export class DemoApi implements ForroApi {
         const p = this.db.profiles.find((x) => x.id === uid)
         // As noites que valeram para esta pessoa neste desafio — base
         // das duas modalidades (espelha `janelasValidasPorMembro`).
-        const janelas = this.noitesValidas(challenge, uid)
-        // Parcerias: carta por parceiro, valendo pelo nível — mesma
-        // regra da produção (ver `pontosDeParcerias`)
-        const pontos =
-          modalidade === 'duplas'
-            ? (pontosDeParcerias(
-                (this.db.duplas ?? []).filter(
-                  (d) =>
-                    d.confirmada &&
-                    d.de_user === uid &&
-                    d.data >= challenge.data_inicio &&
-                    d.data <= challenge.data_fim,
-                ),
-                new Map([[uid, janelas]]),
-              ).get(uid) ?? 0)
-            : janelas.size
+        const { presenca, parcerias } = this.pontosDe(challenge, uid)
+        const pontos = modalidade === 'duplas' ? parcerias : presenca
         return {
           user_id: uid,
           nome: p?.nome ?? 'Alguém',
@@ -1462,6 +1448,31 @@ export class DemoApi implements ForroApi {
         }
       })
       .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome))
+  }
+
+  /** Presença e Parcerias de alguém num desafio: a base do ranking. */
+  private pontosDe(challenge: Challenge, uid: string): { presenca: number; parcerias: number } {
+    // As noites que valeram para esta pessoa neste desafio — base
+    // das duas modalidades (espelha `janelasValidasPorMembro`).
+    const janelas = this.noitesValidas(challenge, uid)
+    // Parcerias: carta por parceiro, valendo pelo nível — mesma
+    // regra da produção (ver `pontosDeParcerias`)
+    const parcerias =
+      pontosDeParcerias(
+        (this.db.duplas ?? []).filter(
+          (d) =>
+            d.confirmada &&
+            d.de_user === uid &&
+            d.data >= challenge.data_inicio &&
+            d.data <= challenge.data_fim,
+        ),
+        new Map([[uid, janelas]]),
+      ).get(uid) ?? 0
+    return { presenca: janelas.size, parcerias }
+  }
+
+  async pontosNoDesafioDe(challenge: Challenge, userId: string) {
+    return this.pontosDe(challenge, userId)
   }
 
   async contarDesafios(userId: string) {
@@ -2104,20 +2115,28 @@ export class DemoApi implements ForroApi {
     if (!passo.video_frente) throw new Error('Esse passo ainda não tem vídeo')
     const libs = (this.db.trilhaLiberacoes = this.db.trilhaLiberacoes ?? [])
     if (libs.some((l) => l.user_id === uid && l.passo_id === passoId)) return
-    const desde = (await this.inicioSemestreAtual()) ?? ''
-    const corte = desde.slice(0, 10)
+    // Mesmo teto do banco: período do desafio principal (o da Forródex),
+    // contando por cima — noites com check-in e uma por dupla confirmada.
+    const principal = this.db.challenges.find((c) => c.forrodex)
+    const de = principal ? somaDias(principal.data_inicio, -1) : '9999-12-31'
+    const ate = principal ? somaDias(principal.data_fim, 1) : '0000-01-01'
+    const noPeriodo = (d: string) => d >= de && d <= ate
     const presencas = new Set(
       this.db.checkins
-        .filter((c) => c.user_id === uid && c.presenca_anulada !== true && c.criado_em >= desde)
-        .map((c) => diaDaNoite(new Date(c.criado_em))),
+        .filter((c) => c.user_id === uid && c.presenca_anulada !== true)
+        .map((c) => diaDaNoite(new Date(c.criado_em)))
+        .filter(noPeriodo),
     ).size
-    const noites = (await this.noitesComDupla(uid)).filter((d) => d >= corte).length
-    const novas = (await this.parceirosDe(uid)).filter((p) => p.primeira && p.primeira >= corte).length
-    const usadas = libs
-      .filter((l) => l.user_id === uid && l.criado_em >= desde)
-      .reduce((soma, l) => soma + (l.custo ?? 1), 0)
+    const parcerias = (this.db.duplas ?? []).filter(
+      (d) => d.de_user === uid && d.confirmada && noPeriodo(d.data),
+    ).length
+    const usadas = principal
+      ? libs
+          .filter((l) => l.user_id === uid && l.criado_em >= principal.data_inicio)
+          .reduce((soma, l) => soma + (l.custo ?? 1), 0)
+      : 0
     const { pontos_por_chave } = await this.regrasTrilha()
-    if (presencas + noites + novas < pontos_por_chave * (usadas + custo)) {
+    if (presencas + parcerias < pontos_por_chave * (usadas + custo)) {
       throw new Error('Você ainda não tem chaves suficientes')
     }
     libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString(), custo })
@@ -2144,16 +2163,6 @@ export class DemoApi implements ForroApi {
     }
     this.db.trilhaRegras = { pontos_por_chave: r.pontos_por_chave }
     this.persist()
-  }
-
-  async noitesComDupla(userId: string): Promise<string[]> {
-    return [
-      ...new Set(
-        (this.db.duplas ?? [])
-          .filter((d) => d.de_user === userId && d.confirmada)
-          .map((d) => d.data),
-      ),
-    ]
   }
 
   async listTurmas(): Promise<Turma[]> {

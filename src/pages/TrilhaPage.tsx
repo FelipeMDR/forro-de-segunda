@@ -211,11 +211,12 @@ export function TrilhaPage() {
           </p>
         )}
       </div>
-      {saldo && <FolhaChave alvo={alvo} saldo={saldo} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
+      {saldo && <FolhaChave alvo={alvo} saldo={saldo} desafio={dados?.desafio ?? null} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
       {saldo && (
         <FolhaRegrasChaves
           aberta={regrasAbertas}
           saldo={saldo}
+          desafio={dados?.desafio ?? null}
           onFechar={() => setRegrasAbertas(false)}
         />
       )}

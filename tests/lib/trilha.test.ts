@@ -273,31 +273,19 @@ describe('nivelDoAluno / niveisVisiveis', () => {
 })
 
 describe('saldoDeChaves', () => {
-  it('presença + noite com dupla + parceria nova, 3 pontos por chave', () => {
-    const s = saldoDeChaves({
-      presencas: ['2026-10-05', '2026-10-12', '2026-10-12'],
-      noitesComDupla: ['2026-10-05', '2026-10-12'],
-      parceiros: [
-        { user_id: 'b', nome: 'Bia', avatar_url: null, noites: 2, primeira: '2026-10-05' },
-        { user_id: 'c', nome: 'Caio', avatar_url: null, noites: 5, primeira: '2026-03-02' },
-      ],
-      desde: '2026-07-01T12:00:00Z',
-      usadas: 1,
-    })
-    // 2 presenças + 2 noites com dupla + 1 parceria nova = 5
-    expect(s).toEqual({ pontos: 5, ganhas: 1, usadas: 1, disponiveis: 0, faltam: 1, pontosPorChave: 3 })
+  it('pontos do desafio principal (Presença + Parcerias), 3 por chave', () => {
+    const s = saldoDeChaves({ presenca: 4, parcerias: 6, usadas: 1 })
+    // 4 + 6 = 10 pontos = 3 chaves; 1 já gasta
+    expect(s).toEqual({ pontos: 10, ganhas: 3, usadas: 1, disponiveis: 2, faltam: 2, pontosPorChave: 3 })
   })
 
   it('segue os pontos por chave que a organização definiu', () => {
-    const s = saldoDeChaves({
-      presencas: ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02'],
-      noitesComDupla: [], parceiros: [], desde: null, usadas: 0, pontosPorChave: 2,
-    })
+    const s = saldoDeChaves({ presenca: 5, parcerias: 0, usadas: 0, pontosPorChave: 2 })
     expect(s).toMatchObject({ pontos: 5, ganhas: 2, disponiveis: 2, faltam: 1, pontosPorChave: 2 })
   })
 
   it('nunca fica negativo', () => {
-    const s = saldoDeChaves({ presencas: [], noitesComDupla: [], parceiros: [], desde: null, usadas: 2 })
+    const s = saldoDeChaves({ presenca: 0, parcerias: 0, usadas: 2 })
     expect(s.disponiveis).toBe(0)
     expect(s.faltam).toBe(3)
   })

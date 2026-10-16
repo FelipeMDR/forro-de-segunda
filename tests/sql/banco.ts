@@ -69,6 +69,12 @@ create table public.semestres (
   id uuid primary key default gen_random_uuid(),
   encerrado_em timestamptz not null default now()
 );
+create table public.challenges (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null default 'Desafio',
+  data_inicio date not null, data_fim date not null,
+  forrodex boolean not null default false
+);
 create table public.turma_professores (
   user_id uuid not null, turma text not null, primary key (user_id, turma)
 );

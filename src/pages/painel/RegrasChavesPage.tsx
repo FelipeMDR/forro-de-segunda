@@ -6,9 +6,8 @@ import { chaves } from '../../lib/textosTrilha'
 import { Campo, Dica } from './contexto'
 
 const GANHOS = [
-  ['Presença', 'cada noite com check-in válido'],
-  ['Parceria', 'noite com dupla confirmada (1 por noite)'],
-  ['Nova parceria', 'primeira dança com alguém no Forródex'],
+  ['Presença', '1 ponto por noite que valeu no desafio'],
+  ['Parceria', 'cada carta da Forródex vale pelo nível (1 a 4)'],
 ] as const
 
 /**
@@ -48,7 +47,7 @@ export function RegrasChavesPage() {
       <Cabecalho titulo="Regras das chaves" sobretitulo="Vídeo-aulas" fallback="/organizador/videoaulas" />
       <div className="flex flex-col gap-4 px-4 pt-2 pb-8">
         <div className="flex flex-col gap-2.5 rounded-[18px] border border-linha bg-sf p-4">
-          <span className="text-sm font-extrabold">Cada um vale 1 ponto</span>
+          <span className="text-sm font-extrabold">Pontos do desafio principal (o da Forródex)</span>
           {GANHOS.map(([titulo, desc]) => (
             <span key={titulo} className="text-sm text-ink2">
               <b className="text-ink">{titulo}:</b> {desc}

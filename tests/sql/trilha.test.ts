@@ -1,8 +1,21 @@
 import type { PGlite } from '@electric-sql/pglite'
 import { describe, expect, it } from 'vitest'
-import { bancoComMigracao, comoUsuario, IDS, pessoa } from './banco'
+import { bancoComMigracao as bancoVazio, comoUsuario, IDS, pessoa } from './banco'
 
 const VIDEO = 'dQw4w9WgXcQ'
+
+/**
+ * Banco com o desafio principal (o da Forródex) cobrindo o ano: é dele
+ * que saem os pontos das chaves. `periodo` estreita o desafio.
+ */
+async function bancoComMigracao(periodo: { inicio: string; fim: string } = { inicio: '2026-01-01', fim: '2026-12-31' }) {
+  const db = await bancoVazio()
+  await db.query(
+    `insert into challenges (titulo, data_inicio, data_fim, forrodex) values ('Espaço Livre', $1, $2, true)`,
+    [periodo.inicio, periodo.fim],
+  )
+  return db
+}
 
 async function passo(
   db: PGlite,
@@ -69,21 +82,32 @@ describe('trilha — gastar chave', () => {
     await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
-  it('noite com dupla e parceria nova somam pontos', async () => {
+  it('parcerias do desafio somam com a presença (no teto, uma por dupla confirmada)', async () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.a, 'Ana')
     await pessoa(db, IDS.b, 'Bia')
+    await pessoa(db, IDS.c, 'Caio')
     await noites(db, IDS.a, ['2026-10-05'])
-    await dupla(db, IDS.a, IDS.b, '2026-10-05') // +1 noite com dupla, +1 parceria nova
+    // 1 presença + 2 cartas de Primeira dança = 3 pontos
+    await dupla(db, IDS.a, IDS.b, '2026-10-05')
+    await dupla(db, IDS.a, IDS.c, '2026-10-05')
     await liberar(db, IDS.a, await passo(db))
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
-  it('pontos de antes do último encerramento não contam', async () => {
-    const db = await bancoComMigracao()
+  it('sem desafio principal (Forródex), ninguém tem chave', async () => {
+    const db = await bancoVazio()
     await pessoa(db, IDS.a, 'Ana')
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19'])
+    await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chaves suficientes')
+  })
+
+  it('noites e duplas fora do período do desafio principal não contam', async () => {
+    const db = await bancoComMigracao({ inicio: '2026-08-01', fim: '2026-12-15' })
+    await pessoa(db, IDS.a, 'Ana')
+    await pessoa(db, IDS.b, 'Bia')
     await noites(db, IDS.a, ['2026-03-02', '2026-03-09', '2026-03-16'])
-    await db.query(`insert into semestres (encerrado_em) values ('2026-07-01T12:00:00Z')`)
+    await dupla(db, IDS.a, IDS.b, '2026-03-02')
     await expect(liberar(db, IDS.a, await passo(db))).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
@@ -121,19 +145,17 @@ describe('trilha — gastar chave', () => {
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
-  it('encerrar o semestre no meio da noite: a presença daquela noite vale nos dois lados', async () => {
-    const db = await bancoComMigracao()
+  it('chaves gastas antes do desafio principal não descontam', async () => {
+    const db = await bancoComMigracao({ inicio: '2026-08-01', fim: '2026-12-15' })
     await pessoa(db, IDS.a, 'Ana')
-    // Check-in às 19:30, semestre encerrado às 20:00 da mesma segunda (SP).
-    // O app conta a noite (corte pela data), então o banco também precisa.
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19'])
+    const antigo = await passo(db, { ordem: 1 })
     await db.query(
-      `insert into checkins (user_id, criado_em) values ($1, '2026-10-05T19:30:00-03:00')`,
-      [IDS.a],
+      `insert into trilha_liberacoes (user_id, passo_id, custo, criado_em) values ($1, $2, 4, '2026-05-01T12:00:00Z')`,
+      [IDS.a, antigo],
     )
-    await db.query(`insert into semestres (encerrado_em) values ('2026-10-05T20:00:00-03:00')`)
-    await noites(db, IDS.a, ['2026-10-12', '2026-10-19'])
-    await liberar(db, IDS.a, await passo(db))
-    expect(await liberacoes(db, IDS.a)).toBe(1)
+    await liberar(db, IDS.a, await passo(db, { ordem: 2 }))
+    expect(await liberacoes(db, IDS.a)).toBe(2)
   })
 
   it('passo mais à frente custa o dobro: 2 chaves pedem o dobro de pontos', async () => {

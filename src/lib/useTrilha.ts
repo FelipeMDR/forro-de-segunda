@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { diaDaNoite, diasSuspensos, mapaAberturas } from './dates'
-import { datasDePresenca } from './presenca'
+import { diaDaNoite } from './dates'
 import { podeEditarTrilha, REGRAS_PADRAO, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
-import type { AberturaAntecipada, Challenge, ParceiroDanca, PassoTrilha, PerfilResumo } from './types'
+import type { Challenge, PassoTrilha, PerfilResumo } from './types'
 
 export interface DadosTrilha {
   ctx: ContextoTrilha
   saldo: SaldoChaves
   /** Foto e nome dos professores dos passos, por id. */
   professores: Map<string, PerfilResumo>
+  /** O desafio principal (Forródex) de onde vêm os pontos; null = nenhum. */
+  desafio: { titulo: string; presenca: number; parcerias: number } | null
 }
 
 /** Os professores de um passo, na ordem em que foram escolhidos. */
@@ -18,9 +19,9 @@ export function professoresDo(passo: PassoTrilha, dados: DadosTrilha): PerfilRes
 }
 
 /**
- * Tudo o que a trilha precisa, numa carga só. Presença pela MESMA regra
- * do perfil (`datasDePresenca`) — se a trilha contasse diferente, o
- * aluno veria um número no perfil e outro aqui.
+ * Tudo o que a trilha precisa, numa carga só. Os pontos das chaves são os
+ * do desafio principal (o da Forródex), com as regras do ranking: o aluno
+ * vê o mesmo número aqui e na tela do desafio.
  */
 export function useTrilha() {
   const { api, userId, profile, papel } = useAuth()
@@ -30,31 +31,27 @@ export function useTrilha() {
   const carregar = useCallback(async () => {
     if (!userId || !profile) return
     try {
-      const [passos, turmas, eventos, feriados, liberacoes, checkins, desafios, aberturas, parceiros, noitesDupla, desde, regras] =
-        await Promise.all([
-          api.listPassosTrilha(),
-          api.listTurmas(),
-          api.listEvents(),
-          api.listFeriados(),
-          api.minhasLiberacoes(),
-          api.checkinsDe(userId),
-          api.listChallenges().catch(() => [] as Challenge[]),
-          api.listAberturas().catch(() => [] as AberturaAntecipada[]),
-          api.parceirosDe(userId).catch(() => [] as ParceiroDanca[]),
-          api.noitesComDupla(userId).catch(() => [] as string[]),
-          api.inicioSemestreAtual().catch(() => null),
-          api.regrasTrilha().catch(() => ({ ...REGRAS_PADRAO })),
-        ])
-      const presencas = datasDePresenca(checkins, {
-        desafios,
-        suspensos: diasSuspensos(feriados),
-        aberturas: mapaAberturas(aberturas),
-      }).map((d) => diaDaNoite(d))
+      const [passos, turmas, eventos, feriados, liberacoes, desafios, regras] = await Promise.all([
+        api.listPassosTrilha(),
+        api.listTurmas(),
+        api.listEvents(),
+        api.listFeriados(),
+        api.minhasLiberacoes(),
+        api.listChallenges().catch(() => [] as Challenge[]),
+        api.regrasTrilha().catch(() => ({ ...REGRAS_PADRAO })),
+      ])
+      const principal = desafios.find((c) => c.forrodex) ?? null
       // Uma consulta só, com quem aparece como professor em algum passo
       const ids = [...new Set(passos.flatMap((p) => p.professores_ids))]
-      const perfis = await api.perfisResumo(ids).catch(() => [] as PerfilResumo[])
+      const [perfis, pontos] = await Promise.all([
+        api.perfisResumo(ids).catch(() => [] as PerfilResumo[]),
+        principal
+          ? api.pontosNoDesafioDe(principal, userId)
+          : Promise.resolve({ presenca: 0, parcerias: 0 }),
+      ])
       setDados({
         professores: new Map(perfis.map((p) => [p.id, p])),
+        desafio: principal ? { titulo: principal.titulo, ...pontos } : null,
         ctx: {
           passos,
           turmas,
@@ -67,14 +64,11 @@ export function useTrilha() {
           regras,
         },
         saldo: saldoDeChaves({
-          presencas,
-          noitesComDupla: noitesDupla,
-          parceiros,
-          desde,
-          // Chaves gastas = soma dos preços pagos (1, 2, 4…)
-          usadas: liberacoes
-            .filter((l) => !desde || l.criado_em >= desde)
-            .reduce((soma, l) => soma + l.custo, 0),
+          ...pontos,
+          // Chaves gastas desde o início do desafio = soma dos preços pagos (1, 2, 4…)
+          usadas: principal
+            ? liberacoes.filter((l) => l.criado_em >= principal.data_inicio).reduce((soma, l) => soma + l.custo, 0)
+            : 0,
           pontosPorChave: regras.pontos_por_chave,
         }),
       })

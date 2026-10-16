@@ -26,12 +26,21 @@ describe('DemoApi — trilha de vídeos', () => {
     const { DemoApi } = await import('../../src/lib/demoApi')
     const api = new DemoApi()
     const banco = api as unknown as {
-      db: { checkins: Array<Record<string, unknown>>; duplas?: unknown[] }
+      db: {
+        checkins: Array<Record<string, unknown>>
+        duplas?: unknown[]
+        challenges: Array<Record<string, unknown>>
+      }
       uid(): string
     }
     // O seed cria check-ins e duplas; zera para o teste controlar os pontos
     banco.db.checkins.length = 0
     banco.db.duplas = []
+    // Os pontos das chaves vêm do desafio principal (o da Forródex)
+    banco.db.challenges.forEach((c, i) => {
+      c.forrodex = i === 0
+      if (i === 0) Object.assign(c, { data_inicio: '2026-01-01', data_fim: '2026-12-31' })
+    })
     await api.signInTelefone('11 98888-0001', 'forro123')
     return { api, banco, uid: banco.uid() }
   }
@@ -108,11 +117,45 @@ describe('DemoApi — trilha de vídeos', () => {
     expect(await api.minhasLiberacoes()).toEqual([expect.objectContaining({ passo_id: dois.id, custo: 2 })])
   })
 
+  it('sem desafio principal (Forródex), ninguém tem chave', async () => {
+    const { api, banco, uid } = await novaApi()
+    banco.db.challenges.forEach((c) => (c.forrodex = false))
+    await api.salvarPassoTrilha({
+      nivel: 'iniciante', ordem: 97, nome: 'Sem desafio', video_frente: 'dQw4w9WgXcQ',
+      video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
+    })
+    const p = (await api.listPassosTrilha()).find((x) => x.nome === 'Sem desafio')!
+    for (const d of ['2026-10-05', '2026-10-12', '2026-10-19']) {
+      banco.db.checkins.push({ id: d, user_id: uid, criado_em: `${d}T23:00:00.000Z`, foto_url: '', legenda: null })
+    }
+    await expect(api.liberarPassoComChave(p.id, 1)).rejects.toThrow('Você ainda não tem chaves suficientes')
+  })
+
   it('aluno não muda as regras', async () => {
     const { api } = await novaApi()
     await expect(api.salvarRegrasTrilha({ pontos_por_chave: 1 })).rejects.toThrow(
       'Só a organização muda as regras das chaves',
     )
+  })
+
+  it('pontos no desafio batem com o ranking de Presença e de Parcerias', async () => {
+    const { DemoApi } = await import('../../src/lib/demoApi')
+    const api = new DemoApi() // seed completo (com check-ins e duplas)
+    await api.signInTelefone('11 98888-0001', 'forro123')
+    const desafios = await api.listChallenges()
+    expect(desafios.length).toBeGreaterThan(0)
+    let comparados = 0
+    for (const c of desafios) {
+      const presenca = await api.getRanking(c, 'checkin')
+      const parcerias = await api.getRanking(c, 'duplas')
+      for (const e of presenca) {
+        const meus = await api.pontosNoDesafioDe(c, e.user_id)
+        expect(meus.presenca).toBe(e.pontos)
+        expect(meus.parcerias).toBe(parcerias.find((x) => x.user_id === e.user_id)?.pontos ?? 0)
+        comparados++
+      }
+    }
+    expect(comparados).toBeGreaterThan(0)
   })
 
   it('cancelar com reposição cria o evento; desfazer apaga os dois', async () => {

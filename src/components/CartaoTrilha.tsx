@@ -108,7 +108,7 @@ export function CartaoTrilha() {
         </div>
       </div>
 
-      <FolhaChave alvo={alvo} saldo={saldo} onFechar={() => setAlvo(null)} onLiberar={liberar} />
+      <FolhaChave alvo={alvo} saldo={saldo} desafio={dados.desafio} onFechar={() => setAlvo(null)} onLiberar={liberar} />
     </section>
   )
 }

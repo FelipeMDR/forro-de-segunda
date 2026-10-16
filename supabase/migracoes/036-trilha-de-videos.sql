@@ -135,50 +135,43 @@ begin
 end;
 $$;
 
-create or replace function public.inicio_semestre_trilha()
-returns timestamptz
+/**
+ * Início do desafio principal (o da Forródex), que é de onde vêm os
+ * pontos das chaves. null = nenhum desafio principal: ninguém pontua.
+ */
+create or replace function public.desafio_principal_trilha()
+returns table (data_inicio date, data_fim date)
 language sql stable security definer set search_path = public as $$
-  select coalesce(max(encerrado_em), '-infinity'::timestamptz) from semestres;
+  select c.data_inicio, c.data_fim from challenges c where c.forrodex limit 1;
 $$;
 
 /**
- * Teto dos pontos de chave no semestre. Conta POR CIMA do app: aqui
- * vale qualquer noite com check-in não anulado, lá só a presença na
- * janela de um desafio. Assim o banco nunca recusa uma chave que o app
- * mostrou, e ainda barra quem chamar a função sem ter ido ao forró.
+ * Teto dos pontos de chave: os pontos são os do desafio principal
+ * (Presença + Parcerias da Forródex), que o app calcula com as regras do
+ * ranking. Aqui se conta POR CIMA, para o banco nunca recusar uma chave
+ * que o app mostrou:
+ * - Presença: qualquer noite com check-in não anulado no período (o app
+ *   ainda exige a janela e o local do desafio);
+ * - Parcerias: uma por dupla confirmada no período (a carta vale 1 a 4,
+ *   e chegar a valer N exige ao menos N noites com a pessoa).
  */
 create or replace function public.teto_pontos_trilha(p_uid uuid)
 returns int
 language sql stable security definer set search_path = public as $$
-  with corte as (
-    select inicio_semestre_trilha() as t,
-           (inicio_semestre_trilha() at time zone 'America/Sao_Paulo')::date as d
-  ),
+  with d as (select * from desafio_principal_trilha()),
   presencas as (
     select count(distinct noite_do_checkin(c.criado_em)) as n
-    from checkins c, corte
-    -- Corta pela NOITE, como o app: encerrar o semestre no meio do forró
-    -- não pode tirar do banco a presença que o app já mostrou.
+    from checkins c, d
     where c.user_id = p_uid and not c.presenca_anulada
-      and noite_do_checkin(c.criado_em) >= noite_do_checkin(corte.t)
+      and noite_do_checkin(c.criado_em) between d.data_inicio - 1 and d.data_fim + 1
   ),
-  noites_dupla as (
-    select count(distinct du.data) as n
-    from duplas du, corte
-    where du.de_user = p_uid and du.confirmada and du.data >= corte.d
-  ),
-  novas as (
+  parcerias as (
     select count(*) as n
-    from (
-      select min(du.data) as primeira
-      from duplas du
-      where du.de_user = p_uid and du.confirmada
-      group by du.para_user
-    ) x, corte
-    where x.primeira >= corte.d
+    from duplas du, d
+    where du.de_user = p_uid and du.confirmada
+      and du.data between d.data_inicio - 1 and d.data_fim + 1
   )
-  select (presencas.n + noites_dupla.n + novas.n)::int
-  from presencas, noites_dupla, novas;
+  select coalesce((select n from presencas), 0)::int + coalesce((select n from parcerias), 0)::int;
 $$;
 -- O Supabase dá EXECUTE a anon/authenticated em toda função nova; sem
 -- isto, qualquer um consultaria a presença de outra pessoa.
@@ -224,9 +217,14 @@ begin
     return;
   end if;
 
+  -- Gastos contam do início do desafio principal (sem ele, teto é 0)
   select coalesce(sum(custo), 0) into v_usadas
   from trilha_liberacoes
-  where user_id = v_uid and criado_em >= inicio_semestre_trilha();
+  where user_id = v_uid
+    and criado_em >= coalesce(
+      (select (data_inicio::timestamp at time zone 'America/Sao_Paulo') from desafio_principal_trilha()),
+      '-infinity'::timestamptz
+    );
 
   select pontos_por_chave into v_pontos from trilha_regras where id;
   if teto_pontos_trilha(v_uid) < coalesce(v_pontos, 3) * (v_usadas + p_custo) then
