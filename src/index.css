@@ -141,6 +141,24 @@
   textarea::placeholder {
     color: var(--ink3);
   }
+  /*
+   * No iOS os campos de data e hora têm uma largura mínima própria e
+   * ignoram o `width: 100%`: numa coluna estreita (dois campos lado a
+   * lado) eles passam da borda do cartão. Sem a aparência nativa eles
+   * aceitam a largura da coluna; o seletor do sistema continua abrindo.
+   */
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  input[type='month'] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
   button {
     cursor: pointer;
   }

@@ -528,7 +528,7 @@ function FolhaCancelar({
           </Campo>
         )}
         {podeRepor && repor === 'sim' && (
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-3">
             <Campo rotulo="Dia da reposição">
               <input
                 type="date"
@@ -610,7 +610,7 @@ function FolhaAbertura({ aberta, onFechar }: { aberta: boolean; onFechar: () => 
   return (
     <Folha aberta={aberta} onFechar={onFechar} titulo="O espaço abriu mais cedo">
       <div className="flex flex-col gap-3 px-5 pb-8">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-3">
           <Campo rotulo="Data">
             <input type="date" className="input" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
           </Campo>

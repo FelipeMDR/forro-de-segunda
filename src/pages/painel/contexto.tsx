@@ -193,7 +193,7 @@ export function EscolherPessoa({
 /** Rótulo de campo nos formulários do painel. */
 export function Campo({ rotulo, children, dica }: { rotulo: string; children: ReactNode; dica?: string }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <span className="px-1 text-sm font-extrabold text-ink2">{rotulo}</span>
       {children}
       {dica && <span className="-mt-0.5 px-1 text-[13px] leading-snug text-ink3">{dica}</span>}

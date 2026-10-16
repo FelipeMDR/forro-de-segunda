@@ -384,13 +384,12 @@ export function ChallengeDetailPage() {
                       {posicao}
                     </span>
                     <Avatar nome={r.nome} url={r.avatar_url} tamanho={32} borda={false} />
-                    <span
-                      className={`min-w-0 flex-1 truncate text-base ${eu ? 'font-extrabold' : 'font-semibold'}`}
-                    >
-                      {eu ? `Você · ${meuNome ?? r.nome}` : r.nome}
-                      {empatado && <span className="text-ink3"> · empate</span>}
+                    {/* Só o nome encurta; o "empate" fica sempre visível */}
+                    <span className={`flex min-w-0 flex-1 text-base ${eu ? 'font-extrabold' : 'font-semibold'}`}>
+                      <span className="truncate">{eu ? `Você · ${meuNome ?? r.nome}` : r.nome}</span>
+                      {empatado && <span className="shrink-0 whitespace-pre text-ink3"> · empate</span>}
                     </span>
-                    <span className="text-lg font-extrabold">{r.pontos}</span>
+                    <span className="shrink-0 text-lg font-extrabold">{r.pontos}</span>
                   </button>
                 </li>
               )

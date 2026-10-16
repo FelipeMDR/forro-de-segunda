@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useEffect,
+  useRef,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -213,10 +214,23 @@ export function Segmentado<T extends string>({
   className?: string
 }) {
   const pilula = forma === 'pilula'
+  // Quando os rótulos não cabem na largura (nomes longos, tela estreita),
+  // a faixa rola para o lado; a aba escolhida é trazida para a vista.
+  const faixa = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = faixa.current
+    const ativa = el?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!el || !ativa || el.scrollWidth <= el.clientWidth) return
+    const folga = 8
+    if (ativa.offsetLeft < el.scrollLeft) el.scrollLeft = ativa.offsetLeft - folga
+    else if (ativa.offsetLeft + ativa.offsetWidth > el.scrollLeft + el.clientWidth)
+      el.scrollLeft = ativa.offsetLeft + ativa.offsetWidth - el.clientWidth + folga
+  }, [valor, opcoes.length])
   return (
     <div
+      ref={faixa}
       role="tablist"
-      className={`flex bg-chip p-1 ${pilula ? 'rounded-full' : 'rounded-2xl'} ${className}`}
+      className={`sem-barra relative flex max-w-full overflow-x-auto bg-chip p-1 ${pilula ? 'rounded-full' : 'rounded-2xl'} ${className}`}
     >
       {opcoes.map((o) => {
         const ativo = o.valor === valor
@@ -229,8 +243,8 @@ export function Segmentado<T extends string>({
             onClick={() => onChange(o.valor)}
             className={`whitespace-nowrap font-extrabold transition-colors ${
               pilula
-                ? 'h-9 rounded-full px-3.5 text-sm'
-                : 'h-11 flex-1 rounded-xl px-2 text-[15px]'
+                ? 'h-9 shrink-0 rounded-full px-3.5 text-sm'
+                : 'h-11 flex-1 shrink-0 rounded-xl px-2 text-[15px]'
             } ${ativo ? 'bg-ink text-fundo' : 'bg-transparent text-ink2'}`}
           >
             {o.rotulo}

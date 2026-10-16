@@ -107,7 +107,7 @@ export function CronogramaPage() {
         </div>
         {turma && (
           <div className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="flex flex-col gap-3">
               <Campo rotulo="Nível da trilha">
                 <select
                   className="input"
@@ -134,14 +134,14 @@ export function CronogramaPage() {
             <BotaoAcao cor="preto" tamanho="m" sombra={false} onClick={() => void salvar()}>
               Salvar turma
             </BotaoAcao>
-            <div className="flex items-center justify-between rounded-xl bg-fundo px-3 py-2.5 text-sm">
-              <span>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-fundo px-3 py-2.5 text-sm">
+              <span className="min-w-0">
                 <b>Aula na agenda: </b>
                 {aulasNaAgenda.length
                   ? aulasNaAgenda.map((e) => `${DIAS[e.dia_semana!]} ${e.hora ?? ''}`.trim()).join(' · ')
                   : 'nenhuma aula semanal'}
               </span>
-              <Link to="/organizador/agenda" className="font-extrabold text-or-t">
+              <Link to="/organizador/agenda" className="shrink-0 font-extrabold text-or-t">
                 Abrir agenda
               </Link>
             </div>
