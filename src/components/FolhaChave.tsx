@@ -2,30 +2,37 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../lib/dates'
-import { chaves } from '../lib/textosTrilha'
+import { chaves, degrausEmTexto } from '../lib/textosTrilha'
 import type { PassoComSituacao, SaldoChaves } from '../lib/trilha'
+import type { RegrasTrilha } from '../lib/types'
 import { Icone } from './Icone'
 import { BotaoAcao, BotaoSuave, Folha } from './ui'
 
 /** O desafio principal (Forródex), de onde saem os pontos das chaves. */
 export type DesafioDasChaves = { titulo: string; presenca: number; parcerias: number } | null
 
-const GANHOS = [
-  ['+1', 'Presença', 'Cada noite que valeu no desafio'],
-  ['+1 a 4', 'Parceria', 'Cada carta da Forródex vale pelo nível dela'],
-] as const
+/** Quanto cada coisa rende, com os pesos da organização. */
+function ganhos(r: RegrasTrilha): [string, string, string][] {
+  const parceria = r.peso_parceria === 1 ? '+1 a 4' : `+${r.peso_parceria} a ${4 * r.peso_parceria}`
+  return [
+    [`+${r.peso_presenca}`, 'Presença', 'Cada noite que valeu no desafio'],
+    [parceria, 'Parceria', 'Cada carta da Forródex vale pelo nível dela'],
+  ]
+}
 
 /** "Liberar com chave": confirma, gasta a chave e mostra o passo aberto. */
 export function FolhaChave({
   alvo,
   saldo,
   desafio,
+  regras,
   onFechar,
   onLiberar,
 }: {
   alvo: PassoComSituacao | null
   saldo: SaldoChaves
   desafio: DesafioDasChaves
+  regras: RegrasTrilha
   onFechar: () => void
   onLiberar: (passoId: string, custo: number) => Promise<void>
 }) {
@@ -104,7 +111,7 @@ export function FolhaChave({
             )}
           </div>
 
-          <ComoGanharChaves saldo={saldo} desafio={desafio} />
+          <ComoGanharChaves saldo={saldo} desafio={desafio} regras={regras} />
 
           <div className="flex flex-col gap-2">
             <BotaoAcao cor="preto" bloco sombra={false} disabled={!temChave || salvando} onClick={() => void liberar()}>
@@ -125,7 +132,15 @@ export function FolhaChave({
 }
 
 /** Como se ganha ponto e quanto falta para a próxima chave (folhas da trilha). */
-export function ComoGanharChaves({ saldo, desafio }: { saldo: SaldoChaves; desafio: DesafioDasChaves }) {
+export function ComoGanharChaves({
+  saldo,
+  desafio,
+  regras,
+}: {
+  saldo: SaldoChaves
+  desafio: DesafioDasChaves
+  regras: RegrasTrilha
+}) {
   const porChave = saldo.pontosPorChave
   const pontosNaVez = porChave - saldo.faltam
   if (!desafio) {
@@ -141,7 +156,7 @@ export function ComoGanharChaves({ saldo, desafio }: { saldo: SaldoChaves; desaf
         <span className="text-sm font-extrabold">Como ganhar chaves</span>
         <span className="text-xs text-ink2">Os mesmos pontos do desafio {desafio.titulo}</span>
       </span>
-      {GANHOS.map(([valor, titulo, desc]) => (
+      {ganhos(regras).map(([valor, titulo, desc]) => (
         <div key={titulo} className="flex items-center gap-3">
           <span className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-[10px] bg-brasa-300 px-1.5 text-[13px] font-extrabold text-or-t">
             {valor}
@@ -174,11 +189,13 @@ export function FolhaRegrasChaves({
   aberta,
   saldo,
   desafio,
+  regras,
   onFechar,
 }: {
   aberta: boolean
   saldo: SaldoChaves
   desafio: DesafioDasChaves
+  regras: RegrasTrilha
   onFechar: () => void
 }) {
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
@@ -193,11 +210,11 @@ export function FolhaRegrasChaves({
             Você tem {plural(saldo.disponiveis, 'chave', 'chaves')}
           </h2>
           <p className="text-[15px] leading-snug text-ink2">
-            O primeiro passo que a sua turma ainda não viu custa 1 chave. Cada passo depois dele custa o dobro: 2, 4, 8…
+            No seu nível, os passos à frente da turma custam {degrausEmTexto(regras.preco_degraus)} chaves. Um nível acima, {regras.preco_um_nivel} por passo; dois acima, {regras.preco_dois_niveis}.
           </p>
         </div>
 
-        <ComoGanharChaves saldo={saldo} desafio={desafio} />
+        <ComoGanharChaves saldo={saldo} desafio={desafio} regras={regras} />
 
         <div className="grid grid-cols-3 gap-2 text-center">
           {[

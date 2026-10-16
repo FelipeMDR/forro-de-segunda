@@ -788,6 +788,16 @@ export type PassoTrilhaInput = Omit<PassoTrilha, 'id'> & { id?: string }
 /** Regras das chaves, editáveis pela organização (tabela `trilha_regras`). */
 export interface RegrasTrilha {
   pontos_por_chave: number
+  /** Pontos de chave por noite de presença no desafio principal. */
+  peso_presenca: number
+  /** Pontos de chave por ponto de parceria (carta da Forródex). */
+  peso_parceria: number
+  /** Preço do 1º, 2º, 3º… passo à frente no próprio nível; o último é o teto. */
+  preco_degraus: number[]
+  /** Preço por passo do nível logo acima. */
+  preco_um_nivel: number
+  /** Preço por passo de dois níveis acima. */
+  preco_dois_niveis: number
 }
 
 /** O mínimo de um perfil para mostrar foto e nome. */

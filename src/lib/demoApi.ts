@@ -2111,7 +2111,7 @@ export class DemoApi implements ForroApi {
   async liberarPassoComChave(passoId: string, custo: number) {
     // Espelha liberar_passo_com_chave (migração 036), com o mesmo teto.
     const uid = this.uid()
-    if (!Number.isInteger(custo) || custo < 1 || custo > 1024 || (custo & (custo - 1)) !== 0) {
+    if (!Number.isInteger(custo) || custo < 1 || custo > 100) {
       throw new Error('Preço de chave inválido')
     }
     const passo = this.passosTrilha().find((p) => p.id === passoId)
@@ -2140,8 +2140,8 @@ export class DemoApi implements ForroApi {
           .filter((l) => l.user_id === uid && l.criado_em >= principal.data_inicio)
           .reduce((soma, l) => soma + (l.custo ?? 1), 0)
       : 0
-    const { pontos_por_chave } = await this.regrasTrilha()
-    if (presencas + parcerias < pontos_por_chave * (usadas + custo)) {
+    const { pontos_por_chave, peso_presenca, peso_parceria } = await this.regrasTrilha()
+    if (peso_presenca * presencas + peso_parceria * parcerias < pontos_por_chave * (usadas + custo)) {
       throw new Error('Você ainda não tem chaves suficientes')
     }
     libs.push({ user_id: uid, passo_id: passoId, criado_em: new Date().toISOString(), custo })
@@ -2155,7 +2155,9 @@ export class DemoApi implements ForroApi {
   }
 
   async regrasTrilha(): Promise<RegrasTrilha> {
-    return { ...(this.db.trilhaRegras ?? REGRAS_PADRAO) }
+    // Bancos demo antigos guardavam só pontos_por_chave
+    const r = { ...REGRAS_PADRAO, ...this.db.trilhaRegras }
+    return { ...r, preco_degraus: [...r.preco_degraus] }
   }
 
   async salvarRegrasTrilha(r: RegrasTrilha) {
@@ -2163,10 +2165,20 @@ export class DemoApi implements ForroApi {
     if (this.db.roles[this.uid()] !== 'organizador') {
       throw new Error('Só a organização muda as regras das chaves')
     }
-    if (!Number.isInteger(r.pontos_por_chave) || r.pontos_por_chave < 1 || r.pontos_por_chave > 20) {
-      throw new Error('Pontos por chave: de 1 a 20')
+    const faixa = (n: number, de: number, ate: number) => Number.isInteger(n) && n >= de && n <= ate
+    if (
+      !faixa(r.pontos_por_chave, 1, 20) ||
+      !faixa(r.peso_presenca, 0, 10) ||
+      !faixa(r.peso_parceria, 0, 10) ||
+      r.preco_degraus.length === 0 ||
+      r.preco_degraus.length > 10 ||
+      !r.preco_degraus.every((x) => faixa(x, 1, 100)) ||
+      !faixa(r.preco_um_nivel, 1, 100) ||
+      !faixa(r.preco_dois_niveis, 1, 100)
+    ) {
+      throw new Error('Valores fora da faixa permitida')
     }
-    this.db.trilhaRegras = { pontos_por_chave: r.pontos_por_chave }
+    this.db.trilhaRegras = { ...r, preco_degraus: [...r.preco_degraus] }
     this.persist()
   }
 

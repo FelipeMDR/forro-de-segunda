@@ -4,6 +4,7 @@ import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
   miniaturaDoYoutube,
   NOME_NIVEL,
+  REGRAS_PADRAO,
   nivelInicial,
   situacaoDoNivel,
   type PassoComSituacao,
@@ -108,7 +109,7 @@ export function CartaoTrilha() {
         </div>
       </div>
 
-      <FolhaChave alvo={alvo} saldo={saldo} desafio={dados.desafio} onFechar={() => setAlvo(null)} onLiberar={liberar} />
+      <FolhaChave alvo={alvo} saldo={saldo} desafio={dados.desafio} regras={dados.ctx.regras ?? REGRAS_PADRAO} onFechar={() => setAlvo(null)} onLiberar={liberar} />
     </section>
   )
 }

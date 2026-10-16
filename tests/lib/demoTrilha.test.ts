@@ -30,6 +30,7 @@ describe('DemoApi — trilha de vídeos', () => {
         checkins: Array<Record<string, unknown>>
         duplas?: unknown[]
         challenges: Array<Record<string, unknown>>
+        trilhaRegras?: Record<string, unknown>
       }
       uid(): string
     }
@@ -41,6 +42,12 @@ describe('DemoApi — trilha de vídeos', () => {
       c.forrodex = i === 0
       if (i === 0) Object.assign(c, { data_inicio: '2026-01-01', data_fim: '2026-12-31' })
     })
+    // Conta simples para os testes de gasto (1 ponto por presença, 3 por
+    // chave); o padrão real tem teste próprio
+    banco.db.trilhaRegras = {
+      pontos_por_chave: 3, peso_presenca: 1, peso_parceria: 1,
+      preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12,
+    }
     await api.signInTelefone('11 98888-0001', 'forro123')
     return { api, banco, uid: banco.uid() }
   }
@@ -80,10 +87,15 @@ describe('DemoApi — trilha de vídeos', () => {
 
   it('regras: começa no padrão; organização muda e o gasto de chave segue', async () => {
     const { api, banco, uid } = await novaApi()
-    expect(await api.regrasTrilha()).toEqual({ pontos_por_chave: 3 })
+    delete banco.db.trilhaRegras
+    expect(await api.regrasTrilha()).toEqual({
+      pontos_por_chave: 10, peso_presenca: 3, peso_parceria: 1,
+      preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12,
+    })
     await api.signInTelefone('11 98888-0003', 'forro123') // Ana, organizadora no demo
-    await api.salvarRegrasTrilha({ pontos_por_chave: 2 })
-    expect(await api.regrasTrilha()).toEqual({ pontos_por_chave: 2 })
+    const novas = { ...(await api.regrasTrilha()), pontos_por_chave: 4, peso_presenca: 2 }
+    await api.salvarRegrasTrilha(novas)
+    expect(await api.regrasTrilha()).toEqual(novas)
     await api.signInTelefone('11 98888-0001', 'forro123')
     await api.salvarPassoTrilha({
       nivel: 'iniciante', ordem: 98, nome: 'Dois pontos', video_frente: 'dQw4w9WgXcQ',
@@ -111,7 +123,8 @@ describe('DemoApi — trilha de vídeos', () => {
     for (const d of ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02', '2026-11-09']) {
       banco.db.checkins.push({ id: d, user_id: uid, criado_em: `${d}T23:00:00.000Z`, foto_url: '', legenda: null })
     }
-    await expect(api.liberarPassoComChave(dois.id, 3)).rejects.toThrow('Preço de chave inválido')
+    await expect(api.liberarPassoComChave(dois.id, 0)).rejects.toThrow('Preço de chave inválido')
+    await expect(api.liberarPassoComChave(dois.id, 101)).rejects.toThrow('Preço de chave inválido')
     await api.liberarPassoComChave(dois.id, 2)
     await expect(api.liberarPassoComChave(um.id, 1)).rejects.toThrow('Você ainda não tem chaves suficientes')
     expect(await api.minhasLiberacoes()).toEqual([expect.objectContaining({ passo_id: dois.id, custo: 2 })])
@@ -133,7 +146,7 @@ describe('DemoApi — trilha de vídeos', () => {
 
   it('aluno não muda as regras', async () => {
     const { api } = await novaApi()
-    await expect(api.salvarRegrasTrilha({ pontos_por_chave: 1 })).rejects.toThrow(
+    await expect(api.salvarRegrasTrilha({ ...(await api.regrasTrilha()), pontos_por_chave: 1 })).rejects.toThrow(
       'Só a organização muda as regras das chaves',
     )
   })

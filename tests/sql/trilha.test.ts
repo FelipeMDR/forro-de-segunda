@@ -14,6 +14,9 @@ async function bancoComMigracao(periodo: { inicio: string; fim: string } = { ini
     `insert into challenges (titulo, data_inicio, data_fim, forrodex) values ('Espaço Livre', $1, $2, true)`,
     [periodo.inicio, periodo.fim],
   )
+  // Conta simples para os testes de gasto: 1 ponto por presença ou
+  // parceria, 3 pontos = 1 chave. O padrão real tem teste próprio.
+  await db.query(`update trilha_regras set pontos_por_chave = 3, peso_presenca = 1, peso_parceria = 1`)
   return db
 }
 
@@ -173,13 +176,17 @@ describe('trilha — gastar chave', () => {
     expect(r.rows).toEqual([{ custo: 2 }])
   })
 
-  it('preço de chave fora da sequência 1, 2, 4, 8… é recusado', async () => {
+  it('preço de chave tem que ser de 1 a 100', async () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.a, 'Ana')
     await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02', '2026-11-09'])
     const p = await passo(db)
-    await expect(liberar(db, IDS.a, p, 3)).rejects.toThrow('Preço de chave inválido')
     await expect(liberar(db, IDS.a, p, 0)).rejects.toThrow('Preço de chave inválido')
+    await expect(liberar(db, IDS.a, p, 101)).rejects.toThrow('Preço de chave inválido')
+    // 3 chaves não é potência de 2, e agora vale (tabela de preços editável)
+    await noites(db, IDS.a, ['2026-11-16', '2026-11-23', '2026-11-30'])
+    await liberar(db, IDS.a, p, 3)
+    expect(await liberacoes(db, IDS.a)).toBe(1)
   })
 
   it('passo guarda os perfis de quem ensinou (vazio por padrão)', async () => {
@@ -239,25 +246,45 @@ describe('trilha — quem edita', () => {
 })
 
 describe('trilha — regras das chaves', () => {
-  async function regras(db: PGlite, uid: string, pontos: number) {
+  const PADRAO = { pontos: 10, presenca: 3, parceria: 1, degraus: [1, 2, 3, 4, 5], umNivel: 8, doisNiveis: 12 }
+  async function regras(db: PGlite, uid: string, r: Partial<typeof PADRAO> = {}) {
+    const x = { ...PADRAO, ...r }
     await comoUsuario(db, uid)
-    await db.query(`select salvar_regras_trilha($1)`, [pontos])
+    await db.query(`select salvar_regras_trilha($1, $2, $3, $4, $5, $6)`, [
+      x.pontos, x.presenca, x.parceria, x.degraus, x.umNivel, x.doisNiveis,
+    ])
   }
 
-  it('começa com 3 pontos por chave', async () => {
-    const db = await bancoComMigracao()
-    const r = await db.query(`select pontos_por_chave from trilha_regras`)
-    expect(r.rows).toEqual([{ pontos_por_chave: 3 }])
+  it('padrão: 3 por presença, 1 por parceria, 10 pontos por chave, preços 1-2-3-4-5, 8 e 12', async () => {
+    const db = await bancoVazio()
+    const r = await db.query(
+      `select pontos_por_chave, peso_presenca, peso_parceria, preco_degraus, preco_um_nivel, preco_dois_niveis from trilha_regras`,
+    )
+    expect(r.rows).toEqual([
+      { pontos_por_chave: 10, peso_presenca: 3, peso_parceria: 1, preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12 },
+    ])
   })
 
-  it('organização muda os pontos por chave, e o gasto passa a seguir a regra nova', async () => {
+  it('no padrão, presença pesa 3: 4 noites (12 pontos) já dão 1 chave', async () => {
+    const db = await bancoVazio()
+    await db.query(`insert into challenges (data_inicio, data_fim, forrodex) values ('2026-01-01', '2026-12-31', true)`)
+    await pessoa(db, IDS.a, 'Ana')
+    await noites(db, IDS.a, ['2026-10-05', '2026-10-12', '2026-10-19'])
+    const p = await passo(db)
+    await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chaves suficientes') // 9 pontos
+    await noites(db, IDS.a, ['2026-10-26'])
+    await liberar(db, IDS.a, p) // 12 pontos
+    expect(await liberacoes(db, IDS.a)).toBe(1)
+  })
+
+  it('organização muda os pesos e os pontos por chave, e o gasto segue a regra nova', async () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.org, 'Org', { organizador: true })
     await pessoa(db, IDS.a, 'Ana')
     await noites(db, IDS.a, ['2026-10-05', '2026-10-12'])
     const p = await passo(db)
     await expect(liberar(db, IDS.a, p)).rejects.toThrow('Você ainda não tem chaves suficientes')
-    await regras(db, IDS.org, 2)
+    await regras(db, IDS.org, { pontos: 4, presenca: 2 })
     await liberar(db, IDS.a, p)
     expect(await liberacoes(db, IDS.a)).toBe(1)
   })
@@ -266,15 +293,19 @@ describe('trilha — regras das chaves', () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.a, 'Ana')
     await pessoa(db, IDS.prof, 'Prof', { cargo: 'Professor(a)' })
-    await expect(regras(db, IDS.a, 1)).rejects.toThrow('Só a organização muda as regras das chaves')
-    await expect(regras(db, IDS.prof, 1)).rejects.toThrow('Só a organização muda as regras das chaves')
+    await expect(regras(db, IDS.a)).rejects.toThrow('Só a organização muda as regras das chaves')
+    await expect(regras(db, IDS.prof)).rejects.toThrow('Só a organização muda as regras das chaves')
   })
 
   it('recusa valores fora da faixa', async () => {
     const db = await bancoComMigracao()
     await pessoa(db, IDS.org, 'Org', { organizador: true })
-    await expect(regras(db, IDS.org, 0)).rejects.toThrow()
-    await expect(regras(db, IDS.org, 21)).rejects.toThrow()
+    await expect(regras(db, IDS.org, { pontos: 0 })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { pontos: 51 })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { presenca: 11 })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { degraus: [] })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { degraus: [1, 0, 3] })).rejects.toThrow()
+    await expect(regras(db, IDS.org, { umNivel: 0 })).rejects.toThrow()
   })
 })
 

@@ -10,6 +10,7 @@ import {
   nivelDoAluno,
   niveisVisiveis,
   podeEditarTrilha,
+  REGRAS_PADRAO,
   saldoDeChaves,
   situacaoDoNivel,
   type ContextoTrilha,
@@ -174,10 +175,10 @@ describe('cronogramaDaTurma', () => {
 })
 
 describe('situacaoDoNivel', () => {
-  it('abre na data da aula; todo passo à frente fica à venda, custando o dobro (1, 2, 4…)', () => {
+  it('abre na data da aula; todo passo à frente fica à venda, pela tabela (1, 2, 3…)', () => {
     const s = situacaoDoNivel('iniciante', ctx())
     expect(s.map((p) => p.estado)).toEqual(['aberto', 'aberto', 'aberto', 'chave', 'chave', 'chave'])
-    expect(s.map((p) => p.custo)).toEqual([null, null, null, 1, 2, 4])
+    expect(s.map((p) => p.custo)).toEqual([null, null, null, 1, 2, 3])
     expect(s[3].data).toBe('2026-10-26')
     expect(s[4].data).toBe('2026-11-02')
   })
@@ -187,6 +188,19 @@ describe('situacaoDoNivel', () => {
     expect(s[3]).toMatchObject({ estado: 'chave', custo: 1 })
     expect(s[4]).toMatchObject({ estado: 'chave', custo: 2 })
     expect(s[5]).toMatchObject({ estado: 'aberto', motivo: 'chave', custo: null })
+  })
+
+  it('o preço no próprio nível sobe pelos degraus e para no último (teto)', () => {
+    const passos = [1, 2, 3, 4, 5, 6, 7].map((n) => passo(n))
+    const s = situacaoDoNivel('iniciante', ctx({ passos, hoje: '2026-09-20' }))
+    expect(s.map((p) => p.custo)).toEqual([1, 2, 3, 4, 5, 5, 5])
+  })
+
+  it('a tabela vem das regras da organização', () => {
+    const regras = { ...REGRAS_PADRAO, preco_degraus: [2, 4], preco_um_nivel: 10 }
+    const c = ctx({ regras, passos: [1, 2, 3, 4, 5, 6].map((n) => passo(n)).concat([passo(1, { id: 'i1', nivel: 'intermediario' })]) })
+    expect(situacaoDoNivel('iniciante', c).map((p) => p.custo)).toEqual([null, null, null, 2, 4, 4])
+    expect(situacaoDoNivel('intermediario', c)[0].custo).toBe(10)
   })
 
   it('sem limite de dias: o próximo passo vira "chave" mesmo semanas antes', () => {
@@ -218,7 +232,7 @@ describe('situacaoDoNivel', () => {
     expect(situacaoDoNivel('iniciante', ctx({ passos }))[3].estado).toBe('bloqueado')
   })
 
-  it('passos dos níveis de cima também ficam à venda, continuando a dobrar', () => {
+  it('passos dos níveis de cima também ficam à venda, com preço fixo por nível (8 e 12)', () => {
     // Iniciante com 4 passos (p4 é o 1º à frente da turma) e 2 do Intermediário
     const c = ctx({
       passos: [1, 2, 3, 4].map((n) => passo(n)).concat([
@@ -227,9 +241,12 @@ describe('situacaoDoNivel', () => {
       ]),
     })
     const inter = situacaoDoNivel('intermediario', c)
-    expect(inter[0]).toMatchObject({ estado: 'chave', custo: 2, data: null })
-    expect(inter[1]).toMatchObject({ estado: 'chave', custo: 4 })
+    // Nível de cima tem preço fixo por passo (8), seja qual for a posição
+    expect(inter[0]).toMatchObject({ estado: 'chave', custo: 8, data: null })
+    expect(inter[1]).toMatchObject({ estado: 'chave', custo: 8 })
     expect(niveisVisiveis(c)).toEqual(['iniciante', 'intermediario'])
+    const av = situacaoDoNivel('avancado', ctx({ passos: c.passos.concat([passo(1, { id: 'a1', nivel: 'avancado' })]) }))
+    expect(av[0]).toMatchObject({ estado: 'chave', custo: 12 })
   })
 
   it('nível abaixo do aluno fica todo aberto (revisão); acima, todo fechado', () => {
@@ -272,21 +289,22 @@ describe('nivelDoAluno / niveisVisiveis', () => {
 })
 
 describe('saldoDeChaves', () => {
-  it('pontos do desafio principal (Presença + Parcerias), 3 por chave', () => {
+  it('padrão: presença vale 3, parceria 1, 10 pontos por chave', () => {
     const s = saldoDeChaves({ presenca: 4, parcerias: 6, usadas: 1 })
-    // 4 + 6 = 10 pontos = 3 chaves; 1 já gasta
-    expect(s).toEqual({ pontos: 10, ganhas: 3, usadas: 1, disponiveis: 2, faltam: 2, pontosPorChave: 3 })
+    // 3×4 + 6 = 18 pontos = 1 chave; 1 já gasta
+    expect(s).toEqual({ pontos: 18, ganhas: 1, usadas: 1, disponiveis: 0, faltam: 2, pontosPorChave: 10 })
   })
 
-  it('segue os pontos por chave que a organização definiu', () => {
-    const s = saldoDeChaves({ presenca: 5, parcerias: 0, usadas: 0, pontosPorChave: 2 })
+  it('segue os pesos e os pontos por chave que a organização definiu', () => {
+    const regras = { ...REGRAS_PADRAO, pontos_por_chave: 2, peso_presenca: 1, peso_parceria: 0 }
+    const s = saldoDeChaves({ presenca: 5, parcerias: 40, usadas: 0, regras })
     expect(s).toMatchObject({ pontos: 5, ganhas: 2, disponiveis: 2, faltam: 1, pontosPorChave: 2 })
   })
 
   it('nunca fica negativo', () => {
     const s = saldoDeChaves({ presenca: 0, parcerias: 0, usadas: 2 })
     expect(s.disponiveis).toBe(0)
-    expect(s.faltam).toBe(3)
+    expect(s.faltam).toBe(10)
   })
 })
 

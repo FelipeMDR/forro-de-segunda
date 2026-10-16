@@ -75,7 +75,7 @@ export function useTrilha() {
           usadas: principal
             ? liberacoes.filter((l) => l.criado_em >= principal.data_inicio).reduce((soma, l) => soma + l.custo, 0)
             : 0,
-          pontosPorChave: regras.pontos_por_chave,
+          regras,
         }),
       })
       setErro(null)

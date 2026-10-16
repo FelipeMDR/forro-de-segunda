@@ -4,10 +4,11 @@ import { FolhaChave, FolhaRegrasChaves } from '../components/FolhaChave'
 import { Icone } from '../components/Icone'
 import { Interruptor, Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
-import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
+import { comoAbriu, degrausEmTexto, quandoLibera } from '../lib/textosTrilha'
 import {
   NIVEIS,
   NOME_NIVEL,
+  REGRAS_PADRAO,
   nivelDoAluno,
   nivelInicial,
   niveisVisiveis,
@@ -47,6 +48,7 @@ export function TrilhaPage() {
   const meu = dados ? nivelDoAluno(dados.ctx) : null
   const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
   const saldo = dados?.saldo
+  const regras = dados?.ctx.regras ?? REGRAS_PADRAO
 
   const visual = (s: PassoComSituacao): Visual =>
     s.estado === 'aberto' ? (praticados.has(s.passo.id) ? 'praticado' : 'aberto') : s.estado
@@ -214,16 +216,17 @@ export function TrilhaPage() {
 
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. O próximo custa 1 chave e cada um depois dele custa o dobro; quando a turma avança, o preço cai.
+            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. No seu nível custa {degrausEmTexto(regras.preco_degraus)} chaves pela distância da turma; um nível acima, {regras.preco_um_nivel}; dois acima, {regras.preco_dois_niveis}.
           </p>
         )}
       </div>
-      {saldo && <FolhaChave alvo={alvo} saldo={saldo} desafio={dados?.desafio ?? null} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
+      {saldo && <FolhaChave alvo={alvo} saldo={saldo} desafio={dados?.desafio ?? null} regras={regras} onFechar={() => setAlvo(null)} onLiberar={liberar} />}
       {saldo && (
         <FolhaRegrasChaves
           aberta={regrasAbertas}
           saldo={saldo}
           desafio={dados?.desafio ?? null}
+          regras={regras}
           onFechar={() => setRegrasAbertas(false)}
         />
       )}

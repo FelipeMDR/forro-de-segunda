@@ -29,11 +29,16 @@ export const NOME_NIVEL: Record<NivelTrilha, string> = {
   avancado: 'Avançado',
 }
 
-export const PONTOS_POR_CHAVE = 3
+export const PONTOS_POR_CHAVE = 10
 
 /** Valem enquanto a organização não mudar (ou sem a migração 036). */
 export const REGRAS_PADRAO: RegrasTrilha = {
   pontos_por_chave: PONTOS_POR_CHAVE,
+  peso_presenca: 3,
+  peso_parceria: 1,
+  preco_degraus: [1, 2, 3, 4, 5],
+  preco_um_nivel: 8,
+  preco_dois_niveis: 12,
 }
 
 const CARGOS_TRILHA = ['Professor(a)', 'Diretor(a) de Ensino']
@@ -278,10 +283,12 @@ interface ItemFila {
 }
 
 /**
- * Passos à frente da turma: o resto do nível do aluno e, depois, os níveis
- * acima. O 1º custa 1 chave, o 2º 2, o 3º 4… — contando a partir da turma,
- * então o preço não muda quando o aluno compra outro, e cai quando a turma
- * avança. Qualquer um deles pode ser comprado (ver `passosAVenda`).
+ * Passos à frente da turma, com o preço de cada um (tabela `trilha_regras`):
+ * - no nível do aluno, sobe pelos degraus (1, 2, 3, 4, 5…) contando a
+ *   partir da turma e para no último (teto). O preço não muda quando o
+ *   aluno compra outro, e cai quando a turma avança;
+ * - nos níveis de cima, preço fixo por passo (um nível acima, dois acima).
+ * Qualquer um pode ser comprado (ver `passosAVenda`).
  */
 function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
   const meu = nivelDoAluno(ctx)
@@ -294,10 +301,19 @@ function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
     const d = datas.get(p.id)
     return !(d && d <= ctx.hoje)
   })
-  for (const n of NIVEIS.slice(NIVEIS.indexOf(meu) + 1)) {
-    fila.push(...ordenarPassos(ctx.passos.filter((p) => p.nivel === n)))
-  }
-  return fila.map((passo, i) => ({ passo, custo: 2 ** i }))
+  const r = ctx.regras ?? REGRAS_PADRAO
+  const degraus = r.preco_degraus.length ? r.preco_degraus : REGRAS_PADRAO.preco_degraus
+  // No próprio nível, o preço sobe pelos degraus e para no último (teto)
+  const itens: ItemFila[] = fila.map((passo, i) => ({
+    passo,
+    custo: degraus[Math.min(i, degraus.length - 1)],
+  }))
+  // Níveis de cima: preço fixo por passo, um para cada distância
+  NIVEIS.slice(NIVEIS.indexOf(meu) + 1).forEach((n, distancia) => {
+    const custo = distancia === 0 ? r.preco_um_nivel : r.preco_dois_niveis
+    for (const passo of ordenarPassos(ctx.passos.filter((p) => p.nivel === n))) itens.push({ passo, custo })
+  })
+  return itens
 }
 
 /**
@@ -375,8 +391,8 @@ export interface EntradaChaves {
   parcerias: number
   /** Chaves gastas desde o início do desafio (soma dos preços). */
   usadas: number
-  /** Regra da organização; sem ela, 3. */
-  pontosPorChave?: number
+  /** Pesos e pontos por chave da organização; sem elas, `REGRAS_PADRAO`. */
+  regras?: RegrasTrilha
 }
 
 export interface SaldoChaves {
@@ -390,8 +406,9 @@ export interface SaldoChaves {
 }
 
 export function saldoDeChaves(e: EntradaChaves): SaldoChaves {
-  const pontos = e.presenca + e.parcerias
-  const porChave = e.pontosPorChave ?? PONTOS_POR_CHAVE
+  const r = e.regras ?? REGRAS_PADRAO
+  const pontos = r.peso_presenca * e.presenca + r.peso_parceria * e.parcerias
+  const porChave = r.pontos_por_chave
   const ganhas = Math.floor(pontos / porChave)
   return {
     pontos,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comoAbriu, linhaCronograma, nomesProfessores, quandoLibera } from '../../src/lib/textosTrilha'
+import { comoAbriu, degrausEmTexto, linhaCronograma, nomesProfessores, quandoLibera } from '../../src/lib/textosTrilha'
 import type { LinhaCronograma, PassoComSituacao } from '../../src/lib/trilha'
 
 const s = (extra: Partial<PassoComSituacao>): PassoComSituacao => ({
@@ -92,5 +92,13 @@ describe('nomesProfessores', () => {
     expect(nomesProfessores(['Ana Paula'])).toBe('Prof. Ana')
     expect(nomesProfessores(['Ana', 'João'])).toBe('Prof. Ana e Prof. João')
     expect(nomesProfessores(['Ana', 'Bia', 'João'])).toBe('Prof. Ana, Prof. Bia e Prof. João')
+  })
+})
+
+describe('degrausEmTexto', () => {
+  it('lista os degraus e diz que o último vale dali em diante', () => {
+    expect(degrausEmTexto([1, 2, 3, 4, 5])).toBe('1, 2, 3, 4 e, do 5º em diante, 5')
+    expect(degrausEmTexto([2, 4])).toBe('2 e, do 2º em diante, 4')
+    expect(degrausEmTexto([3])).toBe('3 cada')
   })
 })

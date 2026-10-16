@@ -111,9 +111,22 @@ $$;
 -- editável: é o que segura quem quer queimar a largada.
 create table if not exists public.trilha_regras (
   id boolean primary key default true check (id),
-  pontos_por_chave int not null default 3 check (pontos_por_chave between 1 and 20),
+  pontos_por_chave int not null default 10 check (pontos_por_chave between 1 and 20),
   atualizado_em timestamptz not null default now()
 );
+-- Pesos dos pontos e tabela de preços (colunas à parte para quem já rodou
+-- a 036 antes). Calibrado com o ranking do Espaço Livre 2026.2:
+-- presença pesa 3 (senão a parceria, que favorece veteranos, domina), e
+-- o preço cresce até um teto em vez de dobrar sem fim.
+alter table public.trilha_regras
+  alter column pontos_por_chave set default 10,
+  add column if not exists peso_presenca int not null default 3 check (peso_presenca between 0 and 10),
+  add column if not exists peso_parceria int not null default 1 check (peso_parceria between 0 and 10),
+  -- Preço do 1º, 2º, 3º… passo à frente no próprio nível; o último vale
+  -- dali em diante (teto)
+  add column if not exists preco_degraus int[] not null default '{1,2,3,4,5}',
+  add column if not exists preco_um_nivel int not null default 8 check (preco_um_nivel between 1 and 100),
+  add column if not exists preco_dois_niveis int not null default 12 check (preco_dois_niveis between 1 and 100);
 insert into public.trilha_regras (id) values (true) on conflict (id) do nothing;
 
 alter table public.trilha_regras enable row level security;
@@ -122,15 +135,33 @@ create policy "trilha_regras_select" on public.trilha_regras
   for select to authenticated using (true);
 
 drop function if exists public.salvar_regras_trilha(int, int);
-create or replace function public.salvar_regras_trilha(p_pontos int)
+drop function if exists public.salvar_regras_trilha(int);
+create or replace function public.salvar_regras_trilha(
+  p_pontos int,
+  p_peso_presenca int,
+  p_peso_parceria int,
+  p_degraus int[],
+  p_um_nivel int,
+  p_dois_niveis int
+)
 returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not is_organizador() then
     raise exception 'Só a organização muda as regras das chaves';
   end if;
+  if p_degraus is null or cardinality(p_degraus) = 0 or cardinality(p_degraus) > 10
+     or exists (select 1 from unnest(p_degraus) x where x is null or x < 1 or x > 100) then
+    raise exception 'Preços por passo: de 1 a 10 valores, cada um de 1 a 100';
+  end if;
   update trilha_regras
-  set pontos_por_chave = p_pontos, atualizado_em = now()
+  set pontos_por_chave = p_pontos,
+      peso_presenca = p_peso_presenca,
+      peso_parceria = p_peso_parceria,
+      preco_degraus = p_degraus,
+      preco_um_nivel = p_um_nivel,
+      preco_dois_niveis = p_dois_niveis,
+      atualizado_em = now()
   where id;
 end;
 $$;
@@ -171,17 +202,18 @@ language sql stable security definer set search_path = public as $$
     where du.de_user = p_uid and du.confirmada
       and du.data between d.data_inicio - 1 and d.data_fim + 1
   )
-  select coalesce((select n from presencas), 0)::int + coalesce((select n from parcerias), 0)::int;
+  select coalesce((select n from presencas), 0)::int * coalesce((select peso_presenca from trilha_regras where id), 1)
+       + coalesce((select n from parcerias), 0)::int * coalesce((select peso_parceria from trilha_regras where id), 1);
 $$;
 -- O Supabase dá EXECUTE a anon/authenticated em toda função nova; sem
 -- isto, qualquer um consultaria a presença de outra pessoa.
 revoke all on function public.teto_pontos_trilha(uuid) from public, anon, authenticated;
 
 /**
- * Gasta `p_custo` chaves num passo. O PREÇO (1, 2, 4… conforme o passo
- * está à frente da turma) é calculado no app, que é onde mora o
- * calendário da trilha; aqui só se confere que é um preço possível e que
- * o aluno tem chaves para pagar. Como a trava é de tela (vídeo não
+ * Gasta `p_custo` chaves num passo. O PREÇO (tabela `trilha_regras`,
+ * pela distância do passo à turma e pelo nível) é calculado no app, que é
+ * onde mora o calendário da trilha; aqui só se confere que é um preço
+ * possível (1 a 100) e que o aluno tem chaves para pagar. Como a trava é de tela (vídeo não
  * listado), isso basta.
  */
 drop function if exists public.liberar_passo_com_chave(uuid);
@@ -197,7 +229,7 @@ begin
   if v_uid is null then
     raise exception 'Você precisa entrar primeiro';
   end if;
-  if p_custo is null or p_custo < 1 or p_custo > 1024 or (p_custo & (p_custo - 1)) <> 0 then
+  if p_custo is null or p_custo < 1 or p_custo > 100 then
     raise exception 'Preço de chave inválido';
   end if;
   -- Dois toques seguidos não gastam a mesma chave duas vezes.

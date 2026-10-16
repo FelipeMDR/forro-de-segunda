@@ -2272,15 +2272,29 @@ export class SupabaseApi implements ForroApi {
   async regrasTrilha(): Promise<RegrasTrilha> {
     const { data, error } = await this.sb
       .from('trilha_regras')
-      .select('pontos_por_chave')
+      .select('*')
       .maybeSingle()
     if (error || !data) return { ...REGRAS_PADRAO } // sem a migração 036
-    return data as RegrasTrilha
+    // Colunas ausentes (036 antiga) caem no padrão
+    const r = data as Partial<RegrasTrilha>
+    return {
+      pontos_por_chave: r.pontos_por_chave ?? REGRAS_PADRAO.pontos_por_chave,
+      peso_presenca: r.peso_presenca ?? REGRAS_PADRAO.peso_presenca,
+      peso_parceria: r.peso_parceria ?? REGRAS_PADRAO.peso_parceria,
+      preco_degraus: r.preco_degraus?.length ? r.preco_degraus : REGRAS_PADRAO.preco_degraus,
+      preco_um_nivel: r.preco_um_nivel ?? REGRAS_PADRAO.preco_um_nivel,
+      preco_dois_niveis: r.preco_dois_niveis ?? REGRAS_PADRAO.preco_dois_niveis,
+    }
   }
 
   async salvarRegrasTrilha(r: RegrasTrilha) {
     const { error } = await this.sb.rpc('salvar_regras_trilha', {
       p_pontos: r.pontos_por_chave,
+      p_peso_presenca: r.peso_presenca,
+      p_peso_parceria: r.peso_parceria,
+      p_degraus: r.preco_degraus,
+      p_um_nivel: r.preco_um_nivel,
+      p_dois_niveis: r.preco_dois_niveis,
     })
     if (error) throw new Error(traduz(error.message))
   }
