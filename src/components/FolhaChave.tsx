@@ -214,9 +214,9 @@ export function FolhaRegrasChaves({
 
         <ul className="flex flex-col gap-2 rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
           <li>
-            A compra é sempre <b className="text-ink">na ordem</b>: para chegar a um passo, compre os de antes. Quando a turma avança, o preço cai.
+            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, sem comprar os de antes. O preço é pela distância da turma: quando ela avança, o preço cai.
           </li>
-          <li>Depois do último passo do seu nível, dá para seguir comprando os do nível seguinte, ainda pelo dobro.</li>
+          <li>Os níveis de cima também ficam à venda, continuando a dobrar depois do último passo do seu nível.</li>
           <li>Quando um novo desafio principal começa, os pontos e as chaves recomeçam com ele.</li>
           <li>O passo liberado continua aberto para você, mesmo depois.</li>
         </ul>

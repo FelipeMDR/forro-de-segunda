@@ -84,7 +84,7 @@ export function RegrasChavesPage() {
         </div>
 
         <Dica>
-          O custo dobra a cada passo à frente da turma e não muda por nível. A compra é sempre na ordem, e depois do último passo do nível o aluno segue para o nível seguinte.
+          O custo dobra a cada passo à frente da turma e não muda por nível. O aluno pode comprar qualquer passo à frente, inclusive dos níveis de cima, sem precisar comprar os de antes.
         </Dica>
         <BotaoAcao cor="preto" bloco disabled={salvando} onClick={() => void salvar()}>
           {salvando ? 'Salvando…' : 'Salvar regras'}

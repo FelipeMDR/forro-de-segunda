@@ -214,7 +214,7 @@ export function TrilhaPage() {
 
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            O próximo passo custa 1 chave e cada um depois dele custa <b className="text-ink">o dobro</b>. Compre na ordem; quando a turma avança, o preço cai.
+            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. O próximo custa 1 chave e cada um depois dele custa o dobro; quando a turma avança, o preço cai.
           </p>
         )}
       </div>

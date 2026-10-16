@@ -278,10 +278,10 @@ interface ItemFila {
 }
 
 /**
- * Passos à frente da turma, na ordem em que o aluno pode comprar: o resto
- * do nível dele e, depois, os níveis acima. O 1º custa 1 chave, o 2º 2,
- * o 3º 4… — contando a partir da turma, então o preço não muda quando o
- * aluno compra o anterior, e cai quando a turma avança.
+ * Passos à frente da turma: o resto do nível do aluno e, depois, os níveis
+ * acima. O 1º custa 1 chave, o 2º 2, o 3º 4… — contando a partir da turma,
+ * então o preço não muda quando o aluno compra outro, e cai quando a turma
+ * avança. Qualquer um deles pode ser comprado (ver `passosAVenda`).
  */
 function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
   const meu = nivelDoAluno(ctx)
@@ -300,32 +300,38 @@ function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
   return fila.map((passo, i) => ({ passo, custo: 2 ** i }))
 }
 
-/** O único passo à venda: o primeiro da fila ainda não comprado. Ninguém pula a fila. */
-function passoAVenda(ctx: ContextoTrilha, fila: ItemFila[]): ItemFila | null {
-  const item = fila.find((f) => !ctx.liberadas.has(f.passo.id))
-  if (!item || !item.passo.pode_chave || !item.passo.video_frente) return null
-  // No nível do aluno, só com a turma no cronograma (sem data, a trilha não foi configurada)
-  if (item.passo.nivel === nivelDoAluno(ctx) && !datasDoNivel(item.passo.nivel, ctx).has(item.passo.id)) {
-    return null
+/**
+ * Passos à venda: TODOS os da fila ainda não comprados, em qualquer nível.
+ * O preço é o da posição na fila (1, 2, 4…), então pular para longe sai
+ * caro — é isso que segura quem quer queimar a largada.
+ */
+function passosAVenda(ctx: ContextoTrilha, fila: ItemFila[]): Map<string, number> {
+  const meu = nivelDoAluno(ctx)
+  const datasDoMeu = meu ? datasDoNivel(meu, ctx) : new Map<string, string>()
+  const venda = new Map<string, number>()
+  for (const { passo, custo } of fila) {
+    if (ctx.liberadas.has(passo.id) || !passo.pode_chave || !passo.video_frente) continue
+    // No nível do aluno, só com a turma no cronograma (sem data, a trilha não foi configurada)
+    if (passo.nivel === meu && !datasDoMeu.has(passo.id)) continue
+    venda.set(passo.id, custo)
   }
-  return item
+  return venda
 }
 
 /**
- * Abas da trilha: o nível do aluno e os de baixo (revisão), mais um nível
- * de cima quando ele já comprou passo lá ou quando chegou a vez de comprar.
+ * Abas da trilha: o nível do aluno e os de baixo (revisão), mais os de
+ * cima que têm passo à venda ou já comprado.
  */
 export function niveisVisiveis(ctx: ContextoTrilha): NivelTrilha[] {
   const comPassos = NIVEIS.filter((n) => ctx.passos.some((p) => p.nivel === n))
   if (ctx.equipe) return comPassos
   const meu = nivelDoAluno(ctx)
   if (!meu) return []
-  const venda = passoAVenda(ctx, filaDeCompra(ctx))
+  const venda = passosAVenda(ctx, filaDeCompra(ctx))
   return comPassos.filter(
     (n) =>
       NIVEIS.indexOf(n) <= NIVEIS.indexOf(meu) ||
-      venda?.passo.nivel === n ||
-      ctx.passos.some((p) => p.nivel === n && ctx.liberadas.has(p.id)),
+      ctx.passos.some((p) => p.nivel === n && (venda.has(p.id) || ctx.liberadas.has(p.id))),
   )
 }
 
@@ -341,9 +347,7 @@ export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoC
   const datas = datasDoNivel(nivel, ctx)
   const meu = nivelDoAluno(ctx)
   const abaixo = meu !== null && NIVEIS.indexOf(nivel) < NIVEIS.indexOf(meu)
-  const fila = filaDeCompra(ctx)
-  const custos = new Map(fila.map((f) => [f.passo.id, f.custo]))
-  const venda = passoAVenda(ctx, fila)
+  const venda = passosAVenda(ctx, filaDeCompra(ctx))
 
   return passos.map((passo, i): PassoComSituacao => {
     const data = nivel === meu ? (datas.get(passo.id) ?? null) : null
@@ -352,12 +356,8 @@ export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoC
     if (abaixo) return { ...base, estado: 'aberto', motivo: 'revisao' }
     if (data && data <= ctx.hoje) return { ...base, estado: 'aberto', motivo: 'data' }
     if (ctx.liberadas.has(passo.id)) return { ...base, estado: 'aberto', motivo: 'chave' }
-    return {
-      ...base,
-      estado: venda?.passo.id === passo.id ? 'chave' : 'bloqueado',
-      motivo: null,
-      custo: custos.get(passo.id) ?? null,
-    }
+    const custo = venda.get(passo.id) ?? null
+    return { ...base, estado: custo ? 'chave' : 'bloqueado', motivo: null, custo }
   })
 }
 
