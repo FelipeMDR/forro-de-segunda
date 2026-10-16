@@ -455,36 +455,44 @@ function FolhaCancelar({
             <input type="date" className="input" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
           </Campo>
         )}
-        <Campo rotulo="Cancela para">
-          <div className="flex flex-wrap gap-2">
-            <ChipEscolha
-              ativo={form.turma === null && form.cancela_aulas}
-              onClick={() => setForm({ ...form, turma: null, suspende_desafios: true, cancela_aulas: true })}
-            >
-              Todas as turmas
-            </ChipEscolha>
-            {(alvo?.turma ? [alvo.turma] : ordenarTurmas(turmas)).map((t) => (
+        {/* As aulas acontecem, mas o salão não fica livre depois
+            (treinamento, evento no espaço). Só no cadastro livre:
+            cancelar uma aula da agenda é sempre cancelar aula. */}
+        {!alvo?.data && (
+          <Campo rotulo="O que não vai acontecer?">
+            <Segmentado
+              opcoes={[
+                { valor: 'aulas', rotulo: 'Aulas' },
+                { valor: 'espaco', rotulo: 'Só o Espaço Livre' },
+              ]}
+              valor={form.cancela_aulas ? 'aulas' : 'espaco'}
+              onChange={(v) =>
+                setForm({ ...form, turma: null, suspende_desafios: true, cancela_aulas: v === 'aulas' })
+              }
+            />
+          </Campo>
+        )}
+        {form.cancela_aulas && (
+          <Campo rotulo="Cancela para">
+            <div className="flex flex-wrap gap-2">
               <ChipEscolha
-                key={t}
-                ativo={form.turma === t}
-                onClick={() => setForm({ ...form, turma: t, suspende_desafios: false, cancela_aulas: true })}
+                ativo={form.turma === null}
+                onClick={() => setForm({ ...form, turma: null, suspende_desafios: true })}
               >
-                Só {t}
+                Todas as turmas
               </ChipEscolha>
-            ))}
-            {/* As aulas acontecem, mas o salão não fica livre depois
-                (treinamento, evento no espaço). Só no cadastro livre:
-                cancelar uma aula da agenda é sempre cancelar aula. */}
-            {!alvo?.data && (
-              <ChipEscolha
-                ativo={!form.cancela_aulas}
-                onClick={() => setForm({ ...form, turma: null, suspende_desafios: true, cancela_aulas: false })}
-              >
-                Só o Espaço Livre
-              </ChipEscolha>
-            )}
-          </div>
-        </Campo>
+              {(alvo?.turma ? [alvo.turma] : ordenarTurmas(turmas)).map((t) => (
+                <ChipEscolha
+                  key={t}
+                  ativo={form.turma === t}
+                  onClick={() => setForm({ ...form, turma: t, suspende_desafios: false })}
+                >
+                  Só {t}
+                </ChipEscolha>
+              ))}
+            </div>
+          </Campo>
+        )}
         <Campo rotulo="Motivo" dica="Opcional, mas ajuda o aluno a entender.">
           <input
             className="input"
