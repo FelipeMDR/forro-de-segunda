@@ -6,7 +6,6 @@ import { Interruptor, Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
 import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
-  NIVEIS,
   NOME_NIVEL,
   REGRAS_PADRAO,
   nivelDoAluno,
@@ -131,13 +130,7 @@ export function TrilhaPage() {
 
         {niveis.length > 1 && nivel && (
           <Segmentado
-            opcoes={niveis.map((n) => ({
-              valor: n,
-              rotulo:
-                meu && !dados?.ctx.equipe && NIVEIS.indexOf(n) < NIVEIS.indexOf(meu)
-                  ? `${NOME_NIVEL[n]} · revisão`
-                  : NOME_NIVEL[n],
-            }))}
+            opcoes={niveis.map((n) => ({ valor: n, rotulo: NOME_NIVEL[n] }))}
             valor={nivel}
             onChange={setNivel}
           />
