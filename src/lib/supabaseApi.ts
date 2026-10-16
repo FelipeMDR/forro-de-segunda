@@ -1765,6 +1765,8 @@ export class SupabaseApi implements ForroApi {
       // Sem a migração 012 a coluna não existe: o cancelamento volta a
       // valer só como aviso na agenda, que era o comportamento antigo.
       suspende_desafios: f.suspende_desafios === true,
+      // Sem a migração 037 todo cancelamento cancela aula, como antes
+      cancela_aulas: f.cancela_aulas !== false,
     }))
   }
 
@@ -1775,6 +1777,9 @@ export class SupabaseApi implements ForroApi {
         motivo: f.motivo.trim() || null,
         turma: f.turma,
         suspende_desafios: f.suspende_desafios,
+        // Só manda a coluna quando precisa: sem a migração 037 o
+        // cancelamento comum continua funcionando
+        ...(f.cancela_aulas ? {} : { cancela_aulas: false }),
       }),
     )
     if (f.reposicao && f.turma) {

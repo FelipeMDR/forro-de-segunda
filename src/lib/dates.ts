@@ -342,7 +342,9 @@ function feriadoQueAfeta(
   return (
     feriados.find(
       (f) =>
-        f.data === dataISO && (f.turma === null || f.turma === eventoTurma),
+        f.cancela_aulas &&
+        f.data === dataISO &&
+        (f.turma === null || f.turma === eventoTurma),
     ) ?? null
   )
 }

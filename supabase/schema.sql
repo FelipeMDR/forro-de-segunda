@@ -183,6 +183,7 @@ create table if not exists public.feriados (
   motivo text,
   turma text,
   suspende_desafios boolean not null default true,
+  cancela_aulas boolean not null default true,
   criado_em timestamptz not null default now()
 );
 

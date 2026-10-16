@@ -145,8 +145,9 @@ export function aulasDaTurma(
     for (; d <= ate; d = somaDias(d, 7)) datas.add(d)
   }
 
+  // Dia sem Espaço Livre (cancela_aulas falso) teve aula: a trilha anda
   const cancelamento = (data: string) =>
-    feriados.find((x) => x.data === data && (x.turma === null || x.turma === turma))
+    feriados.find((x) => x.cancela_aulas && x.data === data && (x.turma === null || x.turma === turma))
 
   // Reposição só vale no lugar de uma aula DESTA turma que foi mesmo
   // cancelada. Repor um dia sem aula, ou uma reposição que sobrou depois

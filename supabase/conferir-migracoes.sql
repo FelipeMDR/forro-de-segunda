@@ -159,6 +159,15 @@ from (values
   (
     '034 — Modo DJ fecha os pedidos sozinho',
     exists (select 1 from pg_proc where proname = 'programar_fechamento_dj')
+  ),
+  (
+    '037 — cancelar só o Espaço Livre, mantendo as aulas',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'feriados'
+        and column_name = 'cancela_aulas'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

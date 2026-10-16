@@ -125,7 +125,8 @@ export function AgendaPainelPage() {
 
   const feriadoDe = (o: OcorrenciaAgenda) =>
     feriados.find(
-      (f) => f.data === toISODate(o.quando) && (f.turma === null || f.turma === o.evento.turma),
+      (f) =>
+        f.cancela_aulas && f.data === toISODate(o.quando) && (f.turma === null || f.turma === o.evento.turma),
     )
 
   const desfazerCancelamento = async (o: OcorrenciaAgenda) => {
@@ -243,9 +244,15 @@ export function AgendaPainelPage() {
                   {proximosFeriados.map((f) => (
                     <LinhaGestao
                       key={f.id}
-                      rotulo={f.suspende_desafios ? 'Sem forró · desafios fechados' : 'Aula cancelada'}
+                      rotulo={
+                        !f.cancela_aulas
+                          ? 'Sem Espaço Livre · aulas mantidas'
+                          : f.suspende_desafios
+                            ? 'Sem forró · desafios fechados'
+                            : 'Aula cancelada'
+                      }
                       corRotulo="text-or-t"
-                      titulo={`${formatDate(f.data)} · ${f.turma ?? 'todas as turmas'}`}
+                      titulo={`${formatDate(f.data)} · ${!f.cancela_aulas ? 'desafios fechados' : (f.turma ?? 'todas as turmas')}`}
                       sub={f.motivo || 'Sem motivo informado'}
                       onExcluir={() => setExcluir({ tipo: 'feriado', id: f.id, titulo: 'Cancelamento' })}
                     />
@@ -383,7 +390,13 @@ function FolhaCancelar({
   const { api } = useAuth()
   const toast = useToast()
   const { recarregar } = usePainel()
-  const [form, setForm] = useState<FeriadoInput>({ data: '', motivo: '', turma: null, suspende_desafios: true })
+  const [form, setForm] = useState<FeriadoInput>({
+    data: '',
+    motivo: '',
+    turma: null,
+    suspende_desafios: true,
+    cancela_aulas: true,
+  })
   const [salvando, setSalvando] = useState(false)
   const [repor, setRepor] = useState<'nao' | 'sim'>('nao')
   const [reposicao, setReposicao] = useState({ data: '', hora: '' })
@@ -396,7 +409,7 @@ function FolhaCancelar({
     if (!alvo) return
     // Cancelar só uma turma normalmente não fecha o espaço: as outras
     // continuam dançando ali. Cancelar todas, sim.
-    setForm({ data: alvo.data, motivo: '', turma: alvo.turma, suspende_desafios: alvo.turma === null })
+    setForm({ data: alvo.data, motivo: '', turma: alvo.turma, suspende_desafios: alvo.turma === null, cancela_aulas: true })
     setRepor('nao')
     setReposicao({ data: '', hora: '' })
   }, [alvo])
@@ -420,9 +433,11 @@ function FolhaCancelar({
       await api.saveFeriado({ ...form, reposicao: comReposicao ? reposicao : null })
       await Promise.all([recarregar.feriados(), onSalvou()])
       toast(
-        form.suspende_desafios
-          ? 'Cancelado. Os alunos já veem na agenda, e os desafios não contam ponto nesse dia.'
-          : 'Cancelado. Os alunos já veem na agenda.',
+        !form.cancela_aulas
+          ? 'Marcado. As aulas seguem, e os desafios não contam ponto nesse dia.'
+          : form.suspende_desafios
+            ? 'Cancelado. Os alunos já veem na agenda, e os desafios não contam ponto nesse dia.'
+            : 'Cancelado. Os alunos já veem na agenda.',
       )
       onFechar()
     } catch (e) {
@@ -443,8 +458,8 @@ function FolhaCancelar({
         <Campo rotulo="Cancela para">
           <div className="flex flex-wrap gap-2">
             <ChipEscolha
-              ativo={form.turma === null}
-              onClick={() => setForm({ ...form, turma: null, suspende_desafios: true })}
+              ativo={form.turma === null && form.cancela_aulas}
+              onClick={() => setForm({ ...form, turma: null, suspende_desafios: true, cancela_aulas: true })}
             >
               Todas as turmas
             </ChipEscolha>
@@ -452,11 +467,22 @@ function FolhaCancelar({
               <ChipEscolha
                 key={t}
                 ativo={form.turma === t}
-                onClick={() => setForm({ ...form, turma: t, suspende_desafios: false })}
+                onClick={() => setForm({ ...form, turma: t, suspende_desafios: false, cancela_aulas: true })}
               >
                 Só {t}
               </ChipEscolha>
             ))}
+            {/* As aulas acontecem, mas o salão não fica livre depois
+                (treinamento, evento no espaço). Só no cadastro livre:
+                cancelar uma aula da agenda é sempre cancelar aula. */}
+            {!alvo?.data && (
+              <ChipEscolha
+                ativo={!form.cancela_aulas}
+                onClick={() => setForm({ ...form, turma: null, suspende_desafios: true, cancela_aulas: false })}
+              >
+                Só o Espaço Livre
+              </ChipEscolha>
+            )}
           </div>
         </Campo>
         <Campo rotulo="Motivo" dica="Opcional, mas ajuda o aluno a entender.">
@@ -501,18 +527,22 @@ function FolhaCancelar({
         )}
         <div className="rounded-2xl bg-sf2 px-4 py-3 text-sm leading-snug text-ink2">
           <b className="text-ink">Trilha de vídeos: </b>
-          {form.turma === null
-            ? 'todas as turmas com aula nesse dia andam uma semana.'
-            : podeRepor && repor === 'sim'
-              ? 'o passo desta aula vai para o dia da reposição, e nada mais muda. A reposição aparece na agenda da turma.'
-              : 'os passos seguintes desta turma andam uma semana.'}
+          {!form.cancela_aulas
+            ? 'as aulas acontecem normalmente, e nada muda.'
+            : form.turma === null
+              ? 'todas as turmas com aula nesse dia andam uma semana.'
+              : podeRepor && repor === 'sim'
+                ? 'o passo desta aula vai para o dia da reposição, e nada mais muda. A reposição aparece na agenda da turma.'
+                : 'os passos seguintes desta turma andam uma semana.'}
         </div>
-        <LinhaInterruptor
-          titulo="Não vai ter forró nesse dia"
-          descricao="Fecha a janela dos desafios: quem aparecer não marca presença"
-          ligado={form.suspende_desafios}
-          onChange={(v) => setForm({ ...form, suspende_desafios: v })}
-        />
+        {form.cancela_aulas && (
+          <LinhaInterruptor
+            titulo="Não vai ter forró nesse dia"
+            descricao="Fecha a janela dos desafios: quem aparecer não marca presença"
+            ligado={form.suspende_desafios}
+            onChange={(v) => setForm({ ...form, suspende_desafios: v })}
+          />
+        )}
         <div className="mt-1 flex gap-2.5">
           <BotaoSuave tamanho="g" className="flex-1" onClick={onFechar}>
             Voltar
@@ -520,9 +550,11 @@ function FolhaCancelar({
           <BotaoAcao tamanho="g" sombra={false} className="flex-[1.3]" disabled={salvando} onClick={() => void salvar()}>
             {salvando
               ? 'Salvando…'
-              : podeRepor && repor === 'sim'
-                ? 'Cancelar e marcar reposição'
-                : 'Cancelar e avisar'}
+              : !form.cancela_aulas
+                ? 'Fechar os desafios'
+                : podeRepor && repor === 'sim'
+                  ? 'Cancelar e marcar reposição'
+                  : 'Cancelar e avisar'}
           </BotaoAcao>
         </div>
       </div>

@@ -67,7 +67,7 @@ export function CronogramaPage() {
 
   // A linha cancelada vem de um feriado da Agenda (da turma ou de todas)
   const feriadoDaLinha = (data: string) =>
-    base.feriados.find((f) => f.data === data && (f.turma === null || f.turma === escolhida)) ?? null
+    base.feriados.find((f) => f.cancela_aulas && f.data === data && (f.turma === null || f.turma === escolhida)) ?? null
 
   const desfazerCancelamento = async () => {
     if (!desfazendo) return

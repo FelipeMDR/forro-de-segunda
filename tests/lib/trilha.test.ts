@@ -25,7 +25,7 @@ const aulaSeg: AgendaEvent = {
 const aulaQua: AgendaEvent = { ...aulaSeg, id: 'e2', turma: 'Iniciante 02', dia_semana: 3, hora: '19:00' }
 
 const feriado = (data: string, turma: string | null): Feriado => ({
-  id: `f-${data}`, data, motivo: 'Feriado', turma, suspende_desafios: false,
+  id: `f-${data}`, data, motivo: 'Feriado', turma, suspende_desafios: false, cancela_aulas: true,
 })
 
 const reposicao = (data: string, de: string, turma = 'Iniciante 01'): AgendaEvent => ({
@@ -93,6 +93,12 @@ describe('aulasDaTurma', () => {
       '2026-10-26',
     )
     expect(r.map((a) => a.tipo)).toEqual(['aula', 'cancelada', 'cancelada', 'aula'])
+  })
+
+  it('dia só sem Espaço Livre teve aula: a trilha anda normal', () => {
+    const soEspacoLivre = { ...feriado('2026-10-12', null), suspende_desafios: true, cancela_aulas: false }
+    const r = aulasDaTurma('Iniciante 01', '2026-10-05', [aulaSeg], [soEspacoLivre], '2026-10-19')
+    expect(r.map((a) => a.tipo)).toEqual(['aula', 'aula', 'aula'])
   })
 
   it('cancelamento num dia sem aula da turma não aparece', () => {

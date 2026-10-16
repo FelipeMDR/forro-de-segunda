@@ -446,6 +446,12 @@ export interface Feriado {
    * as aulas pode ser exatamente a noite do Forró na Rep.
    */
   suspende_desafios: boolean
+  /**
+   * Falso quando as aulas aconteceram e só o Espaço Livre não abriu
+   * (migração 037): o dia fecha os desafios e não mexe em aula, agenda
+   * nem trilha. Vem sempre com `turma: null`.
+   */
+  cancela_aulas: boolean
 }
 
 export interface FeriadoInput {
@@ -453,6 +459,7 @@ export interface FeriadoInput {
   motivo: string
   turma: string | null
   suspende_desafios: boolean
+  cancela_aulas: boolean
   /** Repor a aula em outro dia (só com `turma`): cria o evento de reposição. */
   reposicao?: { data: string; hora: string } | null
 }

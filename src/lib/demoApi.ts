@@ -448,6 +448,7 @@ function seed(): DB {
           motivo: 'Feriado nacional (exemplo)',
           turma: null,
           suspende_desafios: true,
+          cancela_aulas: true,
         },
       ]
     : []
@@ -1504,7 +1505,10 @@ export class DemoApi implements ForroApi {
   }
 
   async listFeriados(): Promise<Feriado[]> {
-    return [...this.db.feriados].sort((a, b) => a.data.localeCompare(b.data))
+    // Demo salvo antes da migração 037 não tem o campo: cancelava aula
+    return this.db.feriados
+      .map((f) => ({ ...f, cancela_aulas: f.cancela_aulas !== false }))
+      .sort((a, b) => a.data.localeCompare(b.data))
   }
 
   async saveFeriado(f: FeriadoInput) {
@@ -1514,6 +1518,7 @@ export class DemoApi implements ForroApi {
       motivo: f.motivo.trim() || null,
       turma: f.turma,
       suspende_desafios: f.suspende_desafios,
+      cancela_aulas: f.cancela_aulas,
     })
     if (f.reposicao && f.turma) {
       this.db.events.push({

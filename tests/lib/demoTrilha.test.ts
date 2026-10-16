@@ -162,7 +162,7 @@ describe('DemoApi — trilha de vídeos', () => {
     const { api } = await novaApi()
     await api.saveFeriado({
       data: '2026-10-26', motivo: 'Salão ocupado', turma: 'Iniciante 01',
-      suspende_desafios: false, reposicao: { data: '2026-10-31', hora: '15:00' },
+      suspende_desafios: false, cancela_aulas: true, reposicao: { data: '2026-10-31', hora: '15:00' },
     })
     const rep = (await api.listEvents()).find((e) => e.reposicao_de === '2026-10-26')
     expect(rep).toMatchObject({ turma: 'Iniciante 01', data: '2026-10-31', hora: '15:00' })
