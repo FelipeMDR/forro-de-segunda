@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BotaoAcao, BotaoSuave, Cabecalho, Confirmar, LinhaInterruptor, Tela } from '../../components/ui'
 import { useApi } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { idDoYoutube, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
+import { ehDrive, idDoVideo, linkDoVideo, miniaturaDoVideo, NIVEIS, NOME_NIVEL } from '../../lib/trilha'
 import type { NivelTrilha, PassoTrilhaInput } from '../../lib/types'
 import { Avatar } from '../../components/Avatar'
 import { Icone } from '../../components/Icone'
@@ -46,9 +46,9 @@ export function EditarPassoPage() {
       }
       setForm(p)
       setLinks({
-        video_frente: p.video_frente ? `https://youtu.be/${p.video_frente}` : '',
-        video_condutor: p.video_condutor ? `https://youtu.be/${p.video_condutor}` : '',
-        video_conduzida: p.video_conduzida ? `https://youtu.be/${p.video_conduzida}` : '',
+        video_frente: p.video_frente ? linkDoVideo(p.video_frente) : '',
+        video_condutor: p.video_condutor ? linkDoVideo(p.video_condutor) : '',
+        video_conduzida: p.video_conduzida ? linkDoVideo(p.video_conduzida) : '',
       })
     })
   }, [api, id, novo, busca, navigate, toast])
@@ -56,16 +56,16 @@ export function EditarPassoPage() {
   if (!form) return null
 
   const ids = {
-    video_frente: links.video_frente.trim() ? idDoYoutube(links.video_frente) : null,
-    video_condutor: links.video_condutor.trim() ? idDoYoutube(links.video_condutor) : null,
-    video_conduzida: links.video_conduzida.trim() ? idDoYoutube(links.video_conduzida) : null,
+    video_frente: links.video_frente.trim() ? idDoVideo(links.video_frente) : null,
+    video_condutor: links.video_condutor.trim() ? idDoVideo(links.video_condutor) : null,
+    video_conduzida: links.video_conduzida.trim() ? idDoVideo(links.video_conduzida) : null,
   }
   const linkRuim = (c: CampoVideo) => links[c].trim() !== '' && ids[c] === null
 
   const salvar = async () => {
     if (!form.nome.trim()) return toast('Dê um nome ao passo', 'erro')
     if ((['video_frente', 'video_condutor', 'video_conduzida'] as const).some(linkRuim)) {
-      return toast('Algum link não é de um vídeo do YouTube', 'erro')
+      return toast('Algum link não é de um vídeo do YouTube ou do Google Drive', 'erro')
     }
     setSalvando(true)
     try {
@@ -85,18 +85,26 @@ export function EditarPassoPage() {
         type="url"
         inputMode="url"
         className="input"
-        placeholder="Colar link do YouTube"
+        placeholder="Colar link do YouTube ou do Drive"
         value={links[c]}
         onChange={(e) => setLinks({ ...links, [c]: e.target.value })}
         aria-invalid={linkRuim(c)}
       />
-      {linkRuim(c) && <span className="text-xs font-bold text-or-t">Esse link não é de um vídeo do YouTube.</span>}
+      {linkRuim(c) && (
+        <span className="text-xs font-bold text-or-t">Esse link não é de um vídeo do YouTube nem de um arquivo do Drive.</span>
+      )}
       {ids[c] && (
-        <img
-          src={`https://i.ytimg.com/vi/${ids[c]}/mqdefault.jpg`}
-          alt=""
-          className="mt-1 h-[50px] w-[88px] rounded-lg object-cover"
-        />
+        <>
+        <span className="mt-1 flex items-center gap-2.5">
+          <img src={miniaturaDoVideo(ids[c]!)} alt="" className="h-[50px] w-[88px] rounded-lg bg-chip object-cover" />
+          <span className="text-xs font-bold text-ink2">{ehDrive(ids[c]!) ? 'Google Drive' : 'YouTube'}</span>
+        </span>
+        {ehDrive(ids[c]!) && (
+          <span className="text-xs leading-snug text-or-t">
+            No Drive, compartilhe como “Qualquer pessoa com o link pode ver” e desative o download para leitores.
+          </span>
+        )}
+        </>
       )}
     </Campo>
   )
@@ -166,7 +174,7 @@ export function EditarPassoPage() {
         </div>
         <Dica>A data de cada turma vem do cronograma dela (Agenda). Níveis acima veem este passo como revisão.</Dica>
         <Dica>
-          Suba o vídeo no canal do projeto como <b>não listado</b> e cole o link. O app guarda só o link.
+          Suba o vídeo no canal do projeto no YouTube como <b>não listado</b> e cole o link. Vídeo do Google Drive também funciona, por enquanto. O app guarda só o link.
         </Dica>
         {campoVideo('video_frente', 'Vídeo de frente')}
         {campoVideo('video_condutor', 'Visão do condutor (opcional)')}

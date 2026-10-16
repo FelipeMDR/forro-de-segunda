@@ -82,13 +82,63 @@ export function idDoYoutube(link: string): string | null {
   return id && ID_YOUTUBE.test(id) ? id : null
 }
 
-/** `enablejsapi=1`: deixa a tela mudar a velocidade pelo postMessage. */
-export function urlDoEmbed(id: string): string {
-  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`
+// ---- Google Drive (provisório: o plano é migrar tudo para o YouTube) ----
+
+const PREFIXO_DRIVE = 'drive:'
+const ID_DRIVE = /^[A-Za-z0-9_-]{20,}$/
+
+/** O vídeo salvo é do Drive ("drive:<ID>")? Senão é um ID do YouTube. */
+export function ehDrive(video: string): boolean {
+  return video.startsWith(PREFIXO_DRIVE)
 }
 
-export function miniaturaDoYoutube(id: string): string {
-  return `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+function idDoDrive(link: string): string | null {
+  let url: URL
+  try {
+    url = new URL(/^https?:\/\//.test(link) ? link : `https://${link}`)
+  } catch {
+    return null
+  }
+  const host = url.hostname.replace(/^www\./, '')
+  if (host !== 'drive.google.com' && host !== 'docs.google.com') return null
+  const m = url.pathname.match(/^\/file\/d\/([^/]+)/)
+  const id = m ? m[1] : url.pathname === '/open' || url.pathname === '/uc' ? url.searchParams.get('id') : null
+  return id && ID_DRIVE.test(id) ? id : null
+}
+
+/**
+ * O que guardar para um link colado: o ID do YouTube, ou "drive:<ID>" para
+ * um arquivo do Google Drive. null = não é vídeo de nenhum dos dois.
+ */
+export function idDoVideo(link: string): string | null {
+  const limpo = link.trim()
+  const youtube = idDoYoutube(limpo)
+  if (youtube) return youtube
+  const drive = idDoDrive(limpo)
+  return drive ? `${PREFIXO_DRIVE}${drive}` : null
+}
+
+/** Link para abrir o vídeo fora do app (é o que aparece no painel ao editar). */
+export function linkDoVideo(video: string): string {
+  return ehDrive(video)
+    ? `https://drive.google.com/file/d/${video.slice(PREFIXO_DRIVE.length)}/view`
+    : `https://youtu.be/${video}`
+}
+
+/**
+ * Player embutido. No YouTube, `enablejsapi=1` deixa a tela mudar a
+ * velocidade pelo postMessage; o player do Drive não aceita esse comando.
+ */
+export function urlDoEmbed(video: string): string {
+  return ehDrive(video)
+    ? `https://drive.google.com/file/d/${video.slice(PREFIXO_DRIVE.length)}/preview`
+    : `https://www.youtube-nocookie.com/embed/${video}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`
+}
+
+export function miniaturaDoVideo(video: string): string {
+  return ehDrive(video)
+    ? `https://drive.google.com/thumbnail?id=${video.slice(PREFIXO_DRIVE.length)}&sz=w320`
+    : `https://i.ytimg.com/vi/${video}/mqdefault.jpg`
 }
 
 // ---- Datas ("YYYY-MM-DD", sempre em UTC para o fuso não mudar o dia) ----

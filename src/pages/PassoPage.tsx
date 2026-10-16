@@ -5,7 +5,7 @@ import { Icone } from '../components/Icone'
 import { Cabecalho, Segmentado, Tela, useVoltar } from '../components/ui'
 import { alternarPraticado, lerPraticados } from '../lib/praticados'
 import { comoAbriu } from '../lib/textosTrilha'
-import { NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
+import { ehDrive, NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
 import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Angulo = 'frente' | 'condutor' | 'conduzida'
@@ -95,7 +95,7 @@ export function PassoPage() {
             className="h-full w-full"
             allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
-            onLoad={() => velocidade !== 1 && mudarVelocidade(velocidade)}
+            onLoad={() => !ehDrive(video) && velocidade !== 1 && mudarVelocidade(velocidade)}
           />
         </div>
       </div>
@@ -138,6 +138,8 @@ export function PassoPage() {
           </div>
         )}
 
+        {/* Velocidade só no YouTube: o player do Drive não aceita o comando */}
+        {!ehDrive(video) && (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-extrabold uppercase tracking-[.06em] text-ink3">Velocidade</span>
           <div className="flex gap-2">
@@ -159,6 +161,7 @@ export function PassoPage() {
             })}
           </div>
         </div>
+        )}
 
         {s.passo.dica && (
           <div className="flex flex-col gap-1.5 rounded-2xl border border-linha bg-sf p-3.5">

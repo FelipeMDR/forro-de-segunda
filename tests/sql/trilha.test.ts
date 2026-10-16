@@ -200,6 +200,12 @@ describe('trilha — gastar chave', () => {
     expect(depois.rows[0].ids).toEqual([IDS.prof])
   })
 
+  it('vídeo do Drive (drive:<ID>) é aceito pela tabela', async () => {
+    const db = await bancoComMigracao()
+    await expect(passo(db, { video: 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345' })).resolves.toBeTruthy()
+    await expect(passo(db, { ordem: 2, video: 'drive:curto' })).rejects.toThrow()
+  })
+
   it('ID de vídeo inválido é recusado pela tabela', async () => {
     const db = await bancoComMigracao()
     await expect(passo(db, { video: 'https://youtu.be/x' })).rejects.toThrow()

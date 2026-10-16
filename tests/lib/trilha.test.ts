@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   aulasDaTurma,
   diasAte,
-  miniaturaDoYoutube,
   urlDoEmbed,
   nivelInicial,
   cronogramaDaTurma,
+  idDoVideo,
   idDoYoutube,
+  linkDoVideo,
+  miniaturaDoVideo,
+  ehDrive,
   nivelDoAluno,
   niveisVisiveis,
   passoDaAula,
@@ -359,7 +362,7 @@ describe('diasAte', () => {
 
 describe('YouTube: miniatura e player', () => {
   it('miniatura pelo ID', () => {
-    expect(miniaturaDoYoutube(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
+    expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
   })
 
   it('player aceita comandos (velocidade) pela API do iframe', () => {
@@ -397,5 +400,38 @@ describe('passoDaAula (Agenda)', () => {
 
   it('depois que a trilha acaba, a aula não tem passo', () => {
     expect(passoDaAula(aulaSeg, '2026-11-30', { ...base, eventos: [aulaSeg] })).toBeNull()
+  })
+})
+
+describe('vídeos do Google Drive', () => {
+  const D = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345'
+
+  it.each([
+    [`https://drive.google.com/file/d/${D}/view?usp=sharing`],
+    [`https://drive.google.com/file/d/${D}/preview`],
+    [`drive.google.com/file/d/${D}`],
+    [`https://drive.google.com/open?id=${D}`],
+    [`https://drive.google.com/uc?id=${D}&export=download`],
+    [`https://docs.google.com/file/d/${D}/edit`],
+  ])('reconhece %s', (link) => expect(idDoVideo(link)).toBe(`drive:${D}`))
+
+  it('YouTube continua sendo só o ID', () => {
+    expect(idDoVideo(`https://youtu.be/${V}?si=x`)).toBe(V)
+  })
+
+  it.each([
+    ['https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz'],
+    ['https://docs.google.com/document/d/abc/edit'],
+    ['https://vimeo.com/1'],
+  ])('recusa %s', (link) => expect(idDoVideo(link)).toBeNull())
+
+  it('player, miniatura e link de cada um', () => {
+    expect(ehDrive(`drive:${D}`)).toBe(true)
+    expect(ehDrive(V)).toBe(false)
+    expect(urlDoEmbed(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/preview`)
+    expect(miniaturaDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/thumbnail?id=${D}&sz=w320`)
+    expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
+    expect(linkDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/view`)
+    expect(linkDoVideo(V)).toBe(`https://youtu.be/${V}`)
   })
 })

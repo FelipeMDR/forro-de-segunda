@@ -7,6 +7,7 @@ const MIGRACOES = [
   '030-dj-loop-autorizado.sql',
   '033-cargo-dj.sql',
   '036-trilha-de-videos.sql',
+  '038-videos-do-drive.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
