@@ -5,16 +5,11 @@ import { useToast } from '../../context/ToastContext'
 import type { RegrasTrilha } from '../../lib/types'
 import { Campo, Dica } from './contexto'
 
-const DEGRAUS = ['1º', '2º', '3º', '4º', '5º+']
-
 type Form = {
   pontos: string
   presenca: string
   parceria: string
-  degraus: string[]
-  umNivel: string
-  doisNiveis: string
-  aumento: string
+  porPasso: string
 }
 
 const inteiro = (v: string, de: number, ate: number) => {
@@ -35,15 +30,11 @@ export function RegrasChavesPage() {
 
   useEffect(() => {
     void api.regrasTrilha().then((r) => {
-      const degraus = DEGRAUS.map((_, i) => String(r.preco_degraus[Math.min(i, r.preco_degraus.length - 1)]))
       setForm({
         pontos: String(r.pontos_por_chave),
         presenca: String(r.peso_presenca),
         parceria: String(r.peso_parceria),
-        degraus,
-        umNivel: String(r.preco_um_nivel),
-        doisNiveis: String(r.preco_dois_niveis),
-        aumento: String(r.preco_aumento_nivel),
+        porPasso: String(r.preco_por_passo),
       })
     })
   }, [api])
@@ -54,26 +45,19 @@ export function RegrasChavesPage() {
     const pontos = inteiro(form.pontos, 1, 20)
     const presenca = inteiro(form.presenca, 0, 10)
     const parceria = inteiro(form.parceria, 0, 10)
-    const degraus = form.degraus.map((d) => inteiro(d, 1, 100))
-    const umNivel = inteiro(form.umNivel, 1, 100)
-    const doisNiveis = inteiro(form.doisNiveis, 1, 100)
-    const aumento = inteiro(form.aumento, 0, 20)
-    if (pontos === null || presenca === null || parceria === null || umNivel === null || doisNiveis === null || aumento === null) return null
-    if (degraus.some((d) => d === null)) return null
+    const porPasso = inteiro(form.porPasso, 1, 10)
+    if (pontos === null || presenca === null || parceria === null || porPasso === null) return null
     return {
       pontos_por_chave: pontos,
       peso_presenca: presenca,
       peso_parceria: parceria,
-      preco_degraus: degraus as number[],
-      preco_um_nivel: umNivel,
-      preco_dois_niveis: doisNiveis,
-      preco_aumento_nivel: aumento,
+      preco_por_passo: porPasso,
     }
   }
   const r = regras()
 
   const salvar = async () => {
-    if (!r) return toast('Confira os valores: pontos por chave de 1 a 20, pesos de 0 a 10, preços de 1 a 100', 'erro')
+    if (!r) return toast('Confira os valores: pontos por chave de 1 a 20, pesos de 0 a 10, chaves por passo de 1 a 10', 'erro')
     setSalvando(true)
     try {
       await api.salvarRegrasTrilha(r)
@@ -120,40 +104,23 @@ export function RegrasChavesPage() {
         </section>
 
         <section className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
-          <span className="text-sm font-extrabold">Preço no próprio nível (passos à frente da turma)</span>
-          <div className="grid grid-cols-5 gap-2">
-            {DEGRAUS.map((rotulo, i) => (
-              <Campo key={rotulo} rotulo={rotulo}>
-                {numero(
-                  form.degraus[i],
-                  (v) => setForm({ ...form, degraus: form.degraus.map((d, j) => (j === i ? v : d)) }),
-                  100,
-                  1,
-                )}
-              </Campo>
-            ))}
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-3 rounded-[18px] border border-linha bg-sf p-4">
-          <span className="text-sm font-extrabold">Preço nos níveis de cima</span>
-          <div className="grid grid-cols-3 gap-2.5">
-            <Campo rotulo="1º passo, um acima">{numero(form.umNivel, (v) => setForm({ ...form, umNivel: v }), 100, 1)}</Campo>
-            <Campo rotulo="1º passo, dois acima">{numero(form.doisNiveis, (v) => setForm({ ...form, doisNiveis: v }), 100, 1)}</Campo>
-            <Campo rotulo="+ por passo">{numero(form.aumento, (v) => setForm({ ...form, aumento: v }), 20)}</Campo>
-          </div>
+          <span className="text-sm font-extrabold">Preço dos passos</span>
+          <Campo rotulo="Chaves por passo de distância da turma">
+            {numero(form.porPasso, (v) => setForm({ ...form, porPasso: v }), 10, 1)}
+          </Campo>
           {r && (
-            <span className="text-xs text-ink2">
-              Ex.: um aluno do Iniciante paga {r.preco_um_nivel} no 1º passo do Intermediário e{' '}
-              {Math.min(100, r.preco_um_nivel + 14 * r.preco_aumento_nivel)} no 15º; {r.preco_dois_niveis} no 1º do Avançado e{' '}
-              {Math.min(100, r.preco_dois_niveis + 11 * r.preco_aumento_nivel)} no 12º.
+            <span className="text-xs leading-snug text-ink2">
+              O 1º passo à frente da turma custa {r.preco_por_passo}, o 2º {2 * r.preco_por_passo}, o 5º{' '}
+              {5 * r.preco_por_passo}. Um aluno cuja turma está na 3ª aula do Iniciante (13 passos) paga{' '}
+              {Math.min(100, 11 * r.preco_por_passo)} pelo 1º passo do Intermediário e{' '}
+              {Math.min(100, 25 * r.preco_por_passo)} pelo último.
             </span>
           )}
         </section>
 
         <Dica>
-          O aluno compra qualquer passo à frente, sem precisar dos anteriores. No próprio nível, o preço depende da distância
-          da turma e para no último degrau; nos níveis de cima, sobe a cada aula daquele nível. Quando a turma avança, o preço cai.
+          O aluno compra qualquer passo à frente, sem precisar dos anteriores. O preço é a distância da turma, contando a
+          trilha em sequência (o resto do nível, depois os de cima), até no máximo 100. Quando a turma avança, o preço cai.
         </Dica>
         <BotaoAcao cor="preto" bloco disabled={salvando} onClick={() => void salvar()}>
           {salvando ? 'Salvando…' : 'Salvar regras'}

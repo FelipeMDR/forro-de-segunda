@@ -2155,9 +2155,14 @@ export class DemoApi implements ForroApi {
   }
 
   async regrasTrilha(): Promise<RegrasTrilha> {
-    // Bancos demo antigos guardavam só pontos_por_chave
+    // Bancos demo antigos guardavam outros campos: fica só o que existe hoje
     const r = { ...REGRAS_PADRAO, ...this.db.trilhaRegras }
-    return { ...r, preco_degraus: [...r.preco_degraus] }
+    return {
+      pontos_por_chave: r.pontos_por_chave,
+      peso_presenca: r.peso_presenca,
+      peso_parceria: r.peso_parceria,
+      preco_por_passo: r.preco_por_passo,
+    }
   }
 
   async salvarRegrasTrilha(r: RegrasTrilha) {
@@ -2170,16 +2175,11 @@ export class DemoApi implements ForroApi {
       !faixa(r.pontos_por_chave, 1, 20) ||
       !faixa(r.peso_presenca, 0, 10) ||
       !faixa(r.peso_parceria, 0, 10) ||
-      r.preco_degraus.length === 0 ||
-      r.preco_degraus.length > 10 ||
-      !r.preco_degraus.every((x) => faixa(x, 1, 100)) ||
-      !faixa(r.preco_um_nivel, 1, 100) ||
-      !faixa(r.preco_dois_niveis, 1, 100) ||
-      !faixa(r.preco_aumento_nivel, 0, 20)
+      !faixa(r.preco_por_passo, 1, 10)
     ) {
       throw new Error('Valores fora da faixa permitida')
     }
-    this.db.trilhaRegras = { ...r, preco_degraus: [...r.preco_degraus] }
+    this.db.trilhaRegras = { ...r }
     this.persist()
   }
 

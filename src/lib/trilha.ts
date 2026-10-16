@@ -36,10 +36,7 @@ export const REGRAS_PADRAO: RegrasTrilha = {
   pontos_por_chave: PONTOS_POR_CHAVE,
   peso_presenca: 3,
   peso_parceria: 1,
-  preco_degraus: [1, 2, 3, 4, 5],
-  preco_um_nivel: 8,
-  preco_dois_niveis: 12,
-  preco_aumento_nivel: 1,
+  preco_por_passo: 1,
 }
 
 const CARGOS_TRILHA = ['Professor(a)', 'Diretor(a) de Ensino']
@@ -284,13 +281,11 @@ interface ItemFila {
 }
 
 /**
- * Passos à frente da turma, com o preço de cada um (tabela `trilha_regras`):
- * - no nível do aluno, sobe pelos degraus (1, 2, 3, 4, 5…) contando a
- *   partir da turma e para no último (teto). O preço não muda quando o
- *   aluno compra outro, e cai quando a turma avança;
- * - nos níveis de cima, uma entrada (um nível acima, dois acima) que sobe
- *   a cada passo daquele nível, até no máximo 100.
- * Qualquer um pode ser comprado (ver `passosAVenda`).
+ * Passos à frente da turma, na sequência da trilha: o resto do nível do
+ * aluno e, depois, os níveis de cima. Cada um custa pela distância: o 1º
+ * custa 1 × `preco_por_passo`, o 2º 2×, o 3º 3×… Por isso o 1º passo do
+ * nível seguinte já custa o resto do nível + 1, e o preço cai quando a
+ * turma avança. Qualquer um pode ser comprado (ver `passosAVenda`).
  */
 function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
   const meu = nivelDoAluno(ctx)
@@ -303,22 +298,12 @@ function filaDeCompra(ctx: ContextoTrilha): ItemFila[] {
     const d = datas.get(p.id)
     return !(d && d <= ctx.hoje)
   })
-  const r = ctx.regras ?? REGRAS_PADRAO
-  const degraus = r.preco_degraus.length ? r.preco_degraus : REGRAS_PADRAO.preco_degraus
-  // No próprio nível, o preço sobe pelos degraus e para no último (teto)
-  const itens: ItemFila[] = fila.map((passo, i) => ({
-    passo,
-    custo: degraus[Math.min(i, degraus.length - 1)],
-  }))
-  // Níveis de cima: entrada por distância, e cada passo daquele nível
-  // custa `preco_aumento_nivel` a mais que o anterior (progressão das aulas)
-  NIVEIS.slice(NIVEIS.indexOf(meu) + 1).forEach((n, distancia) => {
-    const entrada = distancia === 0 ? r.preco_um_nivel : r.preco_dois_niveis
-    ordenarPassos(ctx.passos.filter((p) => p.nivel === n)).forEach((passo, i) => {
-      itens.push({ passo, custo: Math.min(100, entrada + i * r.preco_aumento_nivel) })
-    })
-  })
-  return itens
+  for (const n of NIVEIS.slice(NIVEIS.indexOf(meu) + 1)) {
+    fila.push(...ordenarPassos(ctx.passos.filter((p) => p.nivel === n)))
+  }
+  // O k-ésimo passo à frente custa k × preco_por_passo, até 100
+  const porPasso = (ctx.regras ?? REGRAS_PADRAO).preco_por_passo
+  return fila.map((passo, i) => ({ passo, custo: Math.min(100, (i + 1) * porPasso) }))
 }
 
 /**

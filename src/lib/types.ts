@@ -792,14 +792,8 @@ export interface RegrasTrilha {
   peso_presenca: number
   /** Pontos de chave por ponto de parceria (carta da Forródex). */
   peso_parceria: number
-  /** Preço do 1º, 2º, 3º… passo à frente no próprio nível; o último é o teto. */
-  preco_degraus: number[]
-  /** Preço do 1º passo do nível logo acima. */
-  preco_um_nivel: number
-  /** Preço do 1º passo de dois níveis acima. */
-  preco_dois_niveis: number
-  /** Nos níveis de cima, quanto cada passo custa a mais que o anterior. */
-  preco_aumento_nivel: number
+  /** O k-ésimo passo à frente da turma custa k × isto. */
+  preco_por_passo: number
 }
 
 /** O mínimo de um perfil para mostrar foto e nome. */

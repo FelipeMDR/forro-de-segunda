@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../lib/dates'
-import { chaves, degrausEmTexto } from '../lib/textosTrilha'
+import { chaves } from '../lib/textosTrilha'
 import type { PassoComSituacao, SaldoChaves } from '../lib/trilha'
 import type { RegrasTrilha } from '../lib/types'
 import { Icone } from './Icone'
@@ -210,7 +210,7 @@ export function FolhaRegrasChaves({
             Você tem {plural(saldo.disponiveis, 'chave', 'chaves')}
           </h2>
           <p className="text-[15px] leading-snug text-ink2">
-            No seu nível, os passos à frente da turma custam {degrausEmTexto(regras.preco_degraus)} chaves. Um nível acima, a partir de {regras.preco_um_nivel}; dois acima, a partir de {regras.preco_dois_niveis}, subindo {regras.preco_aumento_nivel} a cada aula.
+            Cada passo à frente da sua turma custa pela distância: o próximo custa {chaves(regras.preco_por_passo)}, o seguinte {2 * regras.preco_por_passo}, depois {3 * regras.preco_por_passo}… A contagem continua nos níveis de cima.
           </p>
         </div>
 

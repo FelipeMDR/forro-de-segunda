@@ -114,22 +114,23 @@ create table if not exists public.trilha_regras (
   pontos_por_chave int not null default 10 check (pontos_por_chave between 1 and 20),
   atualizado_em timestamptz not null default now()
 );
--- Pesos dos pontos e tabela de preços (colunas à parte para quem já rodou
--- a 036 antes). Calibrado com o ranking do Espaço Livre 2026.2:
--- presença pesa 3 (senão a parceria, que favorece veteranos, domina), e
--- o preço cresce até um teto em vez de dobrar sem fim.
+-- Pesos dos pontos e preço (colunas à parte para quem já rodou a 036
+-- antes). Calibrado com o ranking do Espaço Livre 2026.2: presença pesa 3
+-- (senão a parceria, que favorece veteranos, domina).
+-- PREÇO: o k-ésimo passo à frente da turma custa k × preco_por_passo,
+-- contando a trilha inteira em sequência (resto do nível, depois os de
+-- cima). Assim cada aula à frente tem um valor fixo, e o 1º passo do nível
+-- seguinte já custa o resto do nível + 1.
 alter table public.trilha_regras
   alter column pontos_por_chave set default 10,
   add column if not exists peso_presenca int not null default 3 check (peso_presenca between 0 and 10),
   add column if not exists peso_parceria int not null default 1 check (peso_parceria between 0 and 10),
-  -- Preço do 1º, 2º, 3º… passo à frente no próprio nível; o último vale
-  -- dali em diante (teto)
-  add column if not exists preco_degraus int[] not null default '{1,2,3,4,5}',
-  add column if not exists preco_um_nivel int not null default 8 check (preco_um_nivel between 1 and 100),
-  add column if not exists preco_dois_niveis int not null default 12 check (preco_dois_niveis between 1 and 100),
-  -- Nos níveis de cima, cada passo custa este tanto a mais que o anterior
-  -- (as aulas têm progressão: a última do nível mais alto é a mais cara)
-  add column if not exists preco_aumento_nivel int not null default 1 check (preco_aumento_nivel between 0 and 20);
+  add column if not exists preco_por_passo int not null default 1 check (preco_por_passo between 1 and 10),
+  -- Tabela de preços por nível de uma versão anterior desta migração
+  drop column if exists preco_degraus,
+  drop column if exists preco_um_nivel,
+  drop column if exists preco_dois_niveis,
+  drop column if exists preco_aumento_nivel;
 insert into public.trilha_regras (id) values (true) on conflict (id) do nothing;
 
 alter table public.trilha_regras enable row level security;
@@ -140,14 +141,12 @@ create policy "trilha_regras_select" on public.trilha_regras
 drop function if exists public.salvar_regras_trilha(int, int);
 drop function if exists public.salvar_regras_trilha(int);
 drop function if exists public.salvar_regras_trilha(int, int, int, int[], int, int);
+drop function if exists public.salvar_regras_trilha(int, int, int, int[], int, int, int);
 create or replace function public.salvar_regras_trilha(
   p_pontos int,
   p_peso_presenca int,
   p_peso_parceria int,
-  p_degraus int[],
-  p_um_nivel int,
-  p_dois_niveis int,
-  p_aumento int
+  p_preco_por_passo int
 )
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -155,18 +154,11 @@ begin
   if not is_organizador() then
     raise exception 'Só a organização muda as regras das chaves';
   end if;
-  if p_degraus is null or cardinality(p_degraus) = 0 or cardinality(p_degraus) > 10
-     or exists (select 1 from unnest(p_degraus) x where x is null or x < 1 or x > 100) then
-    raise exception 'Preços por passo: de 1 a 10 valores, cada um de 1 a 100';
-  end if;
   update trilha_regras
   set pontos_por_chave = p_pontos,
       peso_presenca = p_peso_presenca,
       peso_parceria = p_peso_parceria,
-      preco_degraus = p_degraus,
-      preco_um_nivel = p_um_nivel,
-      preco_dois_niveis = p_dois_niveis,
-      preco_aumento_nivel = p_aumento,
+      preco_por_passo = p_preco_por_passo,
       atualizado_em = now()
   where id;
 end;
@@ -216,8 +208,8 @@ $$;
 revoke all on function public.teto_pontos_trilha(uuid) from public, anon, authenticated;
 
 /**
- * Gasta `p_custo` chaves num passo. O PREÇO (tabela `trilha_regras`,
- * pela distância do passo à turma e pelo nível) é calculado no app, que é
+ * Gasta `p_custo` chaves num passo. O PREÇO (distância do passo à turma
+ * × `trilha_regras.preco_por_passo`) é calculado no app, que é
  * onde mora o calendário da trilha; aqui só se confere que é um preço
  * possível (1 a 100) e que o aluno tem chaves para pagar. Como a trava é de tela (vídeo não
  * listado), isso basta.

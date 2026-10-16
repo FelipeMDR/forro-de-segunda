@@ -63,10 +63,3 @@ export function linhaCronograma(
   if (aula.data <= hoje) return { texto: 'Dado · vídeo aberto para a turma', tom: 'feito' }
   return { texto: 'Agendado', tom: 'normal' }
 }
-
-/** "1, 2, 3, 4 e, do 5º em diante, 5" — a escada de preços no próprio nível. */
-export function degrausEmTexto(degraus: number[]): string {
-  if (degraus.length <= 1) return `${degraus[0] ?? 1} cada`
-  const antes = degraus.slice(0, -1).join(', ')
-  return `${antes} e, do ${degraus.length}º em diante, ${degraus[degraus.length - 1]}`
-}

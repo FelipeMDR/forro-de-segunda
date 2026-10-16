@@ -4,7 +4,7 @@ import { FolhaChave, FolhaRegrasChaves } from '../components/FolhaChave'
 import { Icone } from '../components/Icone'
 import { Interruptor, Segmentado, Tela, useVoltar } from '../components/ui'
 import { lerPraticados } from '../lib/praticados'
-import { comoAbriu, degrausEmTexto, quandoLibera } from '../lib/textosTrilha'
+import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
   NIVEIS,
   NOME_NIVEL,
@@ -216,7 +216,7 @@ export function TrilhaPage() {
 
         {lista.length > 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
-            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. No seu nível custa {degrausEmTexto(regras.preco_degraus)} chaves pela distância da turma; um nível acima, a partir de {regras.preco_um_nivel}; dois acima, a partir de {regras.preco_dois_niveis}, subindo a cada aula.
+            Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. Cada um custa pela distância da turma: o próximo {regras.preco_por_passo}, o seguinte {2 * regras.preco_por_passo}, e assim por diante, seguindo para os níveis de cima. Quando a turma avança, o preço cai.
           </p>
         )}
       </div>

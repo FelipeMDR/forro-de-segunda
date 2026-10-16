@@ -46,7 +46,7 @@ describe('DemoApi — trilha de vídeos', () => {
     // chave); o padrão real tem teste próprio
     banco.db.trilhaRegras = {
       pontos_por_chave: 3, peso_presenca: 1, peso_parceria: 1,
-      preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12, preco_aumento_nivel: 1,
+      preco_por_passo: 1,
     }
     await api.signInTelefone('11 98888-0001', 'forro123')
     return { api, banco, uid: banco.uid() }
@@ -90,7 +90,7 @@ describe('DemoApi — trilha de vídeos', () => {
     delete banco.db.trilhaRegras
     expect(await api.regrasTrilha()).toEqual({
       pontos_por_chave: 10, peso_presenca: 3, peso_parceria: 1,
-      preco_degraus: [1, 2, 3, 4, 5], preco_um_nivel: 8, preco_dois_niveis: 12, preco_aumento_nivel: 1,
+      preco_por_passo: 1,
     })
     await api.signInTelefone('11 98888-0003', 'forro123') // Ana, organizadora no demo
     const novas = { ...(await api.regrasTrilha()), pontos_por_chave: 4, peso_presenca: 2 }
