@@ -10,6 +10,7 @@ import {
   linkDoVideo,
   miniaturaDoVideo,
   ehDrive,
+  quadroDoPlayer,
   nivelDoAluno,
   niveisVisiveis,
   passoDaAula,
@@ -433,5 +434,19 @@ describe('vídeos do Google Drive', () => {
     expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
     expect(linkDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/view`)
     expect(linkDoVideo(V)).toBe(`https://youtu.be/${V}`)
+  })
+})
+
+describe('quadroDoPlayer', () => {
+  const D = 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345'
+
+  it('vídeo do Drive gravado em pé ganha quadro quadrado (o mínimo para a barra de controles aparecer)', () => {
+    expect(quadroDoPlayer(D, { largura: 320, altura: 569 })).toBe('quadrado')
+  })
+
+  it('Drive deitado, Drive sem medida e YouTube ficam no 16:9', () => {
+    expect(quadroDoPlayer(D, { largura: 320, altura: 180 })).toBe('16:9')
+    expect(quadroDoPlayer(D, null)).toBe('16:9')
+    expect(quadroDoPlayer(V, { largura: 320, altura: 569 })).toBe('16:9')
   })
 })

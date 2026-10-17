@@ -135,6 +135,19 @@ export function urlDoEmbed(video: string): string {
     : `https://www.youtube-nocookie.com/embed/${video}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`
 }
 
+/**
+ * Formato do quadro do player. O Drive desenha vídeo gravado em pé com
+ * altura igual à largura do quadro e não encolhe: num quadro 16:9 a parte
+ * de baixo (com a barra de controles e a tela cheia) some. Quadrado é o
+ * mínimo para caber. `medida` vem da miniatura, que tem a proporção real.
+ */
+export function quadroDoPlayer(
+  video: string,
+  medida: { largura: number; altura: number } | null,
+): '16:9' | 'quadrado' {
+  return ehDrive(video) && medida && medida.altura > medida.largura ? 'quadrado' : '16:9'
+}
+
 export function miniaturaDoVideo(video: string): string {
   return ehDrive(video)
     ? `https://drive.google.com/thumbnail?id=${video.slice(PREFIXO_DRIVE.length)}&sz=w320`
