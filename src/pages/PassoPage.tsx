@@ -5,13 +5,7 @@ import { Icone } from '../components/Icone'
 import { Cabecalho, Segmentado, Tela, useVoltar } from '../components/ui'
 import { alternarPraticado, lerPraticados } from '../lib/praticados'
 import { comoAbriu } from '../lib/textosTrilha'
-import {
-  ehDrive,
-  NIVEIS,
-  NOME_NIVEL,
-  situacaoDoNivel,
-  urlDoEmbed,
-} from '../lib/trilha'
+import { ehDrive, NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
 import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Angulo = 'frente' | 'condutor' | 'conduzida'
@@ -45,8 +39,6 @@ export function PassoPage() {
   const i = lista.findIndex((s) => s.passo.id === id)
   const s = i >= 0 ? lista[i] : null
   const proximo = i >= 0 ? lista[i + 1] : undefined
-
-
 
   if (dados && (!s || s.estado !== 'aberto' || !s.passo.video_frente)) {
     return (
