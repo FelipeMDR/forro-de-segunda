@@ -5,7 +5,15 @@ import { Icone } from '../components/Icone'
 import { Cabecalho, Segmentado, Tela, useVoltar } from '../components/ui'
 import { alternarPraticado, lerPraticados } from '../lib/praticados'
 import { comoAbriu } from '../lib/textosTrilha'
-import { ehDrive, NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
+import {
+  ehDrive,
+  miniaturaDoVideo,
+  NIVEIS,
+  NOME_NIVEL,
+  proporcaoDoPlayer,
+  situacaoDoNivel,
+  urlDoEmbed,
+} from '../lib/trilha'
 import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Angulo = 'frente' | 'condutor' | 'conduzida'
@@ -39,6 +47,27 @@ export function PassoPage() {
   const i = lista.findIndex((s) => s.passo.id === id)
   const s = i >= 0 ? lista[i] : null
   const proximo = i >= 0 ? lista[i + 1] : undefined
+
+  // O vídeo que está tocando (antes dos retornos abaixo: o efeito precisa dele)
+  const videoAtual = s
+    ? ({ frente: s.passo.video_frente, condutor: s.passo.video_condutor, conduzida: s.passo.video_conduzida }[angulo] ??
+      s.passo.video_frente)
+    : null
+
+  // Formato do player: no Drive a miniatura vem na proporção real, então
+  // vídeo gravado em pé ganha player alto. YouTube fica no 16:9 de sempre.
+  const [proporcao, setProporcao] = useState(16 / 9)
+  useEffect(() => {
+    setProporcao(16 / 9)
+    if (!videoAtual || !ehDrive(videoAtual)) return
+    let vivo = true
+    const img = new Image()
+    img.onload = () => vivo && setProporcao(proporcaoDoPlayer(img.naturalWidth, img.naturalHeight))
+    img.src = miniaturaDoVideo(videoAtual)
+    return () => {
+      vivo = false
+    }
+  }, [videoAtual])
 
   if (dados && (!s || s.estado !== 'aberto' || !s.passo.video_frente)) {
     return (
@@ -86,7 +115,10 @@ export function PassoPage() {
           </span>
           <span className="w-11" />
         </div>
-        <div className="aspect-video w-full bg-marinho-500">
+        <div
+          className="mx-auto bg-marinho-500"
+          style={{ aspectRatio: String(proporcao), width: `min(100%, calc(75vh * ${proporcao}))` }}
+        >
           <iframe
             ref={player}
             key={video}

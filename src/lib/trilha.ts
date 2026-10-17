@@ -135,6 +135,16 @@ export function urlDoEmbed(video: string): string {
     : `https://www.youtube-nocookie.com/embed/${video}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`
 }
 
+/**
+ * Largura ÷ altura do player, a partir da miniatura do vídeo (no Drive ela
+ * vem na proporção real). Vídeo gravado em pé ganha player alto em vez de
+ * virar um selo no meio de uma faixa 16:9. Sem medida, 16:9.
+ */
+export function proporcaoDoPlayer(largura: number, altura: number): number {
+  if (!(largura > 0) || !(altura > 0)) return 16 / 9
+  return Math.min(16 / 9, Math.max(9 / 16, largura / altura))
+}
+
 export function miniaturaDoVideo(video: string): string {
   return ehDrive(video)
     ? `https://drive.google.com/thumbnail?id=${video.slice(PREFIXO_DRIVE.length)}&sz=w320`

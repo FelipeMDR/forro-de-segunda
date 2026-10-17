@@ -10,6 +10,7 @@ import {
   linkDoVideo,
   miniaturaDoVideo,
   ehDrive,
+  proporcaoDoPlayer,
   nivelDoAluno,
   niveisVisiveis,
   passoDaAula,
@@ -433,5 +434,23 @@ describe('vídeos do Google Drive', () => {
     expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
     expect(linkDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/view`)
     expect(linkDoVideo(V)).toBe(`https://youtu.be/${V}`)
+  })
+})
+
+describe('proporcaoDoPlayer', () => {
+  it('segue o formato do vídeo: em pé fica alto, deitado fica largo', () => {
+    expect(proporcaoDoPlayer(320, 569)).toBeCloseTo(320 / 569) // 9:16, gravado em pé
+    expect(proporcaoDoPlayer(320, 180)).toBeCloseTo(16 / 9)
+    expect(proporcaoDoPlayer(320, 320)).toBe(1)
+  })
+
+  it('sem medida (miniatura não carregou), fica no 16:9 de sempre', () => {
+    expect(proporcaoDoPlayer(0, 0)).toBeCloseTo(16 / 9)
+    expect(proporcaoDoPlayer(NaN, 100)).toBeCloseTo(16 / 9)
+  })
+
+  it('formatos extremos ficam limitados entre 9:16 e 16:9', () => {
+    expect(proporcaoDoPlayer(100, 1000)).toBeCloseTo(9 / 16)
+    expect(proporcaoDoPlayer(1000, 100)).toBeCloseTo(16 / 9)
   })
 })
