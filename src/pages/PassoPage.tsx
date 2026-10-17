@@ -5,7 +5,7 @@ import { Icone } from '../components/Icone'
 import { Cabecalho, Segmentado, Tela, useVoltar } from '../components/ui'
 import { alternarPraticado, lerPraticados } from '../lib/praticados'
 import { comoAbriu } from '../lib/textosTrilha'
-import { ehDrive, miniaturaDoVideo, NIVEIS, NOME_NIVEL, quadroDoPlayer, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
+import { NIVEIS, NOME_NIVEL, situacaoDoNivel, urlDoEmbed } from '../lib/trilha'
 import { professoresDo, useTrilha } from '../lib/useTrilha'
 
 type Angulo = 'frente' | 'condutor' | 'conduzida'
@@ -39,27 +39,6 @@ export function PassoPage() {
   const i = lista.findIndex((s) => s.passo.id === id)
   const s = i >= 0 ? lista[i] : null
   const proximo = i >= 0 ? lista[i + 1] : undefined
-
-  // O vídeo que está tocando (antes dos retornos abaixo: o efeito precisa dele)
-  const videoAtual = s
-    ? ({ frente: s.passo.video_frente, condutor: s.passo.video_condutor, conduzida: s.passo.video_conduzida }[angulo] ??
-      s.passo.video_frente)
-    : null
-
-  // Medida do vídeo do Drive pela miniatura (vem na proporção real): vídeo
-  // em pé precisa de quadro quadrado para a barra de controles aparecer
-  const [medida, setMedida] = useState<{ largura: number; altura: number } | null>(null)
-  useEffect(() => {
-    setMedida(null)
-    if (!videoAtual || !ehDrive(videoAtual)) return
-    let vivo = true
-    const img = new Image()
-    img.onload = () => vivo && setMedida({ largura: img.naturalWidth, altura: img.naturalHeight })
-    img.src = miniaturaDoVideo(videoAtual)
-    return () => {
-      vivo = false
-    }
-  }, [videoAtual])
 
   if (dados && (!s || s.estado !== 'aberto' || !s.passo.video_frente)) {
     return (
@@ -107,9 +86,7 @@ export function PassoPage() {
           </span>
           <span className="w-11" />
         </div>
-        <div
-          className={`w-full bg-marinho-500 ${quadroDoPlayer(video, medida) === 'quadrado' ? 'aspect-square' : 'aspect-video'}`}
-        >
+        <div className="aspect-video w-full bg-marinho-500">
           <iframe
             ref={player}
             key={video}
@@ -118,7 +95,7 @@ export function PassoPage() {
             className="h-full w-full"
             allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
-            onLoad={() => !ehDrive(video) && velocidade !== 1 && mudarVelocidade(velocidade)}
+            onLoad={() => velocidade !== 1 && mudarVelocidade(velocidade)}
           />
         </div>
       </div>
@@ -161,8 +138,6 @@ export function PassoPage() {
           </div>
         )}
 
-        {/* Velocidade só no YouTube: o player do Drive não aceita o comando */}
-        {!ehDrive(video) && (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-extrabold uppercase tracking-[.06em] text-ink3">Velocidade</span>
           <div className="flex gap-2">
@@ -184,7 +159,6 @@ export function PassoPage() {
             })}
           </div>
         </div>
-        )}
 
         {s.passo.dica && (
           <div className="flex flex-col gap-1.5 rounded-2xl border border-linha bg-sf p-3.5">

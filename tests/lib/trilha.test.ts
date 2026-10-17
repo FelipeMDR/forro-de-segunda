@@ -5,12 +5,9 @@ import {
   urlDoEmbed,
   nivelInicial,
   cronogramaDaTurma,
-  idDoVideo,
   idDoYoutube,
-  linkDoVideo,
-  miniaturaDoVideo,
-  ehDrive,
-  quadroDoPlayer,
+  miniaturaDoYoutube,
+  videoDoYoutube,
   nivelDoAluno,
   niveisVisiveis,
   passoDaAula,
@@ -363,7 +360,7 @@ describe('diasAte', () => {
 
 describe('YouTube: miniatura e player', () => {
   it('miniatura pelo ID', () => {
-    expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
+    expect(miniaturaDoYoutube(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
   })
 
   it('player aceita comandos (velocidade) pela API do iframe', () => {
@@ -404,49 +401,21 @@ describe('passoDaAula (Agenda)', () => {
   })
 })
 
-describe('vídeos do Google Drive', () => {
+describe('só YouTube (o Drive foi retirado)', () => {
   const D = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345'
 
-  it.each([
-    [`https://drive.google.com/file/d/${D}/view?usp=sharing`],
-    [`https://drive.google.com/file/d/${D}/preview`],
-    [`drive.google.com/file/d/${D}`],
-    [`https://drive.google.com/open?id=${D}`],
-    [`https://drive.google.com/uc?id=${D}&export=download`],
-    [`https://docs.google.com/file/d/${D}/edit`],
-  ])('reconhece %s', (link) => expect(idDoVideo(link)).toBe(`drive:${D}`))
-
-  it('YouTube continua sendo só o ID', () => {
-    expect(idDoVideo(`https://youtu.be/${V}?si=x`)).toBe(V)
+  it('link do Drive não é mais aceito', () => {
+    expect(idDoYoutube(`https://drive.google.com/file/d/${D}/view?usp=sharing`)).toBeNull()
   })
 
-  it.each([
-    ['https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz'],
-    ['https://docs.google.com/document/d/abc/edit'],
-    ['https://vimeo.com/1'],
-  ])('recusa %s', (link) => expect(idDoVideo(link)).toBeNull())
-
-  it('player, miniatura e link de cada um', () => {
-    expect(ehDrive(`drive:${D}`)).toBe(true)
-    expect(ehDrive(V)).toBe(false)
-    expect(urlDoEmbed(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/preview`)
-    expect(miniaturaDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/thumbnail?id=${D}&sz=w320`)
-    expect(miniaturaDoVideo(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
-    expect(linkDoVideo(`drive:${D}`)).toBe(`https://drive.google.com/file/d/${D}/view`)
-    expect(linkDoVideo(V)).toBe(`https://youtu.be/${V}`)
-  })
-})
-
-describe('quadroDoPlayer', () => {
-  const D = 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345'
-
-  it('vídeo do Drive gravado em pé ganha quadro quadrado (o mínimo para a barra de controles aparecer)', () => {
-    expect(quadroDoPlayer(D, { largura: 320, altura: 569 })).toBe('quadrado')
+  it('vídeo do Drive que ficou salvo conta como "sem vídeo"', () => {
+    expect(videoDoYoutube(`drive:${D}`)).toBeNull()
+    expect(videoDoYoutube(V)).toBe(V)
+    expect(videoDoYoutube(null)).toBeNull()
   })
 
-  it('Drive deitado, Drive sem medida e YouTube ficam no 16:9', () => {
-    expect(quadroDoPlayer(D, { largura: 320, altura: 180 })).toBe('16:9')
-    expect(quadroDoPlayer(D, null)).toBe('16:9')
-    expect(quadroDoPlayer(V, { largura: 320, altura: 569 })).toBe('16:9')
+  it('miniatura e player do YouTube', () => {
+    expect(miniaturaDoYoutube(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
+    expect(urlDoEmbed(V)).toContain('youtube-nocookie.com/embed/')
   })
 })

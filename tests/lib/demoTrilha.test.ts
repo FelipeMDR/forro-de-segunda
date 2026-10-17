@@ -144,6 +144,21 @@ describe('DemoApi — trilha de vídeos', () => {
     await expect(api.liberarPassoComChave(p.id, 1)).rejects.toThrow('Você ainda não tem chaves suficientes')
   })
 
+  it('passo com vídeo do Drive salvo (de antes) chega sem vídeo', async () => {
+    const { api, banco } = await novaApi()
+    await api.salvarPassoTrilha({
+      nivel: 'iniciante', ordem: 96, nome: 'Era do Drive', video_frente: 'dQw4w9WgXcQ',
+      video_condutor: null, video_conduzida: null, dica: null, professores_ids: [], pode_chave: true,
+    })
+    const db = banco.db as unknown as { trilhaPassos: Array<Record<string, unknown>> }
+    const salvo = db.trilhaPassos.find((p) => p.nome === 'Era do Drive')!
+    salvo.video_frente = 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345'
+    salvo.video_condutor = 'dQw4w9WgXcQ'
+    const p = (await api.listPassosTrilha()).find((x) => x.nome === 'Era do Drive')!
+    expect(p.video_frente).toBeNull()
+    expect(p.video_condutor).toBe('dQw4w9WgXcQ')
+  })
+
   it('aluno não muda as regras', async () => {
     const { api } = await novaApi()
     await expect(api.salvarRegrasTrilha({ ...(await api.regrasTrilha()), pontos_por_chave: 1 })).rejects.toThrow(

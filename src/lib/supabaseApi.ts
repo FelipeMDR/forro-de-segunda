@@ -14,7 +14,7 @@ import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
-import { REGRAS_PADRAO } from './trilha'
+import { REGRAS_PADRAO, videoDoYoutube } from './trilha'
 import { NOME_PADRAO } from './nome'
 import { CARGO_DJ } from './dj'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
@@ -2203,6 +2203,10 @@ export class SupabaseApi implements ForroApi {
     return (data as Array<PassoTrilha & { criado_em?: string }>).map(({ criado_em: _, ...p }) => ({
       ...p,
       professores_ids: p.professores_ids ?? [],
+      // Vídeo do Drive salvo antes conta como "sem vídeo" (só YouTube)
+      video_frente: videoDoYoutube(p.video_frente),
+      video_condutor: videoDoYoutube(p.video_condutor),
+      video_conduzida: videoDoYoutube(p.video_conduzida),
     }))
   }
 

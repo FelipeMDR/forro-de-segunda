@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
-  miniaturaDoVideo,
+  miniaturaDoYoutube,
   NOME_NIVEL,
   REGRAS_PADRAO,
   nivelInicial,
@@ -51,7 +51,7 @@ export function CartaoTrilha() {
         <Link to={`/trilha/${atual.passo.id}`} className="flex items-center gap-3">
           <span className="relative h-[72px] w-[112px] shrink-0 overflow-hidden rounded-[14px] bg-marinho-500">
             <img
-              src={miniaturaDoVideo(atual.passo.video_frente!)}
+              src={miniaturaDoYoutube(atual.passo.video_frente!)}
               alt=""
               loading="lazy"
               className="h-full w-full object-cover"

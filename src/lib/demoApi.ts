@@ -18,7 +18,7 @@ import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
 import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
-import { ordenarPassos, REGRAS_PADRAO, somaDias } from './trilha'
+import { ordenarPassos, REGRAS_PADRAO, somaDias, videoDoYoutube } from './trilha'
 import { compactarNotificacoes } from './notificacoes'
 import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
@@ -2071,7 +2071,14 @@ export class DemoApi implements ForroApi {
 
   async listPassosTrilha(): Promise<PassoTrilha[]> {
     // Bancos demo de antes do campo `professores_ids`
-    return ordenarPassos(this.passosTrilha()).map((p) => ({ ...p, professores_ids: p.professores_ids ?? [] }))
+    // e vídeo do Drive salvo antes conta como "sem vídeo" (só YouTube)
+    return ordenarPassos(this.passosTrilha()).map((p) => ({
+      ...p,
+      professores_ids: p.professores_ids ?? [],
+      video_frente: videoDoYoutube(p.video_frente),
+      video_condutor: videoDoYoutube(p.video_condutor),
+      video_conduzida: videoDoYoutube(p.video_conduzida),
+    }))
   }
 
   async salvarPassoTrilha(p: PassoTrilhaInput) {
