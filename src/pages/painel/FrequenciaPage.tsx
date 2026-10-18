@@ -60,7 +60,10 @@ export function FrequenciaPage() {
       const { inicio, fim } = limitesDoMes(m)
       setPresencas(await api.getAttendance(inicio, fim))
     },
-    [api],
+    // `setPresencas` muda com o mês (a chave do useLembrado): sem ele aqui,
+    // a resposta de outro mês ia para a chave do mês inicial e a tela
+    // ficava em "Carregando…" para sempre.
+    [api, setPresencas],
   )
   useEffect(() => {
     // Trocar de mês troca a chave de `presencas`: mostra o que já havia
