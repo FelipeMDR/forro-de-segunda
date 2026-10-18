@@ -175,7 +175,7 @@ export function UserProfilePage() {
     // Noites juntos neste semestre (mesmo corte da Forródex)
     if (userId) {
       void carregarParceiros(api, userId, eu?.criado_em ?? undefined)
-        .then(({ parceiros }) => {
+        .then((parceiros) => {
           if (!cancelado) setNoitesJuntos(parceiros.find((x) => x.user_id === id)?.noites ?? 0)
         })
         .catch(() => !cancelado && setNoitesJuntos(0))

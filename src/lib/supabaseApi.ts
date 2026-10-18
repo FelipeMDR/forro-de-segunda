@@ -1484,19 +1484,10 @@ export class SupabaseApi implements ForroApi {
     // Sem a migração 035 a coluna não existe — Forródex do semestre
     if (error || !data) return null
     const desafio = data as { id: string; data_inicio: string; data_fim: string }
-    const membros = await todasAsLinhas<{ user_id: string }>((de, ate) =>
-      this.sb
-        .from('challenge_members')
-        .select('user_id')
-        .eq('challenge_id', desafio.id)
-        .order('user_id')
-        .range(de, ate),
-    )
     return {
       challenge_id: desafio.id,
       data_inicio: desafio.data_inicio,
       data_fim: desafio.data_fim,
-      participantes: membros.map((m) => m.user_id),
     }
   }
 

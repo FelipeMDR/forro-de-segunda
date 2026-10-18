@@ -140,7 +140,6 @@ export function ForrodexPage() {
   const [dados, setDados] = useLembrado<{
     perfis: PerfilPublico[]
     parceiros: ParceiroDanca[]
-    universo: Set<string> | null
     turmas: string[]
   } | null>('forrodex', null)
   const [erro, setErro] = useState<string | null>(null)
@@ -153,13 +152,13 @@ export function ForrodexPage() {
     let cancelado = false
     void (async () => {
       try {
-        const [perfis, { parceiros, universo }, turmas] = await Promise.all([
+        const [perfis, parceiros, turmas] = await Promise.all([
           api.listPerfisPublicos(),
           carregarParceiros(api, userId, profile?.criado_em ?? new Date(0).toISOString()),
           api.listTurmas(),
         ])
         if (!cancelado) {
-          setDados({ perfis, parceiros, universo, turmas: turmas.map((t) => t.nome) })
+          setDados({ perfis, parceiros, turmas: turmas.map((t) => t.nome) })
         }
       } catch (e) {
         if (cancelado) return
@@ -179,7 +178,7 @@ export function ForrodexPage() {
   const dex = useMemo(
     () =>
       dados && userId
-        ? montarForrodex(dados.perfis, dados.parceiros, userId, turma, dados.universo)
+        ? montarForrodex(dados.perfis, dados.parceiros, userId, turma)
         : null,
     [dados, userId, turma],
   )
@@ -187,7 +186,7 @@ export function ForrodexPage() {
   const secoes = useMemo(
     () =>
       dados && userId && !turma
-        ? agruparPorTurma(dados.perfis, dados.parceiros, userId, turmas, dados.universo)
+        ? agruparPorTurma(dados.perfis, dados.parceiros, userId, turmas)
         : null,
     [dados, userId, turma, turmas],
   )
@@ -294,9 +293,7 @@ export function ForrodexPage() {
           <p className="rounded-[20px] border border-linha bg-sf px-5 py-8 text-center text-[15px] leading-snug text-ink3">
             {turma
               ? 'Ninguém nessa turma ainda. Quando a turma tiver gente, ela aparece aqui.'
-              : dados?.universo
-                ? 'Ninguém por aqui ainda. Quando a galera chegar, a Forródex enche.'
-                : 'Semestre encerrado. A Forródex volta com as turmas novas — até lá, bom descanso!'}
+              : 'Semestre encerrado. A Forródex volta com as turmas novas — até lá, bom descanso!'}
           </p>
         ) : secoes ? (
           secoes.map((s) => (

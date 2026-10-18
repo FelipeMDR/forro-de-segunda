@@ -33,21 +33,18 @@ export function turmasDe(
  * impossível de completar — mas, se dançou comigo, entra assim mesmo:
  * muita gente continua frequentando depois do curso.
  *
- * `parceiros` já vem cortado no início do semestre (ver `parceirosDe`)
- * e só com duplas confirmadas dos dois lados.
+ * `parceiros` já vem cortado no recorte da Forródex (ver
+ * `carregarParceiros`) e só com duplas confirmadas dos dois lados.
  *
- * Com `universo` (Forródex presa a um desafio, ver `carregarParceiros`),
- * as cartas que faltam são só de quem está nele — com turma ou não, já
- * que convidado de evento também participa. Quem já dançou comigo entra
- * mesmo sem estar inscrito: é a regra do ranking de Parcerias, e os
- * números precisam bater.
+ * Mesmo com a Forródex presa a um desafio, quem entra é a turma, não
+ * os inscritos: a inscrição só declara que a pessoa quer competir. Assim
+ * o "de X" de uma turma é igual para todo mundo dela.
  */
 export function montarForrodex(
   perfis: PerfilPublico[],
   parceiros: ParceiroDanca[],
   meuId: string,
   turma?: string | null,
-  universo?: Set<string> | null,
 ): Forrodex {
   const porId = new Map(perfis.map((p) => [p.id, p]))
   const naTurma = (id: string) => {
@@ -67,7 +64,7 @@ export function montarForrodex(
       (p) =>
         p.id !== meuId &&
         !jaDancei.has(p.id) &&
-        (universo ? universo.has(p.id) : turmasDe(p).length > 0) &&
+        turmasDe(p).length > 0 &&
         naTurma(p.id),
     )
     .map((p) => ({
@@ -133,19 +130,18 @@ export function agruparPorTurma(
   parceiros: ParceiroDanca[],
   meuId: string,
   turmas: string[],
-  universo?: Set<string> | null,
 ): SecaoForrodex[] {
   const secoes: SecaoForrodex[] = turmas
     .map((turma) => ({
       turma,
-      ...montarForrodex(perfis, parceiros, meuId, turma, universo),
+      ...montarForrodex(perfis, parceiros, meuId, turma),
     }))
     .filter((s) => s.total > 0)
 
   const jaApareceu = new Set(
     secoes.flatMap((s) => [...s.descobertos, ...s.faltam].map((c) => c.user_id)),
   )
-  const todos = montarForrodex(perfis, parceiros, meuId, null, universo)
+  const todos = montarForrodex(perfis, parceiros, meuId, null)
   const descobertos = todos.descobertos.filter((c) => !jaApareceu.has(c.user_id))
   const faltam = todos.faltam.filter((c) => !jaApareceu.has(c.user_id))
   if (descobertos.length + faltam.length > 0) {
@@ -164,41 +160,26 @@ export function mensagemForrodexOcupada(titulo: string): string {
   return `O desafio "${titulo}" já está usando a Forródex. Desligue lá antes de mover para este.`
 }
 
-/** O que alimenta a Forródex: com quem dancei e quem entra na coleção. */
-export interface ParceirosForrodex {
-  parceiros: ParceiroDanca[]
-  /** null = todo mundo com turma no semestre (sem desafio preso). */
-  universo: Set<string> | null
-}
-
 /**
  * Busca os parceiros no mesmo recorte da Forródex, para a tela dela e
  * para tudo que fala "neste semestre" com os mesmos números (contador
  * do perfil, noites juntos, etiqueta do salão).
  *
  * Se a organização prendeu a Forródex a um desafio, os parceiros saem
- * com a regra do ranking de Parcerias (ver `parceirosNoDesafio`) e as
- * cartas que faltam são dos participantes; senão, desde o último "Encerrar
- * semestre" (ou `semEncerramento`, quando nunca houve um). Quem usa
- * não diferencia os dois casos — o vínculo não aparece para os alunos.
+ * com a regra do ranking de Parcerias (ver `parceirosNoDesafio`); senão,
+ * desde o último "Encerrar semestre" (ou `semEncerramento`, quando nunca
+ * houve um). Quem usa não diferencia os dois casos — o vínculo não
+ * aparece para os alunos.
  */
 export async function carregarParceiros(
   api: ForroApi,
   userId: string,
   semEncerramento?: string,
-): Promise<ParceirosForrodex> {
+): Promise<ParceiroDanca[]> {
   const recorte = await api.recorteForrodex().catch(() => null)
-  if (recorte) {
-    return {
-      parceiros: await api.parceirosNoDesafio(recorte.challenge_id, userId),
-      universo: new Set(recorte.participantes),
-    }
-  }
+  if (recorte) return api.parceirosNoDesafio(recorte.challenge_id, userId)
   const desde = await api.inicioSemestreAtual().catch(() => null)
-  return {
-    parceiros: await api.parceirosDe(userId, desde ?? semEncerramento),
-    universo: null,
-  }
+  return api.parceirosDe(userId, desde ?? semEncerramento)
 }
 
 /** Nível de uma dupla no semestre, pelas noites que dançaram juntos. */

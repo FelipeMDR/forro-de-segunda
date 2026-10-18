@@ -49,7 +49,7 @@ export function SalaoPage() {
     // A etiqueta é um extra: se falhar, a lista aparece sem ela
     if (userId) {
       void carregarParceiros(api, userId)
-        .then(({ parceiros }) => vivo && setJaDancei(new Set(parceiros.map((p) => p.user_id))))
+        .then((parceiros) => vivo && setJaDancei(new Set(parceiros.map((p) => p.user_id))))
         .catch(() => {})
       void api
         .parceirosPossiveis(noite)

@@ -1247,9 +1247,6 @@ export class DemoApi implements ForroApi {
       challenge_id: c.id,
       data_inicio: c.data_inicio,
       data_fim: c.data_fim,
-      participantes: this.db.members
-        .filter((m) => m.challenge_id === c.id)
-        .map((m) => m.user_id),
     }
   }
 

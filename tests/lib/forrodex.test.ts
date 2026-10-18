@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { ForroApi } from '../../src/lib/api'
 import {
   agruparPorTurma,
+  carregarParceiros,
   contarPorNivel,
   montarForrodex,
   nivelDupla,
@@ -103,43 +105,43 @@ describe('montarForrodex', () => {
   })
 })
 
-describe('montarForrodex presa a um desafio', () => {
-  it('só entra quem participa, com turma ou não', () => {
-    const d = montarForrodex(
-      [perfil('eu'), perfil('a'), perfil('fora'), perfil('convidado', [])],
-      [],
-      'eu',
-      null,
-      new Set(['eu', 'a', 'convidado']),
-    )
-    expect(d.faltam.map((c) => c.user_id)).toEqual(['a', 'convidado'])
-  })
+describe('carregarParceiros', () => {
+  const recorte = {
+    challenge_id: 'd1',
+    data_inicio: '2026-09-07',
+    data_fim: '2026-12-12',
+  }
+  const api = (comDesafio: boolean) =>
+    ({
+      recorteForrodex: async () => (comDesafio ? recorte : null),
+      parceirosNoDesafio: async (id: string) => [par(`do-${id}`, 2)],
+      inicioSemestreAtual: async () => '2026-08-17T15:50:00Z',
+      parceirosDe: async (_: string, desde?: string) => [par(`desde-${desde}`, 1)],
+    }) as unknown as ForroApi
 
-  it('quem dançou comigo conta mesmo fora do desafio, como no ranking', () => {
-    const d = montarForrodex(
-      [perfil('a'), perfil('fora'), perfil('b')],
-      [par('a', 1), par('fora', 4)],
-      'eu',
-      null,
-      new Set(['a', 'b']),
-    )
-    expect(d.descobertos.map((c) => c.user_id)).toEqual(['fora', 'a'])
-    expect(d.faltam.map((c) => c.user_id)).toEqual(['b'])
-    expect(d.total).toBe(3)
-  })
-
-  it('a visão por turma respeita o mesmo universo', () => {
-    const secoes = agruparPorTurma(
-      [perfil('a', ['Inter']), perfil('b', ['Inter']), perfil('convidado', [])],
-      [],
-      'eu',
-      ['Inter'],
-      new Set(['a', 'convidado']),
-    )
-    expect(secoes.map((s) => [s.turma, s.faltam.map((c) => c.user_id)])).toEqual([
-      ['Inter', ['a']],
-      [null, ['convidado']],
+  it('presa a um desafio, os parceiros saem do desafio', async () => {
+    expect((await carregarParceiros(api(true), 'eu')).map((p) => p.user_id)).toEqual([
+      'do-d1',
     ])
+  })
+
+  it('sem desafio, desde o último encerramento', async () => {
+    expect((await carregarParceiros(api(false), 'eu')).map((p) => p.user_id)).toEqual([
+      'desde-2026-08-17T15:50:00Z',
+    ])
+  })
+})
+
+describe('Forródex presa a um desafio', () => {
+  it('o total da turma não depende de quem se inscreveu nem de com quem dancei', () => {
+    // Inscrição no desafio só declara que a pessoa quer competir: a
+    // coleção é a turma inteira, igual para todo mundo dela
+    const turma = [perfil('eu'), perfil('a'), perfil('b'), perfil('c')]
+    const forro = [perfil('convidado', [])]
+    const eu = montarForrodex([...turma, ...forro], [par('a', 1), par('convidado', 3)], 'eu', 'Inter')
+    const a = montarForrodex([...turma, ...forro], [], 'a', 'Inter')
+    expect(eu.total).toBe(3)
+    expect(a.total).toBe(3)
   })
 })
 

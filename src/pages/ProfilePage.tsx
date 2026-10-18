@@ -87,7 +87,7 @@ export function ProfilePage() {
       .catch(() => setSemestreEncerrado(false))
     // Forródex do semestre: pessoas com dupla confirmada desde o corte
     void carregarParceiros(api, userId, profile.criado_em ?? undefined)
-      .then(({ parceiros }) => setDexSemestre(parceiros.length))
+      .then((parceiros) => setDexSemestre(parceiros.length))
       .catch(() => setDexSemestre(null))
   }, [api, userId, profile])
 

@@ -271,7 +271,7 @@ export interface ForroApi {
   /** Qual outro desafio já está com a Forródex. null = nenhum. */
   desafioComForrodex(excetoId?: string): Promise<{ id: string; titulo: string } | null>
   /**
-   * Período e participantes do desafio a que a Forródex está presa.
+   * Período do desafio a que a Forródex está presa.
    * null = Forródex do semestre (nenhum preso, ou migração 035 não rodou).
    */
   recorteForrodex(): Promise<RecorteForrodex | null>
