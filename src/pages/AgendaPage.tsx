@@ -8,8 +8,8 @@ import { Cabecalho } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { diaDaNoite, ocorrenciasEvento, toISODate, type OcorrenciaAgenda } from '../lib/dates'
-import { passoDaAula } from '../lib/trilha'
-import type { AgendaEvent, ConfirmacaoPresenca, Feriado, PassoTrilha, Turma } from '../lib/types'
+import { conteudoDaAula } from '../lib/trilha'
+import type { AgendaEvent, AulaSemVideo, ConfirmacaoPresenca, Feriado, PassoTrilha, Turma } from '../lib/types'
 import { useLembrado } from '../lib/memoriaTelas'
 
 interface Item extends OcorrenciaAgenda {
@@ -53,7 +53,8 @@ export function AgendaPage() {
   )
   const [ocupado, setOcupado] = useState<string | null>(null)
   // Trilha de vídeos: o passo de cada aula (sem a migração 036, nada aparece)
-  const [trilha, setTrilha] = useLembrado<{ passos: PassoTrilha[]; turmas: Turma[] }>('agenda:trilha', {
+  // e as aulas sem vídeo (039; `semVideo` falta no que ficou lembrado de antes)
+  const [trilha, setTrilha] = useLembrado<{ passos: PassoTrilha[]; turmas: Turma[]; semVideo?: AulaSemVideo[] }>('agenda:trilha', {
     passos: [],
     turmas: [],
   })
@@ -68,11 +69,12 @@ export function AgendaPage() {
       ])
       setEventos(e)
       setFeriados(f)
-      const [passos, turmas] = await Promise.all([
+      const [passos, turmas, semVideo] = await Promise.all([
         api.listPassosTrilha().catch(() => [] as PassoTrilha[]),
         api.listTurmas().catch(() => [] as Turma[]),
+        api.listAulasSemVideo().catch(() => [] as AulaSemVideo[]),
       ])
-      setTrilha({ passos, turmas })
+      setTrilha({ passos, turmas, semVideo })
     } catch (e) {
       setErro((e as Error).message)
     }
@@ -198,10 +200,12 @@ export function AgendaPage() {
                   ]
                     .filter(Boolean)
                     .join(' · ')
-                  const passo =
+                  const conteudo =
                     !o.cancelada && eventos
-                      ? passoDaAula(o.evento, toISODate(o.quando), { ...trilha, eventos, feriados })
+                      ? conteudoDaAula(o.evento, toISODate(o.quando), { ...trilha, eventos, feriados })
                       : null
+                  const passo = conteudo?.passo ?? null
+                  const semVideo = conteudo?.semVideo ?? null
                   // Aula que já aconteceu: o vídeo abriu para a turma
                   const passoAberto = passo && toISODate(o.quando) <= diaDaNoite(agora)
                   return (
@@ -244,6 +248,14 @@ export function AgendaPage() {
                                 Passo: {passo.nome}
                               </span>
                             ))}
+                          {semVideo && (
+                            <span className="mt-0.5 flex flex-col gap-0.5">
+                              <span className="text-sm font-extrabold text-ink2">Aula: {semVideo.nome}</span>
+                              {semVideo.descricao && (
+                                <span className="text-[13px] leading-snug text-ink3">{semVideo.descricao}</span>
+                              )}
+                            </span>
+                          )}
                         </div>
                         {o.evento.data && !o.cancelada && !ehHoje && (
                           <span className="shrink-0 rounded-lg border-[1.5px] border-preto bg-verde-500 px-2 py-[3px] text-xs font-extrabold text-preto">

@@ -24,14 +24,9 @@ export function GerenciarTrilhaPage() {
     <Tela>
       <Cabecalho titulo="Vídeo-aulas" sobretitulo="Painel" fallback="/organizador" />
       <div className="flex flex-col gap-3 px-4 pt-2 pb-24">
-        <p className="px-1 text-sm text-ink2">Uma trilha por nível. As datas ficam no cronograma de cada turma.</p>
-        <CartaoAtalho
-          icone="agenda"
-          cor="#DE5300"
-          titulo="Cronogramas das turmas"
-          descricao="Nível, primeira aula e datas de cada passo"
-          onClick={() => navigate('/organizador/videoaulas/cronograma')}
-        />
+        <p className="px-1 text-sm text-ink2">
+          Uma trilha por nível. As datas e as aulas sem vídeo ficam em <b className="text-ink">Agenda › Cronogramas das turmas</b>.
+        </p>
         <CartaoAtalho
           icone="chave"
           cor="#FFB98C"

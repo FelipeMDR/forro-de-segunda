@@ -30,6 +30,7 @@ import {
   DIAS_SEMANA,
   type AberturaAntecipadaInput,
   type AgendaEvent,
+  type AulaSemVideo,
   type Challenge,
   type FeriadoInput,
   PassoTrilha,
@@ -37,7 +38,7 @@ import {
 import { nomesModalidades, statusDoDesafio } from '../ChallengesPage'
 import { Campo, Dica, usePainel } from './contexto'
 import { useLembrado } from '../../lib/memoriaTelas'
-import { passoDaAula } from '../../lib/trilha'
+import { conteudoDaAula } from '../../lib/trilha'
 
 type Aba = 'prox' | 'eventos' | 'desafios'
 
@@ -108,9 +109,12 @@ export function AgendaPainelPage() {
   const [editando, setEditando] = useState<Challenge | 'novo' | null>(null)
 
   // Trilha de vídeos: o passo de cada aula (sem a migração 036, nada aparece)
+  // e as aulas sem vídeo do cronograma (039)
   const [passos, setPassos] = useState<PassoTrilha[]>([])
+  const [semVideo, setSemVideo] = useState<AulaSemVideo[]>([])
   useEffect(() => {
     void api.listPassosTrilha().then(setPassos).catch(() => setPassos([]))
+    void api.listAulasSemVideo().then(setSemVideo).catch(() => setSemVideo([]))
   }, [api])
 
   const carregarEventos = useCallback(async () => {
@@ -181,7 +185,7 @@ export function AgendaPainelPage() {
 
   return (
     <div className="anima-tela">
-      <Cabecalho titulo="Agenda" sobretitulo="Painel" fallback="/organizador" />
+      <Cabecalho titulo="Aulas e eventos" sobretitulo="Agenda" fallback="/organizador/agenda" />
       <Segmentado
         className="mx-4 mb-1 mt-3"
         valor={aba}
@@ -221,9 +225,12 @@ export function AgendaPainelPage() {
                         : (o.evento.turma ?? 'Todas as turmas')}
                     </span>
                     {!o.cancelada && eventos && (() => {
-                      const passo = passoDaAula(o.evento, toISODate(o.quando), { turmas, passos, eventos, feriados })
-                      return passo ? (
-                        <span className="truncate text-[13px] font-bold text-ink2">Passo: {passo.nome}</span>
+                      const c = conteudoDaAula(o.evento, toISODate(o.quando), { turmas, passos, eventos, feriados, semVideo })
+                      if (c?.passo) {
+                        return <span className="truncate text-[13px] font-bold text-ink2">Passo: {c.passo.nome}</span>
+                      }
+                      return c?.semVideo ? (
+                        <span className="truncate text-[13px] font-bold text-ink2">Aula sem vídeo: {c.semVideo.nome}</span>
                       ) : null
                     })()}
                   </div>
@@ -674,7 +681,7 @@ export function NovoEventoPage() {
         }
       }
       toast('Evento adicionado à agenda!')
-      navigate('/organizador/agenda?aba=eventos', { replace: true })
+      navigate('/organizador/agenda/aulas?aba=eventos', { replace: true })
     } catch (e) {
       toast((e as Error).message, 'erro')
     } finally {
@@ -685,7 +692,7 @@ export function NovoEventoPage() {
   const ordemSemana = [1, 2, 3, 4, 5, 6, 0]
   return (
     <div className="anima-tela">
-      <Cabecalho titulo="Novo evento" sobretitulo="Agenda" fallback="/organizador/agenda?aba=eventos" />
+      <Cabecalho titulo="Novo evento" sobretitulo="Agenda" fallback="/organizador/agenda/aulas?aba=eventos" />
       <div className="flex flex-col gap-4 px-4 pt-3.5">
         <Segmentado
           valor={tipo}

@@ -5,6 +5,9 @@ import {
   urlDoEmbed,
   nivelInicial,
   cronogramaDaTurma,
+  cronogramaDeTurma,
+  conteudoDaAula,
+  sequenciaDoNivel,
   idDoYoutube,
   miniaturaDoYoutube,
   videoDoYoutube,
@@ -17,7 +20,7 @@ import {
   situacaoDoNivel,
   type ContextoTrilha,
 } from '../../src/lib/trilha'
-import type { AgendaEvent, Feriado, PassoTrilha, Turma } from '../../src/lib/types'
+import type { AgendaEvent, AulaSemVideo, Feriado, PassoTrilha, Turma } from '../../src/lib/types'
 
 const V = 'dQw4w9WgXcQ'
 
@@ -417,5 +420,53 @@ describe('só YouTube (o Drive foi retirado)', () => {
   it('miniatura e player do YouTube', () => {
     expect(miniaturaDoYoutube(V)).toBe(`https://i.ytimg.com/vi/${V}/mqdefault.jpg`)
     expect(urlDoEmbed(V)).toContain('youtube-nocookie.com/embed/')
+  })
+})
+
+describe('aulas sem vídeo', () => {
+  const passos = [1, 2, 3, 4].map((n) => passo(n))
+  const semVideo = (ordem: number, extra: Partial<AulaSemVideo> = {}): AulaSemVideo => ({
+    id: `sv${ordem}`, nivel: 'iniciante', ordem, nome: `Conceito ${ordem}`, descricao: null, ...extra,
+  })
+
+  it('entra na posição dela e empurra os passos seguintes uma semana', () => {
+    expect(sequenciaDoNivel(passos, [semVideo(2)]).map((s) => s.passo?.id ?? s.semVideo?.id)).toEqual([
+      'p1', 'sv2', 'p2', 'p3', 'p4',
+    ])
+  })
+
+  it('duas na mesma posição ficam em seguida; depois do fim, vão para o final', () => {
+    const seq = sequenciaDoNivel(passos, [semVideo(1), semVideo(1, { id: 'sv1b', nome: 'Z' }), semVideo(20)])
+    expect(seq.map((s) => s.passo?.id ?? s.semVideo?.id)).toEqual(['sv1', 'sv1b', 'p1', 'p2', 'p3', 'p4', 'sv20'])
+  })
+
+  it('no cronograma da turma: ocupa a data e a turma inteira do nível anda junto', () => {
+    const turma = turmas[0]
+    const c = cronogramaDeTurma(turma, passos, [aulaSeg], [], [semVideo(2), semVideo(1, { nivel: 'avancado' })])
+    expect(c.map((l) => [l.aula.data, l.passo?.id ?? l.semVideo?.id])).toEqual([
+      ['2026-10-05', 'p1'], ['2026-10-12', 'sv2'], ['2026-10-19', 'p2'], ['2026-10-26', 'p3'], ['2026-11-02', 'p4'],
+    ])
+  })
+
+  it('cancelamento empurra a aula sem vídeo como empurra um passo', () => {
+    const c = cronogramaDeTurma(turmas[0], passos, [aulaSeg], [feriado('2026-10-12', null)], [semVideo(2)])
+    expect(c.map((l) => [l.aula.data, l.passo?.id ?? l.semVideo?.id ?? null])).toEqual([
+      ['2026-10-05', 'p1'], ['2026-10-12', null], ['2026-10-19', 'sv2'], ['2026-10-26', 'p2'],
+      ['2026-11-02', 'p3'], ['2026-11-09', 'p4'],
+    ])
+  })
+
+  it('na Agenda: a aula mostra a aula sem vídeo, e o passo vai para a semana seguinte', () => {
+    const base = { turmas, passos, feriados: [] as Feriado[], eventos: [aulaSeg], semVideo: [semVideo(2)] }
+    expect(conteudoDaAula(aulaSeg, '2026-10-12', base)).toEqual({ passo: null, semVideo: semVideo(2) })
+    expect(passoDaAula(aulaSeg, '2026-10-12', base)).toBeNull()
+    expect(passoDaAula(aulaSeg, '2026-10-19', base)?.id).toBe('p2')
+  })
+
+  it('na trilha do aluno: não aparece, mas atrasa a data dos passos', () => {
+    const s = situacaoDoNivel('iniciante', ctx({ passos, semVideo: [semVideo(1)], hoje: '2026-10-05' }))
+    expect(s.map((x) => x.passo.id)).toEqual(['p1', 'p2', 'p3', 'p4'])
+    expect(s[0].data).toBe('2026-10-12')
+    expect(s[0].estado).not.toBe('aberto')
   })
 })

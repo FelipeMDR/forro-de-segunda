@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { diaDaNoite } from './dates'
 import { podeEditarTrilha, REGRAS_PADRAO, saldoDeChaves, type ContextoTrilha, type SaldoChaves } from './trilha'
-import type { Challenge, PassoTrilha, PerfilResumo } from './types'
+import type { AulaSemVideo, Challenge, PassoTrilha, PerfilResumo } from './types'
 import { equipeEfetiva, lerVerComoAluno, salvarVerComoAluno } from './verComoAluno'
 
 export interface DadosTrilha {
@@ -35,7 +35,7 @@ export function useTrilha() {
   const carregar = useCallback(async () => {
     if (!userId || !profile) return
     try {
-      const [passos, turmas, eventos, feriados, liberacoes, desafios, regras] = await Promise.all([
+      const [passos, turmas, eventos, feriados, liberacoes, desafios, regras, semVideo] = await Promise.all([
         api.listPassosTrilha(),
         api.listTurmas(),
         api.listEvents(),
@@ -43,6 +43,7 @@ export function useTrilha() {
         api.minhasLiberacoes(),
         api.listChallenges().catch(() => [] as Challenge[]),
         api.regrasTrilha().catch(() => ({ ...REGRAS_PADRAO })),
+        api.listAulasSemVideo().catch(() => [] as AulaSemVideo[]),
       ])
       const principal = desafios.find((c) => c.forrodex) ?? null
       // Uma consulta só, com quem aparece como professor em algum passo
@@ -64,6 +65,7 @@ export function useTrilha() {
           minhasTurmas: profile.turmas.map((t) => t.turma),
           eventos,
           feriados,
+          semVideo,
           liberadas: new Set(liberacoes.map((l) => l.passo_id)),
           hoje: diaDaNoite(new Date()),
           equipe: equipeEfetiva(equipeReal, comoAluno),

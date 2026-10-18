@@ -193,14 +193,15 @@ src/
   sw.ts           service worker (precache, cache de fotos, push)
 supabase/
   schema.sql      esquema completo: tabelas + RLS + triggers + storage
-  migracoes/      mudanças para bancos JÁ no ar (rodar em ordem)
+  migracoes/      mudanças para bancos JÁ no ar (`npm run migrar`)
   retencao.sql    limpeza de fotos antigas (rodar semestralmente)
   functions/send-push  edge function do lembrete
 ```
 
 > **Banco já em produção?** Não rode o `schema.sql` de novo — ele recria
 > políticas que já existem e dá erro. Use os arquivos de
-> [`supabase/migracoes/`](supabase/migracoes) na ordem numérica.
+> [`supabase/migracoes/`](supabase/migracoes) na ordem numérica: `npm run migrar`
+> roda os que faltam (veja o DEPLOY.md).
 
 ### Decisões de modelagem
 

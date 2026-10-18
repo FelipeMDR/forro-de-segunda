@@ -39,7 +39,7 @@ import { PainelLayout } from './pages/painel/contexto'
 import { DenunciasPage } from './pages/painel/DenunciasPage'
 import { DistintivosPage, NovoDistintivoPage } from './pages/painel/DistintivosPage'
 import { FrequenciaPage } from './pages/painel/FrequenciaPage'
-import { PainelHome, PessoasHub } from './pages/painel/HubPage'
+import { AgendaHub, PainelHome, PessoasHub } from './pages/painel/HubPage'
 import { ImportarPage } from './pages/painel/ImportarPage'
 import { CargosPage, SemestrePage, TurmasPage } from './pages/painel/TurmasCargosPage'
 
@@ -107,15 +107,18 @@ export default function App() {
                 <Route path="turmas" element={<TurmasPage />} />
                 <Route path="cargos" element={<CargosPage />} />
                 <Route path="semestre" element={<SemestrePage />} />
-                <Route path="agenda" element={<AgendaPainelPage />} />
+                <Route path="agenda" element={<AgendaHub />} />
+                <Route path="agenda/aulas" element={<AgendaPainelPage />} />
                 <Route path="agenda/evento" element={<NovoEventoPage />} />
+                <Route path="agenda/cronograma" element={<CronogramaPage />} />
                 <Route path="distintivos" element={<DistintivosPage />} />
                 <Route path="distintivos/novo" element={<NovoDistintivoPage />} />
                 <Route path="frequencia" element={<FrequenciaPage />} />
                 <Route path="denuncias" element={<DenunciasPage />} />
                 <Route path="videoaulas" element={<GerenciarTrilhaPage />} />
                 <Route path="videoaulas/passo/:id" element={<EditarPassoPage />} />
-                <Route path="videoaulas/cronograma" element={<CronogramaPage />} />
+                {/* O cronograma morava em Vídeo-aulas; links antigos caem no lugar novo */}
+                <Route path="videoaulas/cronograma" element={<Navigate to="/organizador/agenda/cronograma" replace />} />
                 <Route path="videoaulas/regras" element={<RegrasChavesPage />} />
               </Route>
               <Route path="/dj" element={<DJPage />} />

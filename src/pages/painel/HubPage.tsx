@@ -25,14 +25,14 @@ export function PainelHome() {
           icone="agenda"
           cor="#0391D5"
           titulo="Agenda"
-          descricao="Aulas e eventos · cancelamentos e feriados · desafios"
+          descricao="Aulas e eventos · cronograma das turmas · desafios"
           onClick={() => navigate('/organizador/agenda')}
         />
         <CartaoAtalho
           icone="play"
           cor="#0391D5"
           titulo="Vídeo-aulas"
-          descricao="Trilhas por nível · cronograma das turmas"
+          descricao="Trilhas por nível · regras das chaves"
           onClick={() => navigate('/organizador/videoaulas')}
         />
         <CartaoAtalho
@@ -56,6 +56,31 @@ export function PainelHome() {
           descricao="Fotos denunciadas para moderar"
           contador={reports.length}
           onClick={() => navigate('/organizador/denuncias')}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function AgendaHub() {
+  const navigate = useNavigate()
+  return (
+    <div className="anima-tela">
+      <Cabecalho titulo="Agenda" sobretitulo="Painel" fallback="/organizador" />
+      <div className="flex flex-col gap-2.5 px-4 pt-4">
+        <CartaoAtalho
+          icone="agenda"
+          cor="#0391D5"
+          titulo="Aulas e eventos"
+          descricao="Próximas aulas · eventos · cancelamentos e feriados · desafios"
+          onClick={() => navigate('/organizador/agenda/aulas')}
+        />
+        <CartaoAtalho
+          icone="camadas"
+          cor="#DE5300"
+          titulo="Cronogramas das turmas"
+          descricao="Nível, primeira aula e o que se ensina em cada data · aulas sem vídeo"
+          onClick={() => navigate('/organizador/agenda/cronograma')}
         />
       </div>
     </div>

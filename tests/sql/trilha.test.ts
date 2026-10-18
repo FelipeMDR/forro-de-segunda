@@ -1,4 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { bancoComMigracao as bancoVazio, comoUsuario, IDS, pessoa } from './banco'
 
@@ -320,5 +321,28 @@ describe('trilha — privilégios', () => {
       )
       expect(r.rows[0].pode).toBe(false)
     }
+  })
+})
+
+describe('trilha — aulas sem vídeo (039)', () => {
+  it('guarda nível, posição e nome; recusa nome vazio e posição zero', async () => {
+    const db = await bancoComMigracao()
+    await db.query(`insert into trilha_aulas_sem_video (nivel, ordem, nome) values ('iniciante', 4, 'Musicalidade')`)
+    const r = await db.query<{ nome: string }>(`select nome from trilha_aulas_sem_video where nivel = 'iniciante'`)
+    expect(r.rows).toEqual([{ nome: 'Musicalidade' }])
+    await expect(
+      db.query(`insert into trilha_aulas_sem_video (nivel, ordem, nome) values ('iniciante', 1, '  ')`),
+    ).rejects.toThrow()
+    await expect(
+      db.query(`insert into trilha_aulas_sem_video (nivel, ordem, nome) values ('iniciante', 0, 'X')`),
+    ).rejects.toThrow()
+  })
+
+  it('pode rodar de novo sem perder nada', async () => {
+    const db = await bancoComMigracao()
+    await db.query(`insert into trilha_aulas_sem_video (nivel, ordem, nome) values ('avancado', 2, 'Postura')`)
+    await db.exec(readFileSync(new URL('../../supabase/migracoes/039-aulas-sem-video.sql', import.meta.url), 'utf8'))
+    const r = await db.query(`select 1 from trilha_aulas_sem_video`)
+    expect(r.rows).toHaveLength(1)
   })
 })

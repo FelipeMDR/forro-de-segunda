@@ -784,6 +784,21 @@ export interface PassoTrilha {
 
 export type PassoTrilhaInput = Omit<PassoTrilha, 'id'> & { id?: string }
 
+/**
+ * Aula de conceito, sem vídeo (migração 039). Ocupa uma semana na
+ * sequência do nível; não aparece na trilha nem conta para chaves.
+ */
+export interface AulaSemVideo {
+  id: string
+  nivel: NivelTrilha
+  /** Posição na sequência do nível: a aula nº N é a N-ésima aula da turma. */
+  ordem: number
+  nome: string
+  descricao: string | null
+}
+
+export type AulaSemVideoInput = Omit<AulaSemVideo, 'id'> & { id?: string }
+
 /** Regras das chaves, editáveis pela organização (tabela `trilha_regras`). */
 export interface RegrasTrilha {
   pontos_por_chave: number

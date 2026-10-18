@@ -60,6 +60,8 @@ export function linhaCronograma(
     return { texto: ehProxima ? 'Reposição · próxima aula' : 'Reposição', tom: 'reposicao' }
   }
   if (ehProxima) return { texto: 'Próxima aula', tom: 'proxima' }
-  if (aula.data <= hoje) return { texto: 'Dado · vídeo aberto para a turma', tom: 'feito' }
+  if (aula.data <= hoje) {
+    return { texto: l.semVideo ? 'Dado' : 'Dado · vídeo aberto para a turma', tom: 'feito' }
+  }
   return { texto: 'Agendado', tom: 'normal' }
 }

@@ -48,6 +48,8 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  AulaSemVideo,
+  AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
 } from './types'
@@ -382,6 +384,11 @@ export interface ForroApi {
   /** Cria (sem `id`) ou atualiza um passo. Professores e organização. */
   salvarPassoTrilha(p: PassoTrilhaInput): Promise<void>
   removerPassoTrilha(id: string): Promise<void>
+  /** Aulas sem vídeo de todos os níveis; [] sem a migração 039. */
+  listAulasSemVideo(): Promise<AulaSemVideo[]>
+  /** Cria (sem `id`) ou atualiza uma aula sem vídeo. Professores e organização. */
+  salvarAulaSemVideo(a: AulaSemVideoInput): Promise<void>
+  removerAulaSemVideo(id: string): Promise<void>
   /** Nível e primeira aula da trilha de uma turma. */
   definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null): Promise<void>
   /** Passos que EU liberei com chave. */

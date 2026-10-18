@@ -66,6 +66,8 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  AulaSemVideo,
+  AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
 } from './types'
@@ -2217,6 +2219,30 @@ export class SupabaseApi implements ForroApi {
 
   async removerPassoTrilha(id: string) {
     ok(await this.sb.from('trilha_passos').delete().eq('id', id))
+  }
+
+  async listAulasSemVideo(): Promise<AulaSemVideo[]> {
+    const { data, error } = await this.sb
+      .from('trilha_aulas_sem_video')
+      .select('id, nivel, ordem, nome, descricao')
+      .order('nivel')
+      .order('ordem')
+    if (error) return [] // sem a migração 039
+    return data as AulaSemVideo[]
+  }
+
+  async salvarAulaSemVideo(a: AulaSemVideoInput) {
+    const { id, ...campos } = a
+    const linha = { ...campos, nome: campos.nome.trim(), descricao: campos.descricao?.trim() || null }
+    ok(
+      id
+        ? await this.sb.from('trilha_aulas_sem_video').update(linha).eq('id', id)
+        : await this.sb.from('trilha_aulas_sem_video').insert(linha),
+    )
+  }
+
+  async removerAulaSemVideo(id: string) {
+    ok(await this.sb.from('trilha_aulas_sem_video').delete().eq('id', id))
   }
 
   async definirTrilhaDaTurma(turma: string, nivel: NivelTrilha | null, inicio: string | null) {

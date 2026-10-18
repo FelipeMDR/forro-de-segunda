@@ -77,6 +77,8 @@ import type {
   NivelTrilha,
   PassoTrilha,
   PassoTrilhaInput,
+  AulaSemVideo,
+  AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
 } from './types'
@@ -174,6 +176,7 @@ interface DB {
   semestres?: string[]
   /** Trilha de vídeos (migração 036) — ausente em bancos demo antigos. */
   trilhaPassos?: PassoTrilha[]
+  trilhaAulasSemVideo?: AulaSemVideo[]
   trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string; custo?: number }>
   trilhaRegras?: RegrasTrilha
   alunos: AlunoCadastrado[]
@@ -2094,6 +2097,30 @@ export class DemoApi implements ForroApi {
   async removerPassoTrilha(id: string) {
     this.db.trilhaPassos = this.passosTrilha().filter((p) => p.id !== id)
     this.db.trilhaLiberacoes = (this.db.trilhaLiberacoes ?? []).filter((l) => l.passo_id !== id)
+    this.persist()
+  }
+
+  async listAulasSemVideo(): Promise<AulaSemVideo[]> {
+    return [...(this.db.trilhaAulasSemVideo ?? [])].sort(
+      (a, b) => a.nivel.localeCompare(b.nivel) || a.ordem - b.ordem,
+    )
+  }
+
+  async salvarAulaSemVideo(a: AulaSemVideoInput) {
+    const lista = (this.db.trilhaAulasSemVideo ??= [])
+    const linha = { ...a, nome: a.nome.trim(), descricao: a.descricao?.trim() || null }
+    if (a.id) {
+      const i = lista.findIndex((x) => x.id === a.id)
+      if (i < 0) throw new Error('Essa aula não existe mais')
+      lista[i] = { ...linha, id: a.id }
+    } else {
+      lista.push({ ...linha, id: uuid() })
+    }
+    this.persist()
+  }
+
+  async removerAulaSemVideo(id: string) {
+    this.db.trilhaAulasSemVideo = (this.db.trilhaAulasSemVideo ?? []).filter((a) => a.id !== id)
     this.persist()
   }
 

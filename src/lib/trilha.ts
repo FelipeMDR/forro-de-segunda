@@ -1,5 +1,6 @@
 import type {
   AgendaEvent,
+  AulaSemVideo,
   Feriado,
   NivelTrilha,
   Papel,
@@ -18,7 +19,8 @@ import type {
  * As datas saem da Agenda: as aulas de uma turma são os eventos
  * semanais dela a partir de `trilha_inicio`, menos os cancelamentos,
  * mais as reposições (evento de data única com `reposicao_de`). A aula
- * nº N da turma é o N-ésimo passo do nível dela.
+ * nº N da turma é a N-ésima aula da sequência do nível: os passos, com as
+ * aulas sem vídeo (migração 039) encaixadas na posição delas.
  */
 
 export const NIVEIS: readonly NivelTrilha[] = ['iniciante', 'intermediario', 'avancado']
@@ -192,38 +194,71 @@ export function aulasDaTurma(
 
 export interface LinhaCronograma {
   aula: AulaDaTurma
-  /** null em aula cancelada, ou quando a trilha acabou. */
+  /** null em aula cancelada, em aula sem vídeo, ou quando a trilha acabou. */
   passo: PassoTrilha | null
+  /** A aula sem vídeo dada nesse dia (aí `passo` é null). */
+  semVideo: AulaSemVideo | null
+}
+
+type ItemSequencia = { passo: PassoTrilha; semVideo: null } | { passo: null; semVideo: AulaSemVideo }
+
+/**
+ * A sequência de aulas de um nível: os passos na ordem deles, com cada
+ * aula sem vídeo entrando na posição `ordem` (a nº 4 é a 4ª aula). Duas
+ * na mesma posição ficam uma depois da outra; as que passam do fim dos
+ * passos vão para o final.
+ */
+export function sequenciaDoNivel(passosDoNivel: PassoTrilha[], semVideoDoNivel: AulaSemVideo[]): ItemSequencia[] {
+  const passos = ordenarPassos(passosDoNivel)
+  const extras = [...semVideoDoNivel].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome))
+  const seq: ItemSequencia[] = []
+  let p = 0
+  let e = 0
+  while (p < passos.length || e < extras.length) {
+    if (e < extras.length && (p >= passos.length || extras[e].ordem <= seq.length + 1)) {
+      seq.push({ passo: null, semVideo: extras[e++] })
+    } else {
+      seq.push({ passo: passos[p++], semVideo: null })
+    }
+  }
+  return seq
 }
 
 export function cronogramaDaTurma(
   passosDoNivel: PassoTrilha[],
   aulas: AulaDaTurma[],
+  semVideoDoNivel: AulaSemVideo[] = [],
 ): LinhaCronograma[] {
-  const ordem = ordenarPassos(passosDoNivel)
+  const seq = sequenciaDoNivel(passosDoNivel, semVideoDoNivel)
   let i = 0
   return aulas.map((aula) =>
-    aula.tipo === 'cancelada' ? { aula, passo: null } : { aula, passo: ordem[i++] ?? null },
+    aula.tipo === 'cancelada'
+      ? { aula, passo: null, semVideo: null }
+      : { aula, ...(seq[i++] ?? { passo: null, semVideo: null }) },
   )
 }
 
-/** Cronograma completo de uma turma: vai até a última aula com passo. */
+/** Cronograma completo de uma turma: vai até a última aula com passo ou sem vídeo. */
 export function cronogramaDeTurma(
   turma: Turma,
   passos: PassoTrilha[],
   eventos: AgendaEvent[],
   feriados: Feriado[],
+  semVideo: AulaSemVideo[] = [],
 ): LinhaCronograma[] {
   if (!turma.nivel || !turma.trilha_inicio) return []
   const doNivel = passos.filter((p) => p.nivel === turma.nivel)
-  if (doNivel.length === 0) return []
+  const semVideoDoNivel = semVideo.filter((a) => a.nivel === turma.nivel)
+  const total = doNivel.length + semVideoDoNivel.length
+  if (total === 0) return []
   // Folga larga: cancelamentos empurram, reposições não encurtam.
-  const ate = somaDias(turma.trilha_inicio, 7 * (doNivel.length + 26))
+  const ate = somaDias(turma.trilha_inicio, 7 * (total + 26))
   const linhas = cronogramaDaTurma(
     doNivel,
     aulasDaTurma(turma.nome, turma.trilha_inicio, eventos, feriados, ate),
+    semVideoDoNivel,
   )
-  const ultima = linhas.map((l) => l.passo !== null).lastIndexOf(true)
+  const ultima = linhas.map((l) => l.passo !== null || l.semVideo !== null).lastIndexOf(true)
   return linhas.slice(0, ultima + 1)
 }
 
@@ -236,16 +271,38 @@ export function cronogramaDeTurma(
 export function passoDaAula(
   evento: AgendaEvent,
   data: string,
-  base: { turmas: Turma[]; passos: PassoTrilha[]; eventos: AgendaEvent[]; feriados: Feriado[] },
+  base: BaseDaAgenda,
 ): PassoTrilha | null {
+  return conteudoDaAula(evento, data, base)?.passo ?? null
+}
+
+export interface BaseDaAgenda {
+  turmas: Turma[]
+  passos: PassoTrilha[]
+  eventos: AgendaEvent[]
+  feriados: Feriado[]
+  /** Aulas sem vídeo (migração 039); sem elas, só passos. */
+  semVideo?: AulaSemVideo[]
+}
+
+/**
+ * O que se ensina numa aula da Agenda: um passo ou uma aula sem vídeo.
+ * Mesmas regras de `passoDaAula`; null quando não há nenhum dos dois.
+ */
+export function conteudoDaAula(
+  evento: AgendaEvent,
+  data: string,
+  base: BaseDaAgenda,
+): { passo: PassoTrilha | null; semVideo: AulaSemVideo | null } | null {
   if (!evento.turma) return null
   if (evento.data && !evento.reposicao_de) return null
   const turma = base.turmas.find((t) => t.nome === evento.turma)
   if (!turma) return null
-  const linha = cronogramaDeTurma(turma, base.passos, base.eventos, base.feriados).find(
+  const linha = cronogramaDeTurma(turma, base.passos, base.eventos, base.feriados, base.semVideo).find(
     (l) => l.aula.data === data && l.aula.tipo !== 'cancelada',
   )
-  return linha?.passo ?? null
+  if (!linha || (!linha.passo && !linha.semVideo)) return null
+  return { passo: linha.passo, semVideo: linha.semVideo }
 }
 
 // ---- Situação para o aluno ----
@@ -257,6 +314,8 @@ export interface ContextoTrilha {
   minhasTurmas: string[]
   eventos: AgendaEvent[]
   feriados: Feriado[]
+  /** Aulas sem vídeo: não aparecem na trilha, mas empurram as datas dos passos. */
+  semVideo?: AulaSemVideo[]
   /** Passos liberados com chave. */
   liberadas: ReadonlySet<string>
   /** Dia da noite de hoje ("YYYY-MM-DD"). */
@@ -296,7 +355,7 @@ function datasDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): Map<string, stri
   const datas = new Map<string, string>()
   for (const t of ctx.turmas) {
     if (t.nivel !== nivel || !ctx.minhasTurmas.includes(t.nome)) continue
-    for (const l of cronogramaDeTurma(t, ctx.passos, ctx.eventos, ctx.feriados)) {
+    for (const l of cronogramaDeTurma(t, ctx.passos, ctx.eventos, ctx.feriados, ctx.semVideo)) {
       if (!l.passo) continue
       const atual = datas.get(l.passo.id)
       if (!atual || l.aula.data < atual) datas.set(l.passo.id, l.aula.data)

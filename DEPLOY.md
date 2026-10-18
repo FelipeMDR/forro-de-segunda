@@ -205,11 +205,33 @@ Fez uma mudança no código? `git push` e pronto: a Vercel publica sozinha e
 **os alunos recebem a atualização automaticamente** ao abrir o app. Ninguém
 precisa desinstalar nem reinstalar nada.
 
-Se a mudança mexer no banco, rode o SQL no Supabase **antes** do push.
+Se a mudança mexer no banco, rode as migrações **antes** do push:
 
-Migrações novas que ainda precisam ser rodadas:
+```bash
+npm run migrar
+```
 
-- `supabase/migracoes/036-trilha-de-videos.sql`: trilha de vídeo-aulas (passos, chaves, nível da turma, reposição de aula). Sem ela, o app mostra "A trilha ainda não foi configurada", e a reposição no cancelamento avisa que falta a migração. Depois de rodar, use "Reload schema cache".
+O script roda, em ordem, os arquivos de `supabase/migracoes/` que ainda não
+foram rodados, guarda o registro em `interno.migracoes` e recarrega o schema
+da API no fim (o antigo "Reload schema cache"). `npm run migrar -- --status`
+só mostra o que falta.
+
+**Configuração (uma vez por computador):** no Supabase, **Project Settings →
+Database → Connection string → Session pooler**, copie o endereço, troque
+`[YOUR-PASSWORD]` pela senha do banco e cole no `.env.local` (que não vai
+para o git):
+
+```
+SUPABASE_DB_URL=postgresql://postgres.xxxx:SENHA@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
+```
+
+Na primeira vez, o banco ainda não tem registro das migrações coladas à mão.
+Diga até qual com certeza já rodou, e as seguintes rodam na hora (da 034 em
+diante todas podem rodar de novo sem estrago, então na dúvida marque menos):
+
+```bash
+npm run migrar -- --ja-rodadas-ate 033
+```
 
 ## Dois cuidados de manutenção
 
