@@ -611,7 +611,9 @@ function LinhaGravacao({
       <input
         ref={arquivo}
         type="file"
-        accept="audio/*"
+        // O seletor do iPhone deixa .mp3 cinza com o filtro "audio/*":
+        // lá vai sem filtro, e `enviar` confere se o arquivo toca
+        accept={ehIPhone() ? undefined : 'audio/*'}
         className="hidden"
         onChange={(e) => {
           void enviar(e.target.files?.[0])
