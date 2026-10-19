@@ -17,9 +17,11 @@ import {
   apagarGravacao,
   guardarGravacao,
   guardarMarcas,
+  guardarForca,
   guardarParceiros,
   lerGravacao,
   lerMarcas,
+  lerForca,
   lerParceiros,
 } from '../lib/resistenciaLocal'
 import {
@@ -30,6 +32,7 @@ import {
   modoGravacao,
   prepararSom,
   tocarBuffer,
+  type Forca,
 } from '../lib/somAviso'
 import type { ConexaoDJ, PlayerAgora } from '../lib/types'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
@@ -55,6 +58,12 @@ const VIGIA_PAUSA_MS = 15_000
 const DESTAQUE_MS = 3_500
 /** O toque na estrela vem um pouco depois do momento: compensa. */
 const ATRASO_DO_TOQUE_MS = 500
+
+const FORCAS = [
+  { valor: 'normal', rotulo: 'Normal' },
+  { valor: 'forte', rotulo: 'Forte' },
+  { valor: 'maximo', rotulo: 'Máximo' },
+] as const
 
 const PARCEIROS = [
   { valor: '3', rotulo: '3 parceiros' },
@@ -88,6 +97,7 @@ export function ResistenciaPage() {
   const pode = usePodeSerDJ()
   const [conexao, setConexao] = useState<ConexaoDJ | null>(null)
   const [parceiros, setParceiros] = useState<3 | 4>(lerParceiros)
+  const [forca, setForca] = useState<Forca>(lerForca)
   const [gravacoes, setGravacoes] = useState<Record<Fala, Blob | null>>({
     voltou: null,
     trocou: null,
@@ -173,8 +183,8 @@ export function ResistenciaPage() {
   // Sem gravação, um apito: a voz sintética do celular pausaria a música
   const tocarFala = useCallback((fala: Fala): Promise<void> => {
     const buf = audios.current[fala]
-    return buf ? tocarBuffer(buf) : apito(fala === 'trocou')
-  }, [])
+    return buf ? tocarBuffer(buf, forca) : apito(fala === 'trocou')
+  }, [forca])
 
   const avisar = useCallback(
     async (fala: Fala) => {
@@ -322,6 +332,21 @@ export function ResistenciaPage() {
                   guardarParceiros(n)
                 }}
               />
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="px-1 text-[15px] font-extrabold">Força do aviso</span>
+              <Segmentado
+                valor={forca}
+                opcoes={FORCAS}
+                onChange={(f) => {
+                  setForca(f)
+                  guardarForca(f)
+                }}
+              />
+              <span className="px-1 text-[13px] leading-snug text-ink3">
+                A música não baixa: quem sobe é a voz. Mais forte fica mais alto e mais
+                rasgado. Teste no Ouvir com a música tocando.
+              </span>
             </div>
             <div className="overflow-hidden rounded-[20px] border border-linha bg-sf">
               <div className="px-3.5 pt-3 text-xs font-extrabold uppercase tracking-[.06em] text-ink3">

@@ -1,4 +1,5 @@
 import type { Fala } from './resistencia'
+import type { Forca } from './somAviso'
 
 /**
  * O que o Modo Resistência guarda no celular do professor: as duas
@@ -91,5 +92,25 @@ export function guardarParceiros(n: 3 | 4) {
     localStorage.setItem(CHAVE_PARCEIROS, String(n))
   } catch {
     // tanto faz: volta para 3 na próxima vez
+  }
+}
+
+const CHAVE_FORCA = 'fds-resistencia-forca'
+
+/** Começa no máximo: com a música alta, o aviso precisa de tudo. */
+export function lerForca(): Forca {
+  try {
+    const f = localStorage.getItem(CHAVE_FORCA)
+    return f === 'normal' || f === 'forte' ? f : 'maximo'
+  } catch {
+    return 'maximo'
+  }
+}
+
+export function guardarForca(f: Forca) {
+  try {
+    localStorage.setItem(CHAVE_FORCA, f)
+  } catch {
+    // tanto faz: volta para o máximo na próxima vez
   }
 }
