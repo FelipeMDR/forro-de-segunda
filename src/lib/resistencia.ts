@@ -11,16 +11,20 @@
  * Tudo aqui é puro: sem relógio, sem rede.
  */
 
-/** "Voltou pra roda" vem este tanto antes do "trocou". */
-export const AVISO_ANTES_MS = 4_000
+/**
+ * "Voltou pra roda" vem este tanto antes do "trocou": tempo para o
+ * pessoal se organizar no salão antes de trocar.
+ */
+export const AVISO_ANTES_MS = 10_000
 
 /**
  * Em volta de um momento marcado, nenhum aviso: a dupla precisa estar
  * assentada antes da pausa (ANTES) e curtir a virada até o fim (DEPOIS).
- * Os valores valem para o "trocou"; o "voltou pra roda" já cabe neles.
+ * Os valores valem para o "trocou". O DEPOIS inclui o intervalo do
+ * aviso, para o "voltou pra roda" também não cair em cima do momento.
  */
 export const PROTEGE_ANTES_MS = 10_000
-export const PROTEGE_DEPOIS_MS = 7_000
+export const PROTEGE_DEPOIS_MS = AVISO_ANTES_MS + 3_000
 
 /** Sem troca nos primeiros segundos nem no finzinho da música. */
 export const MARGEM_INICIO_MS = 20_000

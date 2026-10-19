@@ -58,7 +58,9 @@ describe('avisosCruzados', () => {
   const trocas = [MIN]
 
   it('toca "voltou pra roda" antes e "trocou" na divisa', () => {
-    expect(avisosCruzados(trocas, 55_800, 56_100)).toEqual([{ fala: 'voltou', troca: 0 }])
+    const voltou = MIN - AVISO_ANTES_MS
+    expect(AVISO_ANTES_MS).toBe(10_000)
+    expect(avisosCruzados(trocas, voltou - 200, voltou + 100)).toEqual([{ fala: 'voltou', troca: 0 }])
     expect(avisosCruzados(trocas, 59_900, 60_200)).toEqual([{ fala: 'trocou', troca: 0 }])
   })
 
