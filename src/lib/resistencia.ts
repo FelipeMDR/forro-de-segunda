@@ -26,9 +26,18 @@ export const AVISO_ANTES_MS = 10_000
 export const PROTEGE_ANTES_MS = 10_000
 export const PROTEGE_DEPOIS_MS = AVISO_ANTES_MS + 3_000
 
-/** Sem troca nos primeiros segundos nem no finzinho da música. */
+/**
+ * Sem troca do meio nos primeiros segundos nem perto do fim: o fim já
+ * tem a troca dele, e as duas não podem colar.
+ */
 export const MARGEM_INICIO_MS = 20_000
-export const MARGEM_FIM_MS = 15_000
+export const MARGEM_FIM_MS = 25_000
+
+/**
+ * A troca do fim cai este tanto antes de a música acabar, para não
+ * perder o fim: a leitura do Spotify pode já mostrar a música seguinte.
+ */
+export const FIM_TROCA_MS = 1_500
 
 /** Duas trocas nunca ficam mais perto que isto. */
 export const INTERVALO_MINIMO_MS = 20_000
@@ -45,22 +54,31 @@ function protegido(t: number, marcas: readonly number[]): boolean {
 
 /**
  * Onde cai cada "trocou" (ms desde o começo da música). `parceiros` é
- * com quantas pessoas cada um dança na música: 3 parceiros = 2 trocas.
+ * com quantas pessoas cada um dança na música: 3 parceiros = 2 trocas
+ * no meio e mais uma no fim. Sem a do fim, quem dança o último pedaço
+ * de uma música dança também o primeiro da seguinte, e fica com o dobro
+ * do tempo dos outros.
  *
- * A divisa ideal é a divisão igual. Se ela cair perto de um momento
- * marcado, vai para a borda mais próxima da proteção (antes ou depois
- * do momento), desde que caiba na música e não cole na troca anterior.
- * Sem lugar possível, a troca não acontece: melhor um parceiro a menos
- * do que trocar em cima da pausa.
+ * A divisa ideal do meio é a divisão igual. Se ela cair perto de um
+ * momento marcado, vai para a borda mais próxima da proteção (antes ou
+ * depois do momento), desde que caiba na música e não cole na troca
+ * anterior. Sem lugar possível, a troca não acontece: melhor um parceiro
+ * a menos do que trocar em cima da pausa. A do fim não se move: a
+ * música acaba ali de qualquer jeito.
  */
 export function momentosDeTroca(
   duracaoMs: number,
   parceiros: number,
   marcas: readonly number[] = [],
 ): number[] {
+  if (parceiros < 2 || duracaoMs <= FIM_TROCA_MS) return []
+  return [...trocasDoMeio(duracaoMs, parceiros, marcas), Math.round(duracaoMs - FIM_TROCA_MS)]
+}
+
+function trocasDoMeio(duracaoMs: number, parceiros: number, marcas: readonly number[]): number[] {
   const ini = MARGEM_INICIO_MS
   const fim = duracaoMs - MARGEM_FIM_MS
-  if (parceiros < 2 || fim <= ini) return []
+  if (fim <= ini) return []
 
   const bordas = marcas.flatMap((m) => [m - PROTEGE_ANTES_MS, m + PROTEGE_DEPOIS_MS])
   const trocas: number[] = []

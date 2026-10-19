@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AVISO_ANTES_MS,
   avisosCruzados,
+  FIM_TROCA_MS,
   marcarMomento,
   minutoSegundo,
   momentosDeTroca,
@@ -13,14 +14,21 @@ import { playerAgora } from '../../supabase/functions/_shared/djPuro'
 const MIN = 60_000
 
 describe('momentosDeTroca', () => {
-  it('divide a música em partes iguais', () => {
-    expect(momentosDeTroca(3 * MIN, 3)).toEqual([MIN, 2 * MIN])
-    expect(momentosDeTroca(4 * MIN, 4)).toEqual([MIN, 2 * MIN, 3 * MIN])
+  it('divide a música em partes iguais e troca também no fim dela', () => {
+    expect(momentosDeTroca(3 * MIN, 3)).toEqual([MIN, 2 * MIN, 3 * MIN - FIM_TROCA_MS])
+    expect(momentosDeTroca(4 * MIN, 4)).toEqual([MIN, 2 * MIN, 3 * MIN, 4 * MIN - FIM_TROCA_MS])
   })
 
-  it('sem troca com 1 parceiro ou música curta demais', () => {
+  it('a troca do fim não deixa ninguém dançar o fim de uma e o começo da outra', () => {
+    // 3 parceiros: cada um dança um terço, e a próxima música começa com outro par
+    const trocas = momentosDeTroca(3 * MIN, 3)
+    expect(trocas).toHaveLength(3)
+    expect(trocas[2]).toBeGreaterThan(3 * MIN - 3_000)
+  })
+
+  it('sem troca com 1 parceiro; música curta troca só no fim', () => {
     expect(momentosDeTroca(3 * MIN, 1)).toEqual([])
-    expect(momentosDeTroca(30_000, 3)).toEqual([])
+    expect(momentosDeTroca(30_000, 3)).toEqual([30_000 - FIM_TROCA_MS])
   })
 
   it('foge de um momento marcado para a borda mais próxima', () => {
@@ -41,9 +49,10 @@ describe('momentosDeTroca', () => {
   })
 
   it('pula a troca se não houver lugar, em vez de trocar em cima da pausa', () => {
-    // Momentos colados cobrindo o meio inteiro de uma música curta
+    // Momentos colados cobrindo o meio inteiro de uma música curta: sobra
+    // só a troca do fim
     const marcas = [25_000, 35_000, 45_000, 55_000]
-    expect(momentosDeTroca(75_000, 2, marcas)).toEqual([])
+    expect(momentosDeTroca(75_000, 2, marcas)).toEqual([75_000 - FIM_TROCA_MS])
   })
 
   it('não cola duas trocas', () => {

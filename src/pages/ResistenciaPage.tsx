@@ -212,8 +212,15 @@ export function ResistenciaPage() {
     const antes = anterior.current
     anterior.current = { uri, ms: progresso }
     if (!uri || antes.uri !== uri || progresso < antes.ms - 10_000) {
-      // Música nova (ou a mesma de novo, do começo): o que já passou não toca
+      // Música nova (ou a mesma de novo, do começo): o que já passou não
+      // toca. Mas um "voltou pra roda" sem o "trocou" (a música acabou
+      // antes, com crossfade, ou foi pulada) ganha o "trocou" agora: a
+      // roda já está esperando
+      const semTrocou = [...jaTocou.current].some(
+        (c) => c.endsWith(':voltou') && !jaTocou.current.has(c.replace(':voltou', ':trocou')),
+      )
       jaTocou.current.clear()
+      if (semTrocou && uri) void avisar('trocou')
       return
     }
     for (const a of avisosCruzados(trocas, antes.ms, progresso)) {
