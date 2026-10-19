@@ -22,6 +22,14 @@ import {
   lerMarcas,
   lerParceiros,
 } from '../lib/resistenciaLocal'
+import {
+  apito,
+  decodificar,
+  iPhoneSemMistura,
+  modoGravacao,
+  prepararSom,
+  tocarBuffer,
+} from '../lib/somAviso'
 import type { ConexaoDJ, PlayerAgora } from '../lib/types'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 
@@ -34,12 +42,14 @@ const FRASES: Record<Fala, string> = {
 const LEITURA_MS = 4_000
 /** Entre leituras, o progresso é estimado pelo relógio, nesta cadência. */
 const TIQUE_MS = 200
-/**
- * Gravação curta de propósito: no Android, um som de até ~5 s faz o
- * Spotify só abaixar o volume enquanto ele toca; mais longo, o Spotify
- * pausa (e o app teria de dar play de novo).
- */
+/** Fala curta: o aviso não pode atropelar a troca. */
 const GRAVACAO_MAX_MS = 4_000
+/**
+ * Rede de segurança: se mesmo assim o Spotify aparecer pausado até este
+ * tempo depois de um aviso, o app dá play de novo. Uma leitura logo
+ * depois do aviso não basta: o Spotify demora para contar que pausou.
+ */
+const VIGIA_PAUSA_MS = 15_000
 /** Quanto o aviso fica escrito na tela. */
 const DESTAQUE_MS = 3_500
 /** O toque na estrela vem um pouco depois do momento: compensa. */
@@ -67,7 +77,7 @@ function progressoEstimado(l: Leitura, agora: number): number {
  * Modo Resistência: aula em roda em que os avançados trocam de par no
  * meio da música. A tela acompanha o Spotify do professor e, em cada
  * divisa, toca "Voltou pra roda" e "Agradeceu, beijou e trocou" na voz
- * gravada (ou na voz do celular, sem gravação).
+ * gravada (ou num apito, sem gravação), misturada com a música.
  *
  * Precisa ficar ABERTA no celular ligado na caixa: o aviso sai daqui.
  */
@@ -99,23 +109,26 @@ export function ResistenciaPage() {
     )
   }, [api, pode])
 
-  // Os áudios ficam prontos antes da hora, e são "destravados" no toque
-  // em Começar: o navegador do celular só deixa tocar som depois de um
-  // toque da pessoa
-  const audios = useRef<Partial<Record<Fala, HTMLAudioElement>>>({})
+  // As gravações ficam decodificadas antes da hora, prontas para tocar
+  // sem atraso na divisa
+  const audios = useRef<Partial<Record<Fala, AudioBuffer>>>({})
   useEffect(() => {
-    const urls: string[] = []
+    let vivo = true
     for (const fala of ['voltou', 'trocou'] as const) {
       const b = gravacoes[fala]
       if (!b) {
         delete audios.current[fala]
         continue
       }
-      const url = URL.createObjectURL(b)
-      urls.push(url)
-      audios.current[fala] = new Audio(url)
+      void decodificar(b).then((buf) => {
+        if (!vivo) return
+        if (buf) audios.current[fala] = buf
+        else delete audios.current[fala]
+      })
     }
-    return () => urls.forEach((u) => URL.revokeObjectURL(u))
+    return () => {
+      vivo = false
+    }
   }, [gravacoes])
 
   const uri = leitura.player?.faixa?.uri ?? null
@@ -129,11 +142,18 @@ export function ResistenciaPage() {
   )
 
   // --- Ler o Spotify ---------------------------------------------------
+  const vigiarAte = useRef(0)
   const ler = useCallback(async () => {
     try {
       const player = await api.playerAgora()
       setLeitura({ player, em: performance.now() })
       setSemSpotify(player === null)
+      if (player?.faixa && !player.tocando && performance.now() < vigiarAte.current) {
+        // Pausou logo depois de um aviso: foi o aviso, não o professor
+        vigiarAte.current = 0
+        console.warn('[resistencia] o Spotify pausou no aviso; dando play')
+        await api.playSpotify().catch((e) => console.warn('[resistencia] play falhou', e))
+      }
       return player
     } catch (e) {
       console.warn('[resistencia] leitura falhou', e)
@@ -149,48 +169,21 @@ export function ResistenciaPage() {
   }, [ligado, ler])
 
   // --- Falar -----------------------------------------------------------
+  // Sem gravação, um apito: a voz sintética do celular pausaria a música
   const tocarFala = useCallback((fala: Fala): Promise<void> => {
-    const el = audios.current[fala]
-    if (el) {
-      el.currentTime = 0
-      return new Promise((ok) => {
-        const fim = () => ok()
-        el.onended = fim
-        el.onerror = fim
-        setTimeout(fim, GRAVACAO_MAX_MS + 3_000)
-        el.play().catch(fim)
-      })
-    }
-    // Sem gravação: a voz do próprio celular
-    return new Promise((ok) => {
-      if (!('speechSynthesis' in window)) return ok()
-      const u = new SpeechSynthesisUtterance(FRASES[fala])
-      u.lang = 'pt-BR'
-      u.rate = 1.05
-      u.onend = () => ok()
-      u.onerror = () => ok()
-      speechSynthesis.cancel()
-      speechSynthesis.speak(u)
-      setTimeout(ok, 6_000)
-    })
+    const buf = audios.current[fala]
+    return buf ? tocarBuffer(buf) : apito(fala === 'trocou')
   }, [])
 
   const avisar = useCallback(
     async (fala: Fala) => {
-      const tocavaAntes = leitura.player?.tocando === true
+      if (leitura.player?.tocando) vigiarAte.current = performance.now() + VIGIA_PAUSA_MS
       setDestaque(fala)
       setTimeout(() => setDestaque((d) => (d === fala ? null : d)), DESTAQUE_MS)
       navigator.vibrate?.(200)
       await tocarFala(fala)
-      // Se o celular pausou o Spotify por causa do som, dá play de novo
-      if (!tocavaAntes) return
-      const depois = await ler()
-      if (depois && !depois.tocando) {
-        await api.playSpotify().catch((e) => console.warn('[resistencia] play falhou', e))
-        void ler()
-      }
     },
-    [api, ler, leitura.player?.tocando, tocarFala],
+    [leitura.player?.tocando, tocarFala],
   )
 
   // --- O relógio: estima o progresso e solta os avisos ----------------
@@ -241,19 +234,7 @@ export function ResistenciaPage() {
 
   const comecar = () => {
     // Destrava o som dentro do toque (exigência do navegador do celular)
-    for (const el of Object.values(audios.current)) {
-      if (!el) continue
-      el.muted = true
-      void el
-        .play()
-        .then(() => {
-          el.pause()
-          el.currentTime = 0
-        })
-        .catch(() => {})
-        .finally(() => (el.muted = false))
-    }
-    if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''))
+    prepararSom()
     anterior.current = { uri: null, ms: 0 }
     setLigado(true)
   }
@@ -319,7 +300,14 @@ export function ResistenciaPage() {
           <>
             <p className="text-[15px] leading-snug text-ink2">
               Dê play na playlist no Spotify deste celular, ligado na caixa. Em cada troca
-              toca “{FRASES.voltou}” e, {AVISO_ANTES_MS / 1000} s depois, “{FRASES.trocou}”.
+              toca “{FRASES.voltou}” e, {AVISO_ANTES_MS / 1000} s depois, “{FRASES.trocou}”,
+              por cima da música, sem pausar nem abaixar.
+            </p>
+            <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
+              <b className="text-ink">No iPhone, tire do silencioso</b> (a chave na lateral): o
+              aviso toca como som de fundo, e o silencioso cala ele.
+              {iPhoneSemMistura() &&
+                ' Este navegador não garante tocar sem pausar a música: atualize o iOS para o 16.4 ou mais novo.'}
             </p>
             <div className="flex flex-col gap-2">
               <span className="px-1 text-[15px] font-extrabold">Parceiros por música</span>
@@ -342,7 +330,10 @@ export function ResistenciaPage() {
                   key={fala}
                   fala={fala}
                   gravacao={gravacoes[fala]}
-                  onOuvir={() => void tocarFala(fala)}
+                  onOuvir={() => {
+                    prepararSom()
+                    void tocarFala(fala)
+                  }}
                   onMudou={(b) => setGravacoes((g) => ({ ...g, [fala]: b }))}
                 />
               ))}
@@ -524,6 +515,7 @@ function LinhaGravacao({
       return
     }
     try {
+      modoGravacao()
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const r = new MediaRecorder(stream)
       const pedacos: Blob[] = []
@@ -543,15 +535,14 @@ function LinhaGravacao({
     }
   }
 
-  const enviar = (f: File | undefined) => {
+  const enviar = async (f: File | undefined) => {
     if (!f) return
-    const el = new Audio(URL.createObjectURL(f))
-    el.onloadedmetadata = () => {
-      if (el.duration > 5) {
-        toast('Áudio longo: com mais de 5 s o Spotify pode pausar no aviso', 'erro')
-      }
-      URL.revokeObjectURL(el.src)
+    const buf = await decodificar(f)
+    if (!buf) {
+      toast('Esse arquivo de áudio não abre neste celular', 'erro')
+      return
     }
+    if (buf.duration > 6) toast('Áudio longo: a fala vai atropelar a troca', 'erro')
     void salvar(f)
   }
 
@@ -565,7 +556,7 @@ function LinhaGravacao({
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[16px] font-extrabold">“{FRASES[fala]}”</span>
         <span className={`text-xs font-bold ${gravacao ? 'text-verde-700' : 'text-ink3'}`}>
-          {gravacao ? 'gravada' : 'voz do celular'}
+          {gravacao ? 'gravada' : 'apito'}
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -595,7 +586,7 @@ function LinhaGravacao({
         accept="audio/*"
         className="hidden"
         onChange={(e) => {
-          enviar(e.target.files?.[0])
+          void enviar(e.target.files?.[0])
           e.target.value = ''
         }}
       />
