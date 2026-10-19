@@ -42,10 +42,15 @@ function sessaoDeAudio(tipo: 'ambient' | 'auto') {
  * ainda pausaria a música, e a tela avisa para atualizar.
  */
 export function iPhoneSemMistura(): boolean {
-  const ios =
+  return ehIPhone() && !('audioSession' in navigator)
+}
+
+/** iPhone ou iPad (o iPad se apresenta como Mac, mas tem toque). */
+export function ehIPhone(): boolean {
+  return (
     /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
-  return ios && !('audioSession' in navigator)
+  )
 }
 
 /**

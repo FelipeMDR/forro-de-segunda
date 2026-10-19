@@ -25,6 +25,7 @@ import {
 import {
   apito,
   decodificar,
+  ehIPhone,
   iPhoneSemMistura,
   modoGravacao,
   prepararSom,
@@ -235,6 +236,7 @@ export function ResistenciaPage() {
   const comecar = () => {
     // Destrava o som dentro do toque (exigência do navegador do celular)
     prepararSom()
+    if (ehIPhone()) toast('Confira: iPhone fora do silencioso, senão o aviso não toca')
     anterior.current = { uri: null, ms: 0 }
     setLigado(true)
   }
@@ -303,7 +305,7 @@ export function ResistenciaPage() {
               toca “{FRASES.voltou}” e, {AVISO_ANTES_MS / 1000} s depois, “{FRASES.trocou}”,
               por cima da música, sem pausar nem abaixar.
             </p>
-            <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
+            <p className="rounded-2xl border-[1.5px] border-brasa-500 bg-sf px-4 py-3 text-sm leading-snug text-ink2">
               <b className="text-ink">No iPhone, tire do silencioso</b> (a chave na lateral): o
               aviso toca como som de fundo, e o silencioso cala ele.
               {iPhoneSemMistura() &&
@@ -332,6 +334,7 @@ export function ResistenciaPage() {
                   gravacao={gravacoes[fala]}
                   onOuvir={() => {
                     prepararSom()
+                    if (ehIPhone()) toast('Sem som? Tire o iPhone do silencioso')
                     void tocarFala(fala)
                   }}
                   onMudou={(b) => setGravacoes((g) => ({ ...g, [fala]: b }))}
