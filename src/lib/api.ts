@@ -22,6 +22,7 @@ import type {
   DistintivoDefInput,
   DistintivoRecebedor,
   FaixaSpotify,
+  PlayerAgora,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -587,6 +588,13 @@ export interface ForroApi {
    * grava a sessão quando algo muda, então é um aviso por música.
    */
   assinarSessaoDJ(cb: () => void): () => void
+  /**
+   * Modo Resistência: o que o Spotify de quem chama está tocando, e em
+   * que ponto. null = nenhum aparelho com o Spotify aberto.
+   */
+  playerAgora(): Promise<PlayerAgora | null>
+  /** Dá play (retoma a música pausada). */
+  playSpotify(): Promise<void>
   /** Busca no Spotify. Só ao enviar o formulário — nunca a cada tecla. */
   buscarMusicas(q: string): Promise<FaixaSpotify[]>
   pedirMusica(f: FaixaSpotify): Promise<void>

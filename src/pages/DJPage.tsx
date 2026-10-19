@@ -323,6 +323,24 @@ export function DJPage() {
             </span>
           </>
         )}
+        {conexao.conectado && (
+          <button
+            type="button"
+            onClick={() => navigate('/dj/resistencia')}
+            className="flex items-center gap-3 rounded-[20px] border border-linha bg-sf p-4 text-left"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brasa-500 text-preto">
+              <Icone nome="pessoas" tamanho={24} traco={2.3} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[16px] font-extrabold">Aula de resistência</span>
+              <span className="text-[13px] leading-snug text-ink2">
+                Avisa na caixa a hora de trocar de par
+              </span>
+            </span>
+            <Icone nome="avancar" tamanho={20} />
+          </button>
+        )}
       </div>
 
       <Confirmar

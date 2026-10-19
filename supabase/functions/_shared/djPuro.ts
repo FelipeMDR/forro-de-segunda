@@ -73,6 +73,32 @@ export function estadoDoPlayer(resposta: unknown): EstadoPlayer | null {
   return { tocando, filaUris }
 }
 
+/** O player do DJ como o Modo Resistência precisa: qual música e em que ponto. */
+export interface PlayerAgora {
+  faixa: FaixaApi | null
+  progresso_ms: number
+  tocando: boolean
+}
+
+/**
+ * Lê a resposta de GET /me/player. null = nenhum aparelho ativo (o
+ * Spotify responde 204, corpo vazio).
+ */
+export function playerAgora(resposta: unknown): PlayerAgora | null {
+  const r = resposta as {
+    device?: unknown
+    progress_ms?: number | null
+    is_playing?: boolean
+    item?: unknown
+  } | null
+  if (!r || !r.device) return null
+  return {
+    faixa: faixaDaApi(r.item ?? null),
+    progresso_ms: r.progress_ms ?? 0,
+    tocando: r.is_playing === true,
+  }
+}
+
 export interface TokenGuardado {
   access_token: string
   refresh_token: string

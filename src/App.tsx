@@ -14,6 +14,7 @@ import { TrilhaPage } from './pages/TrilhaPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
 import { DJPage } from './pages/DJPage'
+import { ResistenciaPage } from './pages/ResistenciaPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
@@ -122,6 +123,7 @@ export default function App() {
                 <Route path="videoaulas/regras" element={<RegrasChavesPage />} />
               </Route>
               <Route path="/dj" element={<DJPage />} />
+              <Route path="/dj/resistencia" element={<ResistenciaPage />} />
               <Route path="/musica" element={<MusicaPage />} />
               <Route path="/spotify/conectado" element={<SpotifyConectadoPage />} />
             </Route>

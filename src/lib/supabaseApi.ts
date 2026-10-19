@@ -39,6 +39,7 @@ import type {
   DistintivoDefInput,
   DistintivoRecebedor,
   FaixaSpotify,
+  PlayerAgora,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -3019,6 +3020,15 @@ export class SupabaseApi implements ForroApi {
   async buscarMusicas(q: string) {
     const r = await this.invocar<{ faixas: FaixaSpotify[] }>('spotify-buscar', { q })
     return r.faixas
+  }
+
+  async playerAgora() {
+    const r = await this.invocar<{ player: PlayerAgora | null }>('spotify-player', { acao: 'estado' })
+    return r.player
+  }
+
+  async playSpotify() {
+    await this.invocar('spotify-player', { acao: 'play' })
   }
 
   async pedirMusica(f: FaixaSpotify) {

@@ -697,6 +697,13 @@ export interface FaixaSpotify {
   duracao_ms: number
 }
 
+/** O player do DJ para o Modo Resistência: qual música e em que ponto. */
+export interface PlayerAgora {
+  faixa: FaixaSpotify | null
+  progresso_ms: number
+  tocando: boolean
+}
+
 export type StatusPedido = 'esperando' | 'enviado' | 'tocou' | 'cancelado'
 
 /** Um pedido da noite, com quem pediu. */

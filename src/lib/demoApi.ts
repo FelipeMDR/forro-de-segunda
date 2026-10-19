@@ -50,6 +50,7 @@ import type {
   DistintivoDefInput,
   DistintivoRecebedor,
   FaixaSpotify,
+  PlayerAgora,
   FeedItem,
   Feriado,
   FeriadoInput,
@@ -587,6 +588,8 @@ function seed(): DB {
 export class DemoApi implements ForroApi {
   readonly mode = 'demo' as const
   private db: DB
+  /** Modo Resistência no demo: quando a "playlist" começou. */
+  private resistenciaDesde: number | null = null
   private authListeners = new Set<(uid: string | null) => void>()
   private feedListeners = new Set<() => void>()
 
@@ -2638,6 +2641,26 @@ export class DemoApi implements ForroApi {
     const timer = setInterval(cb, 5_000)
     return () => clearInterval(timer)
   }
+
+  /**
+   * Spotify de mentira do Modo Resistência: a playlist do demo tocando
+   * em sequência, cada música com 3 min, contados do relógio. Não
+   * depende do Modo DJ ligado, como em produção.
+   */
+  async playerAgora(): Promise<PlayerAgora | null> {
+    if (!this.db.djConexoes?.[this.uid()]) return null
+    const duracao = 180_000
+    const desde = (this.resistenciaDesde ??= Date.now())
+    const passou = Date.now() - desde
+    const idx = Math.floor(passou / duracao) % PLAYLIST_DEMO.length
+    return {
+      faixa: { ...PLAYLIST_DEMO[idx], duracao_ms: duracao },
+      progresso_ms: passou % duracao,
+      tocando: true,
+    }
+  }
+
+  async playSpotify() {}
 
   async buscarMusicas(q: string) {
     const normal = (t: string) =>
