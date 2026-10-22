@@ -180,6 +180,8 @@ interface DB {
   trilhaAulasSemVideo?: AulaSemVideo[]
   trilhaLiberacoes?: Array<{ user_id: string; passo_id: string; criado_em: string; custo?: number }>
   trilhaRegras?: RegrasTrilha
+  /** Nível de acesso de quem está sem turma (migração 040); sem entrada = Iniciante. */
+  trilhaAcesso?: Record<string, NivelTrilha>
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -1991,6 +1993,15 @@ export class DemoApi implements ForroApi {
   }
 
   async encerrarSemestre() {
+    // Espelha guardar_niveis_do_semestre (migração 040): o maior nível de
+    // cada um nas turmas que acabam; quem já estava sem turma volta a Iniciante.
+    const acesso: Record<string, NivelTrilha> = {}
+    for (const p of this.db.profiles) {
+      const niveis = p.turmas.flatMap((v) => this.db.turmas.find((t) => t.nome === v.turma)?.nivel ?? [])
+      if (niveis.includes('avancado')) acesso[p.id] = 'avancado'
+      else if (niveis.includes('intermediario')) acesso[p.id] = 'intermediario'
+    }
+    this.db.trilhaAcesso = acesso
     const afetados = this.db.profiles.filter(
       (p) => p.turmas.length > 0 || p.turmas_ensino.length > 0,
     )
@@ -2140,6 +2151,22 @@ export class DemoApi implements ForroApi {
     return (this.db.trilhaLiberacoes ?? [])
       .filter((l) => l.user_id === uid)
       .map(({ passo_id, criado_em, custo }) => ({ passo_id, criado_em, custo: custo ?? 1 }))
+  }
+
+  async meuAcessoTrilha() {
+    return this.db.trilhaAcesso?.[this.uid()] ?? null
+  }
+
+  async listAcessosTrilha() {
+    return { ...(this.db.trilhaAcesso ?? {}) }
+  }
+
+  async setAcessoTrilha(userId: string, nivel: NivelTrilha) {
+    const acesso = { ...(this.db.trilhaAcesso ?? {}) }
+    if (nivel === 'iniciante') delete acesso[userId]
+    else acesso[userId] = nivel
+    this.db.trilhaAcesso = acesso
+    this.persist()
   }
 
   async liberarPassoComChave(passoId: string, custo: number) {

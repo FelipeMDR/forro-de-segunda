@@ -324,6 +324,11 @@ export interface ContextoTrilha {
   equipe: boolean
   /** Regras das chaves; sem elas, `REGRAS_PADRAO`. */
   regras?: RegrasTrilha
+  /**
+   * Nível de acesso de quem está sem turma (migração 040): o maior nível
+   * do semestre passado ou o que a organização deu. null = Iniciante.
+   */
+  acessoSemTurma?: NivelTrilha | null
 }
 
 export type EstadoPasso = 'aberto' | 'chave' | 'bloqueado'
@@ -348,6 +353,47 @@ export function nivelDoAluno(ctx: ContextoTrilha): NivelTrilha | null {
     }
   }
   return maior >= 0 ? NIVEIS[maior] : null
+}
+
+/**
+ * Aluno sem turma no semestre: vê o acervo (ver `datasDoAcervo`) até o
+ * nível de acesso dele, sem chave. A equipe vê tudo de qualquer jeito.
+ */
+export function semTurma(ctx: ContextoTrilha): boolean {
+  return !ctx.equipe && ctx.minhasTurmas.length === 0
+}
+
+/** Até que nível vai o acervo de quem está sem turma; null = tem turma. */
+export function nivelDoAcervo(ctx: ContextoTrilha): NivelTrilha | null {
+  return semTurma(ctx) ? (ctx.acessoSemTurma ?? 'iniciante') : null
+}
+
+/**
+ * Datas do acervo: cada passo abre quando a turma MAIS ATRASADA do nível
+ * tiver a aula dele. Assim ninguém de fora vê um passo antes de algum
+ * aluno ativo daquele nível. Turma sem trilha configurada não conta;
+ * nível sem nenhuma turma na trilha fica todo fechado.
+ */
+function datasDoAcervo(nivel: NivelTrilha, ctx: ContextoTrilha): Map<string, string> {
+  const cronogramas = ctx.turmas
+    .filter((t) => t.nivel === nivel)
+    .map((t) => cronogramaDeTurma(t, ctx.passos, ctx.eventos, ctx.feriados, ctx.semVideo))
+    .filter((linhas) => linhas.length > 0)
+  const datas = new Map<string, string>()
+  const vezes = new Map<string, number>()
+  for (const linhas of cronogramas) {
+    for (const l of linhas) {
+      if (!l.passo) continue
+      const atual = datas.get(l.passo.id)
+      if (!atual || l.aula.data > atual) datas.set(l.passo.id, l.aula.data)
+      vezes.set(l.passo.id, (vezes.get(l.passo.id) ?? 0) + 1)
+    }
+  }
+  // Passo que alguma turma ainda nem tem no cronograma não abre
+  for (const id of [...datas.keys()]) {
+    if (vezes.get(id) !== cronogramas.length) datas.delete(id)
+  }
+  return datas
 }
 
 /** Data mais cedo, entre as turmas do aluno nesse nível, de cada passo. */
@@ -420,6 +466,8 @@ function passosAVenda(ctx: ContextoTrilha, fila: ItemFila[]): Map<string, number
 export function niveisVisiveis(ctx: ContextoTrilha): NivelTrilha[] {
   const comPassos = NIVEIS.filter((n) => ctx.passos.some((p) => p.nivel === n))
   if (ctx.equipe) return comPassos
+  const acervo = nivelDoAcervo(ctx)
+  if (acervo) return comPassos.filter((n) => NIVEIS.indexOf(n) <= NIVEIS.indexOf(acervo))
   const meu = nivelDoAluno(ctx)
   if (!meu) return []
   const venda = passosAVenda(ctx, filaDeCompra(ctx))
@@ -433,12 +481,22 @@ export function niveisVisiveis(ctx: ContextoTrilha): NivelTrilha[] {
 /** Aba em que a trilha abre: o nível do aluno, ou o primeiro com passos (revisão). */
 export function nivelInicial(ctx: ContextoTrilha): NivelTrilha | null {
   const niveis = niveisVisiveis(ctx)
-  const meu = nivelDoAluno(ctx)
+  const meu = nivelDoAcervo(ctx) ?? nivelDoAluno(ctx)
   return meu && niveis.includes(meu) ? meu : (niveis[0] ?? null)
 }
 
 export function situacaoDoNivel(nivel: NivelTrilha, ctx: ContextoTrilha): PassoComSituacao[] {
   const passos = ordenarPassos(ctx.passos.filter((p) => p.nivel === nivel))
+  if (semTurma(ctx)) {
+    const datas = datasDoAcervo(nivel, ctx)
+    return passos.map((passo, i): PassoComSituacao => {
+      const base = { passo, numero: i + 1, data: datas.get(passo.id) ?? null, custo: null }
+      if (base.data && base.data <= ctx.hoje) return { ...base, estado: 'aberto', motivo: 'data' }
+      // Comprado quando ainda tinha turma: continua dele
+      if (ctx.liberadas.has(passo.id)) return { ...base, estado: 'aberto', motivo: 'chave' }
+      return { ...base, estado: 'bloqueado', motivo: null }
+    })
+  }
   const datas = datasDoNivel(nivel, ctx)
   const meu = nivelDoAluno(ctx)
   const abaixo = meu !== null && NIVEIS.indexOf(nivel) < NIVEIS.indexOf(meu)

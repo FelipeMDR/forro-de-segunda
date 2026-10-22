@@ -199,3 +199,34 @@ describe('DemoApi — trilha de vídeos', () => {
     expect((await api.listEvents()).some((e) => e.reposicao_de === '2026-10-26')).toBe(false)
   })
 })
+
+describe('DemoApi — acesso à trilha sem turma', () => {
+  beforeEach(() => instalarLocalStorage())
+
+  it('encerrar semestre guarda o maior nível; quem já estava sem turma volta a Iniciante', async () => {
+    const { DemoApi } = await import('../../src/lib/demoApi')
+    const api = new DemoApi()
+    await api.signInTelefone('11 98888-0001', 'forro123')
+    const banco = api as unknown as {
+      db: { profiles: Array<{ id: string; turmas: Array<{ turma: string; papel_danca: null }> }>; turmas: Array<{ nome: string; nivel?: string | null }> }
+    }
+    banco.db.turmas = [
+      { nome: 'Iniciante 01', nivel: 'iniciante' },
+      { nome: 'Inter', nivel: 'intermediario' },
+      { nome: 'AV', nivel: 'avancado' },
+    ] as typeof banco.db.turmas
+    const [a, b, c, d] = banco.db.profiles
+    a.turmas = [{ turma: 'Inter', papel_danca: null }, { turma: 'AV', papel_danca: null }]
+    b.turmas = [{ turma: 'Inter', papel_danca: null }]
+    c.turmas = [{ turma: 'Iniciante 01', papel_danca: null }]
+    d.turmas = []
+    await api.setAcessoTrilha(d.id, 'avancado')
+    expect(await api.listAcessosTrilha()).toEqual({ [d.id]: 'avancado' })
+
+    await api.encerrarSemestre()
+    expect(await api.listAcessosTrilha()).toEqual({ [a.id]: 'avancado', [b.id]: 'intermediario' })
+
+    await api.setAcessoTrilha(a.id, 'iniciante')
+    expect(await api.listAcessosTrilha()).toEqual({ [b.id]: 'intermediario' })
+  })
+})

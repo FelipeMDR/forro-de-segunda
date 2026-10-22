@@ -6,6 +6,7 @@ import {
   NOME_NIVEL,
   REGRAS_PADRAO,
   nivelInicial,
+  semTurma,
   situacaoDoNivel,
   type PassoComSituacao,
 } from '../lib/trilha'
@@ -94,7 +95,7 @@ export function CartaoTrilha() {
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
+      {!semTurma(dados.ctx) && <div className="flex flex-col gap-1.5">
         <div className="flex justify-between text-xs font-bold text-ink2">
           <span>Presença e parceria até a próxima chave</span>
           <span>
@@ -107,7 +108,7 @@ export function CartaoTrilha() {
             style={{ width: `${(pontosNaVez / saldo.pontosPorChave) * 100}%` }}
           />
         </div>
-      </div>
+      </div>}
 
       <FolhaChave alvo={alvo} saldo={saldo} desafio={dados.desafio} regras={dados.ctx.regras ?? REGRAS_PADRAO} onFechar={() => setAlvo(null)} onLiberar={liberar} />
     </section>

@@ -400,6 +400,15 @@ export interface ForroApi {
    */
   liberarPassoComChave(passoId: string, custo: number): Promise<void>
   /**
+   * Até que nível vai o acervo da trilha de quem está sem turma (migração
+   * 040). null = Iniciante (o padrão, e também sem a migração).
+   */
+  meuAcessoTrilha(): Promise<NivelTrilha | null>
+  /** Níveis de acesso acima de Iniciante, por user_id (organizador). */
+  listAcessosTrilha(): Promise<Record<string, NivelTrilha>>
+  /** Muda o nível de acesso de um aluno; vale até o próximo encerramento (organizador). */
+  setAcessoTrilha(userId: string, nivel: NivelTrilha): Promise<void>
+  /**
    * Pontos de uma pessoa num desafio, com as MESMAS regras do ranking:
    * `presenca` = noites que valeram, `parcerias` = soma das cartas da
    * Forródex no desafio. É o que vira chave na trilha de vídeos.

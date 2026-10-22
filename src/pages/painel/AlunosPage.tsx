@@ -18,7 +18,8 @@ import { combinaBusca } from '../../lib/busca'
 import { CARGO_DJ } from '../../lib/dj'
 import { ordenarTurmas } from '../../lib/forrodex'
 import { ehEmailSintetico, telefoneValido } from '../../lib/phone'
-import { ehEquipeDoProjeto, turmaLabel, type PapelDanca, type Profile } from '../../lib/types'
+import { NIVEIS, NOME_NIVEL } from '../../lib/trilha'
+import { ehEquipeDoProjeto, turmaLabel, type NivelTrilha, type PapelDanca, type Profile } from '../../lib/types'
 import { Campo, Dica, usePainel } from './contexto'
 
 /** Turmas marcadas e o papel em cada uma (null = sem papel definido). */
@@ -90,7 +91,9 @@ function SeletorTurmas({
 /** Busca e lista de quem tem conta no app. */
 export function AlunosPage() {
   const navigate = useNavigate()
+  const { api } = useAuth()
   const { perfis, turmas, alunos } = usePainel()
+  const [acessos, setAcessos] = useState<Record<string, NivelTrilha>>({})
   const [busca, setBusca] = useState('')
   const [turma, setTurma] = useState<string | null>(null)
   const nomesTurmas = ordenarTurmas(turmas.map((t) => t.nome))
@@ -112,6 +115,17 @@ export function AlunosPage() {
     [perfis, busca, turma],
   )
   const naChamada = alunos?.length ?? 0
+
+  useEffect(() => {
+    api.listAcessosTrilha().then(setAcessos).catch(() => {})
+  }, [api])
+
+  const subtitulo = (p: Profile) => {
+    if (p.turmas.length === 0 && p.turmas_ensino.length === 0 && acessos[p.id]) {
+      return [p.cargos[0], `Sem turma · vídeos até ${NOME_NIVEL[acessos[p.id]]}`].filter(Boolean).join(' · ')
+    }
+    return [p.cargos[0], turmaLabel(p.turmas)].filter(Boolean).join(' · ') || 'Sem turma'
+  }
 
   return (
     <div className="anima-tela">
@@ -168,7 +182,7 @@ export function AlunosPage() {
             onClick={() => navigate(`/organizador/alunos/${p.id}`)}
             avatar={<Avatar nome={p.nome} url={p.avatar_url} tamanho={42} />}
             nome={p.nome}
-            sub={[p.cargos[0], turmaLabel(p.turmas)].filter(Boolean).join(' · ') || 'Sem turma'}
+            sub={subtitulo(p)}
           />
         ))}
         {lista.length === 0 && (
@@ -192,6 +206,9 @@ export function AlunoPage() {
   const [mapa, setMapa] = useState<MapaTurmas>({})
   const [cargosSel, setCargosSel] = useState<Set<string>>(new Set())
   const [ensino, setEnsino] = useState<Set<string>>(new Set())
+  // Até que nível vão os vídeos se ficar sem turma (migração 040)
+  const [acessoSalvo, setAcessoSalvo] = useState<NivelTrilha>('iniciante')
+  const [acesso, setAcesso] = useState<NivelTrilha>('iniciante')
   const [salvando, setSalvando] = useState(false)
   const [confirmarRemocao, setConfirmarRemocao] = useState(false)
 
@@ -202,6 +219,17 @@ export function AlunoPage() {
     setCargosSel(new Set(perfil.cargos))
     setEnsino(new Set(perfil.turmas_ensino))
   }, [perfil])
+
+  useEffect(() => {
+    if (!id) return
+    api
+      .listAcessosTrilha()
+      .then((todos) => {
+        setAcessoSalvo(todos[id] ?? 'iniciante')
+        setAcesso(todos[id] ?? 'iniciante')
+      })
+      .catch(() => {})
+  }, [api, id])
 
   if (!perfil) {
     return (
@@ -229,6 +257,7 @@ export function AlunoPage() {
       for (const c of cargosSel) if (!perfil.cargos.includes(c)) await api.addCargoAluno(perfil.id, c)
       for (const t of perfil.turmas_ensino) if (!ensino.has(t)) await api.removeTurmaEnsino(perfil.id, t)
       for (const t of ensino) if (!perfil.turmas_ensino.includes(t)) await api.addTurmaEnsino(perfil.id, t)
+      if (acesso !== acessoSalvo) await api.setAcessoTrilha(perfil.id, acesso)
       await recarregar.pessoas()
       toast('Alterações salvas')
       navigate('/organizador/alunos')
@@ -282,6 +311,19 @@ export function AlunoPage() {
         <Campo rotulo="Turmas e papel de dança">
           <SeletorTurmas turmas={nomesTurmas} valor={mapa} onChange={setMapa} />
         </Campo>
+
+        {Object.keys(mapa).length === 0 && (
+          <Campo
+            rotulo="Vídeos da trilha sem turma"
+            dica="Vê só os passos que a última turma do nível já teve em aula, sem chave. Vale até o próximo Encerrar semestre, que guarda o maior nível de quem estava em turma; quem já estava sem turma volta para Iniciante."
+          >
+            <Segmentado
+              opcoes={NIVEIS.map((n) => ({ valor: n, rotulo: NOME_NIVEL[n] }))}
+              valor={acesso}
+              onChange={setAcesso}
+            />
+          </Campo>
+        )}
 
         <Campo rotulo="Cargos" dica="O cargo de DJ vem sozinho quando a pessoa conecta o Spotify (veja Cargos do projeto).">
           <div className="flex flex-wrap gap-2">

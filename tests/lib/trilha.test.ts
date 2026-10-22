@@ -299,7 +299,8 @@ describe('nivelDoAluno / niveisVisiveis', () => {
     const semVideoNoTopo = passos.map((p) => (p.id === 'a1' ? { ...p, video_frente: null } : p))
     expect(niveisVisiveis(ctx({ passos: semVideoNoTopo, minhasTurmas: ['Intermediário'] }))).toEqual(['iniciante', 'intermediario'])
     expect(niveisVisiveis(ctx({ passos, minhasTurmas: [], equipe: true }))).toEqual(['iniciante', 'intermediario', 'avancado'])
-    expect(niveisVisiveis(ctx({ passos, minhasTurmas: [] }))).toEqual([])
+    // Sem turma: acervo até o nível de acesso (Iniciante por padrão), ver trilhaSemTurma.test
+    expect(niveisVisiveis(ctx({ passos, minhasTurmas: [] }))).toEqual(['iniciante'])
   })
 })
 
@@ -347,8 +348,12 @@ describe('nivelInicial', () => {
     expect(nivelInicial(ctx({ minhasTurmas: [], equipe: true }))).toBe('iniciante')
   })
 
+  it('sem turma: abre no nível de acesso do acervo', () => {
+    expect(nivelInicial(ctx({ minhasTurmas: [] }))).toBe('iniciante')
+  })
+
   it('sem nada para ver: null', () => {
-    expect(nivelInicial(ctx({ minhasTurmas: [] }))).toBeNull()
+    expect(nivelInicial(ctx({ passos: [], minhasTurmas: [] }))).toBeNull()
   })
 })
 

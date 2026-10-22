@@ -8,6 +8,7 @@ import { comoAbriu, quandoLibera } from '../lib/textosTrilha'
 import {
   NOME_NIVEL,
   REGRAS_PADRAO,
+  nivelDoAcervo,
   nivelDoAluno,
   nivelInicial,
   niveisVisiveis,
@@ -45,6 +46,8 @@ export function TrilhaPage() {
 
   const niveis = dados ? niveisVisiveis(dados.ctx) : []
   const meu = dados ? nivelDoAluno(dados.ctx) : null
+  // Sem turma: acervo do que já foi dado, sem chave
+  const acervo = dados ? nivelDoAcervo(dados.ctx) : null
   const lista = dados && nivel ? situacaoDoNivel(nivel, dados.ctx) : []
   const saldo = dados?.saldo
   const regras = dados?.ctx.regras ?? REGRAS_PADRAO
@@ -70,7 +73,7 @@ export function TrilhaPage() {
         >
           <Icone nome="voltar" className="h-6 w-6" />
         </button>
-        {saldo && (
+        {saldo && !acervo && (
           <button
             type="button"
             onClick={() => setRegrasAbertas(true)}
@@ -87,7 +90,9 @@ export function TrilhaPage() {
       <div className="flex flex-col gap-1.5 px-5 pt-1 pb-4">
         <h1 className="text-[34px] font-extrabold leading-none tracking-[-0.02em]">Trilha de passos</h1>
         <p className="text-[15px] leading-snug text-ink2">
-          Os vídeos abrem conforme a turma avança. Veio às aulas e dançou com a turma? Ganhe chaves e veja o próximo passo antes.
+          {acervo
+            ? 'Os vídeos abrem conforme as turmas avançam.'
+            : 'Os vídeos abrem conforme a turma avança. Veio às aulas e dançou com a turma? Ganhe chaves e veja o próximo passo antes.'}
         </p>
       </div>
 
@@ -117,7 +122,9 @@ export function TrilhaPage() {
 
         {dados && niveis.length === 0 && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
-            {dados.ctx.minhasTurmas.length === 0
+            {acervo
+              ? 'Os vídeos ainda não subiram. Assim que os professores subirem, eles aparecem aqui.'
+              : dados.ctx.minhasTurmas.length === 0
               ? 'Você ainda não está em nenhuma turma. Quando a organização te colocar numa, a trilha dela aparece aqui.'
               : 'A trilha da sua turma ainda não foi configurada. Assim que os professores subirem os vídeos, eles aparecem aqui.'}
           </p>
@@ -125,6 +132,12 @@ export function TrilhaPage() {
         {dados && meu && !dados.ctx.equipe && niveis.length > 0 && !niveis.includes(meu) && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-sm text-ink2">
             Os vídeos do seu nível ainda não subiram. Enquanto isso, dá para revisar os níveis anteriores.
+          </p>
+        )}
+
+        {acervo && niveis.length > 0 && (
+          <p className="rounded-2xl bg-chip px-4 py-3 text-sm leading-snug text-ink2">
+            <b className="text-ink">Você está sem turma neste semestre.</b> Cada vídeo abre no dia em que a última turma do nível tiver a aula. Seu acesso vai até o {NOME_NIVEL[acervo]}; quem ajusta é a organização.
           </p>
         )}
 
@@ -207,7 +220,7 @@ export function TrilhaPage() {
           </section>
         )}
 
-        {lista.length > 0 && (
+        {lista.length > 0 && !acervo && (
           <p className="rounded-2xl bg-chip px-4 py-3 text-[13px] leading-snug text-ink2">
             Dá para comprar <b className="text-ink">qualquer passo à frente</b>, de qualquer nível. Cada um custa pela distância da turma: o próximo {regras.preco_por_passo}, o seguinte {2 * regras.preco_por_passo}, e assim por diante, seguindo para os níveis de cima. Quando a turma avança, o preço cai.
           </p>

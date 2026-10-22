@@ -2270,6 +2270,37 @@ export class SupabaseApi implements ForroApi {
     }))
   }
 
+  async meuAcessoTrilha(): Promise<NivelTrilha | null> {
+    const uid = await this.requireUid()
+    const { data, error } = await this.sb.from('trilha_acesso').select('nivel').eq('user_id', uid).maybeSingle()
+    // Sem a migração 040 a tabela não existe: todo mundo sem turma é Iniciante
+    if (error) return null
+    return ((data as { nivel: NivelTrilha } | null)?.nivel) ?? null
+  }
+
+  async listAcessosTrilha(): Promise<Record<string, NivelTrilha>> {
+    const data = await todasAsLinhas<{ user_id: string; nivel: NivelTrilha }>((de, ate) =>
+      this.sb.from('trilha_acesso').select('user_id, nivel').order('user_id').range(de, ate),
+    ).catch(() => [])
+    return Object.fromEntries(data.map((l) => [l.user_id, l.nivel]))
+  }
+
+  async setAcessoTrilha(userId: string, nivel: NivelTrilha) {
+    const r =
+      nivel === 'iniciante'
+        ? await this.sb.from('trilha_acesso').delete().eq('user_id', userId)
+        : await this.sb
+            .from('trilha_acesso')
+            .upsert({ user_id: userId, nivel, atualizado_em: new Date().toISOString() })
+    if (r.error) {
+      throw new Error(
+        /trilha_acesso/.test(r.error.message)
+          ? 'Falta rodar a migração 040 no Supabase'
+          : traduz(r.error.message),
+      )
+    }
+  }
+
   async liberarPassoComChave(passoId: string, custo: number) {
     const { error } = await this.sb.rpc('liberar_passo_com_chave', { p_passo: passoId, p_custo: custo })
     if (error) throw new Error(traduz(error.message))
@@ -2589,6 +2620,13 @@ export class SupabaseApi implements ForroApi {
   }
 
   async encerrarSemestre() {
+    // Antes de apagar as matrículas: guarda o maior nível de cada um para
+    // o acervo da trilha do semestre que vem (migração 040). Sem a
+    // migração a função não existe, e o encerramento segue como antes.
+    const { error: erroNiveis } = await this.sb.rpc('guardar_niveis_do_semestre')
+    if (erroNiveis && !/guardar_niveis_do_semestre/.test(erroNiveis.message)) {
+      throw new Error(traduz(erroNiveis.message))
+    }
     const perfis = await this.listProfiles()
     const comTurma = perfis.filter((p) => p.turmas.length > 0)
     for (const lote of emLotes(comTurma.map((p) => p.id), 100)) {

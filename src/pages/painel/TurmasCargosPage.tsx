@@ -376,6 +376,10 @@ export function SemestrePage() {
               dá aula
             </li>
             <li>a Forródex de todo mundo zera e a Retrospectiva do semestre é liberada</li>
+            <li>
+              o maior nível de cada um fica guardado para os vídeos da trilha, se ficar sem turma; quem
+              já estava sem turma volta para Iniciante
+            </li>
             <li>a matrícula nova precisa ser importada, e quem dá aula remarcado</li>
             <li>contas, pontos, check-ins e distintivos não são tocados</li>
           </ul>

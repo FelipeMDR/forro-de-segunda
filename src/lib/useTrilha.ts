@@ -35,7 +35,7 @@ export function useTrilha() {
   const carregar = useCallback(async () => {
     if (!userId || !profile) return
     try {
-      const [passos, turmas, eventos, feriados, liberacoes, desafios, regras, semVideo] = await Promise.all([
+      const [passos, turmas, eventos, feriados, liberacoes, desafios, regras, semVideo, acessoSemTurma] = await Promise.all([
         api.listPassosTrilha(),
         api.listTurmas(),
         api.listEvents(),
@@ -44,6 +44,8 @@ export function useTrilha() {
         api.listChallenges().catch(() => [] as Challenge[]),
         api.regrasTrilha().catch(() => ({ ...REGRAS_PADRAO })),
         api.listAulasSemVideo().catch(() => [] as AulaSemVideo[]),
+        // Só quem está sem turma usa o nível de acesso (acervo)
+        profile.turmas.length === 0 ? api.meuAcessoTrilha().catch(() => null) : Promise.resolve(null),
       ])
       const principal = desafios.find((c) => c.forrodex) ?? null
       // Uma consulta só, com quem aparece como professor em algum passo
@@ -70,6 +72,7 @@ export function useTrilha() {
           hoje: diaDaNoite(new Date()),
           equipe: equipeEfetiva(equipeReal, comoAluno),
           regras,
+          acessoSemTurma,
         },
         saldo: saldoDeChaves({
           ...pontos,
