@@ -2150,18 +2150,17 @@ export class DemoApi implements ForroApi {
   }
 
   private gravarCaca(p: Parameters<DemoApi['guardarCacaDoSemestre']>[0]) {
-    // Igual à função: o mesmo semestre (mesmo início) é substituído, para
-    // uma nova tentativa de encerrar não duplicar o emblema
-    const antigos = new Set(
-      (this.db.cacaSemestres ?? []).filter((s) => s.inicio === p.inicio).map((s) => s.id),
-    )
+    // Igual à função: se o mesmo semestre (mesmo início) já foi guardado,
+    // vale a primeira foto. A nova tentativa de encerrar roda com as
+    // turmas já zeradas em parte e não deve substituir nem duplicar.
+    if ((this.db.cacaSemestres ?? []).some((s) => s.inicio === p.inicio)) return
     const id = uuid()
     this.db.cacaSemestres = [
-      ...(this.db.cacaSemestres ?? []).filter((s) => !antigos.has(s.id)),
+      ...(this.db.cacaSemestres ?? []),
       { id, inicio: p.inicio, fim: new Date().toISOString() },
     ]
     this.db.cacaResultados = [
-      ...(this.db.cacaResultados ?? []).filter((r) => !antigos.has(r.semestre_id)),
+      ...(this.db.cacaResultados ?? []),
       ...p.resultados.map((r) => ({
         semestre_id: id,
         user_id: r.user_id,

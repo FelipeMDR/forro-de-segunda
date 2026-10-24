@@ -51,25 +51,27 @@ describe('caça aos professores — congelamento do semestre', () => {
     expect(s.rows[0]).toEqual({ inicio: null })
   })
 
-  it('gravar de novo o mesmo início substitui, sem duplicar', async () => {
+  it('gravar de novo o mesmo início mantém a primeira foto, sem duplicar', async () => {
     const db = await comTime()
     await comoUsuario(db, IDS.org)
-    await guardar(db, PAYLOAD)
+    const primeiro = await guardar(db, PAYLOAD)
+    // A nova tentativa roda com as turmas já zeradas em parte: foto pior
     const segundo = {
       ...PAYLOAD,
       equipe: [PAYLOAD.equipe[0]],
-      resultados: [{ user_id: IDS.a, nivel: 3, pegos: 2, meta: 2, total_equipe: 2 }],
+      resultados: [],
     }
     const { rows } = await guardar(db, segundo)
+    expect(rows[0].id).toBe(primeiro.rows[0].id)
     const s = await db.query<{ id: string }>(`select id from caca_semestres`)
     expect(s.rows).toEqual([{ id: rows[0].id }])
     const r = await db.query(`select semestre_id, user_id, nivel, pegos from caca_resultados`)
-    expect(r.rows).toEqual([{ semestre_id: rows[0].id, user_id: IDS.a, nivel: 3, pegos: 2 }])
+    expect(r.rows).toEqual([{ semestre_id: rows[0].id, user_id: IDS.a, nivel: 2, pegos: 1 }])
     const e = await db.query(`select 1 from caca_equipe`)
-    expect(e.rows).toHaveLength(1)
+    expect(e.rows).toHaveLength(2)
   })
 
-  it('início nulo também é substituído; outro início fica', async () => {
+  it('início nulo também mantém a primeira; outro início fica', async () => {
     const db = await comTime()
     await comoUsuario(db, IDS.org)
     await guardar(db, { ...PAYLOAD, inicio: null })

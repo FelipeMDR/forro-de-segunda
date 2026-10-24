@@ -957,10 +957,15 @@ begin
   end if;
 
   -- Idempotente: se o encerramento falhar depois daqui e a organização
-  -- tentar de novo, o mesmo semestre (mesmo início) é substituído, e não
-  -- duplicado. O cascade leva a equipe e os resultados antigos.
-  delete from caca_semestres
-  where inicio is not distinct from nullif(p->>'inicio', '')::timestamptz;
+  -- tentar de novo, vale a primeira foto do semestre (mesmo início). A
+  -- nova tentativa roda com as turmas já zeradas em parte e calcularia
+  -- uma foto pior; por isso ela não substitui nem duplica.
+  select id into sid from caca_semestres
+  where inicio is not distinct from nullif(p->>'inicio', '')::timestamptz
+  limit 1;
+  if sid is not null then
+    return sid;
+  end if;
 
   insert into caca_semestres (inicio)
   values (nullif(p->>'inicio', '')::timestamptz)
