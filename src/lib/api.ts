@@ -517,6 +517,12 @@ export interface ForroApi {
    * relação com quando as turmas do projeto de fato começam.
    */
   inicioSemestreAtual(): Promise<string | null>
+  /**
+   * Todas as datas de "Encerrar semestre", em ordem cronológica. A
+   * retrospectiva usa as duas últimas: ela só aparece com o semestre
+   * encerrado, então o período dela vai do penúltimo ao último.
+   */
+  encerramentosDeSemestre(): Promise<string[]>
   listProfiles(): Promise<Profile[]>
   /** Adiciona um vínculo turma+papel a um aluno (organizador). */
   addTurmaAluno(

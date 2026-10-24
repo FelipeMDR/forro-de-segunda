@@ -2672,6 +2672,16 @@ export class SupabaseApi implements ForroApi {
     return (data as { encerrado_em: string } | null)?.encerrado_em ?? null
   }
 
+  async encerramentosDeSemestre(): Promise<string[]> {
+    const { data, error } = await this.sb
+      .from('semestres')
+      .select('encerrado_em')
+      .order('encerrado_em', { ascending: true })
+    // Sem a migração 017: sem histórico, como em `inicioSemestreAtual`
+    if (error) return []
+    return (data as { encerrado_em: string }[]).map((s) => s.encerrado_em)
+  }
+
   async listPerfisPublicos(): Promise<PerfilPublico[]> {
     // Colunas nomeadas de propósito: `*` traria o telefone junto, e a
     // busca é usada por qualquer aluno.

@@ -12,6 +12,7 @@ import { diasSuspensos, mapaAberturas } from '../lib/dates'
 import { nivelDupla } from '../lib/forrodex'
 import { carregarPerfilStats } from '../lib/perfilStats'
 import {
+  inicioDoSemestreEncerrado,
   montarRetrospectiva,
   musicaMaisTocada,
   type MusicaDoSemestre,
@@ -50,14 +51,20 @@ export function RetrospectivaPage() {
     let cancelado = false
     void (async () => {
       try {
-        // O início real do semestre é o último "Encerrar semestre". Sem
-        // isso ter acontecido nunca, cai para quando a conta foi criada
-        // — melhor que chutar pelo calendário civil.
-        const ultimoEncerramento = await api.inicioSemestreAtual().catch(() => null)
-        const desde = ultimoEncerramento ?? profile.criado_em ?? new Date(0).toISOString()
+        // A retrospectiva só aparece com o semestre encerrado: o período
+        // vai do penúltimo "Encerrar semestre" até o último. Sem
+        // penúltimo, cai para quando a conta foi criada — melhor que
+        // chutar pelo calendário civil.
+        const encerramentos = await api
+          .encerramentosDeSemestre()
+          .catch(() => [] as string[])
+        const desde = inicioDoSemestreEncerrado(encerramentos, profile.criado_em)
         const [checkins, ps, desafios, feriados, aberturas, tocadas, stats] = await Promise.all([
           api.checkinsComReacoes(userId, desde),
-          api.parceirosDe(userId, desde).catch(() => [] as ParceiroDanca[]),
+          // Até o encerramento: a dupla de depois já é do semestre novo
+          api
+            .parceirosDe(userId, desde, encerramentos.at(-1))
+            .catch(() => [] as ParceiroDanca[]),
           api.listChallenges().catch(() => []),
           api.listFeriados().catch(() => []),
           api.listAberturas().catch(() => []),

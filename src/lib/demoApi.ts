@@ -2022,6 +2022,10 @@ export class DemoApi implements ForroApi {
     return lista.length > 0 ? lista[lista.length - 1] : null
   }
 
+  async encerramentosDeSemestre(): Promise<string[]> {
+    return [...(this.db.semestres ?? [])]
+  }
+
   async listProfiles(): Promise<Profile[]> {
     return [...this.db.profiles].sort((a, b) => a.nome.localeCompare(b.nome))
   }

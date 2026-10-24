@@ -6,6 +6,7 @@
  * pior. O desenho é o mesmo do cartão que aparece no último slide, em
  * coordenadas de uma tela de 288×512 multiplicadas por 3,75.
  */
+import { semestreDe } from './retrospectiva'
 export interface DadosStory {
   /** "2026.1" */
   codigo: string
@@ -151,5 +152,6 @@ export async function desenharStory(d: DadosStory): Promise<Blob> {
 
 /** "2026.1" a partir de quando o semestre começou. */
 export function codigoDoSemestre(inicio: Date): string {
-  return `${inicio.getFullYear()}.${inicio.getMonth() < 6 ? 1 : 2}`
+  const { ano, numero } = semestreDe(inicio)
+  return `${ano}.${numero}`
 }

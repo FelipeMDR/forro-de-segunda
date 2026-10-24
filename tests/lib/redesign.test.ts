@@ -40,6 +40,10 @@ describe('codigoDoSemestre', () => {
     expect(codigoDoSemestre(new Date('2026-03-02T12:00:00'))).toBe('2026.1')
     expect(codigoDoSemestre(new Date('2026-08-03T12:00:00'))).toBe('2026.2')
   })
+
+  it('começo em dezembro é o 1º semestre do ano seguinte', () => {
+    expect(codigoDoSemestre(new Date('2026-12-14T12:00:00'))).toBe('2027.1')
+  })
 })
 
 describe('progresso dos distintivos de marco', () => {

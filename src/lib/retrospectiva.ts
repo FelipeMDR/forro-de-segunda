@@ -31,8 +31,33 @@ export interface Retrospectiva {
  * ele começar.
  */
 export function rotuloDoSemestre(inicio: Date): string {
-  const primeiro = inicio.getMonth() < 6
-  return `${primeiro ? '1º' : '2º'} semestre de ${inicio.getFullYear()}`
+  const { ano, numero } = semestreDe(inicio)
+  return `${numero}º semestre de ${ano}`
+}
+
+/**
+ * Qual semestre começa em `inicio`. Novembro e dezembro contam como o
+ * 1º do ano seguinte: o 2º semestre costuma ser encerrado em dezembro,
+ * e o que começa ali é o do ano que vem.
+ */
+export function semestreDe(inicio: Date): { ano: number; numero: 1 | 2 } {
+  const mes = inicio.getMonth()
+  if (mes >= 10) return { ano: inicio.getFullYear() + 1, numero: 1 }
+  return { ano: inicio.getFullYear(), numero: mes < 6 ? 1 : 2 }
+}
+
+/**
+ * Início do semestre que ACABOU de ser encerrado — o que a retrospectiva
+ * conta. A retrospectiva só aparece depois do "Encerrar semestre", então
+ * o último encerramento é o FIM do período; o início é o penúltimo.
+ * Sem penúltimo (primeiro encerramento da história), cai para a criação
+ * da conta. `encerramentos` vem em ordem cronológica.
+ */
+export function inicioDoSemestreEncerrado(
+  encerramentos: string[],
+  criadoEm: string | null | undefined,
+): string {
+  return encerramentos.at(-2) ?? criadoEm ?? new Date(0).toISOString()
 }
 
 export function montarRetrospectiva(
