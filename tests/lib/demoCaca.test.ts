@@ -28,7 +28,15 @@ describe('DemoApi — caça aos professores', () => {
     const banco = api as unknown as {
       db: {
         duplas?: Array<Record<string, unknown>>
-        profiles: Array<{ id: string; nome: string }>
+        profiles: Array<{
+          id: string
+          nome: string
+          telefone: string | null
+          cargos: string[]
+          papel_principal: string | null
+          turmas: Array<{ turma: string; papel_danca: string | null }>
+        }>
+        semestres?: string[]
       }
       uid(): string
     }
@@ -96,5 +104,35 @@ describe('DemoApi — caça aos professores', () => {
     expect(r.map((d) => d.para_user).sort()).toEqual(['b', 'e'])
     const todas = await api.duplasConfirmadasEntre(null, '2026-06-30')
     expect(todas.map((d) => d.para_user).sort()).toEqual(['b', 'c', 'e'])
+  })
+
+  it('encerrarSemestre congela a caça antes de zerar as turmas', async () => {
+    const { api, banco } = await novaApi('11 98888-0003') // Ana, organizadora
+    const maria = banco.db.profiles.find((p) => p.telefone === '11 98888-0001')!
+    const joao = banco.db.profiles.find((p) => p.telefone === '11 98888-0002')!
+    for (const p of banco.db.profiles) {
+      p.cargos = []
+      p.papel_principal = null
+    }
+    joao.cargos = ['Professor']
+    joao.papel_principal = 'Condutor(a)'
+    // Na turma, Maria é conduzida; o papel principal diz o contrário. Se
+    // a caça fosse congelada depois de zerar as turmas, ela valeria como
+    // condutora, ficaria sem meta e sem linha.
+    maria.turmas = [{ turma: 'Intermediário', papel_danca: 'Conduzido(a)' }]
+    maria.papel_principal = 'Condutor(a)'
+    banco.db.semestres = []
+    banco.db.duplas = [
+      { id: '1', data: '2026-10-19', de_user: maria.id, para_user: joao.id, confirmada: true, criado_em: '' },
+      { id: '2', data: '2026-10-19', de_user: joao.id, para_user: maria.id, confirmada: true, criado_em: '' },
+    ]
+    await api.encerrarSemestre()
+    expect(maria.turmas).toEqual([])
+    const lista = await api.cacaCongeladaDe(maria.id)
+    expect(lista).toHaveLength(1)
+    // Equipe de um só: pegar o João já é a equipe inteira
+    expect(lista[0]).toMatchObject({ inicio: null, nivel: 4, pegos: 1, meta: 1, total_equipe: 1 })
+    // João é o único da equipe: sem ninguém para caçar, sem linha
+    expect(await api.cacaCongeladaDe(joao.id)).toEqual([])
   })
 })

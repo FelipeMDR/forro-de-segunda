@@ -6,6 +6,7 @@ import {
   limitesDaNoite,
   mapaAberturas,
 } from './dates'
+import { cacaParaCongelar } from './caca'
 import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
@@ -2745,6 +2746,16 @@ export class SupabaseApi implements ForroApi {
     const { error: erroNiveis } = await this.sb.rpc('guardar_niveis_do_semestre')
     if (erroNiveis && !/guardar_niveis_do_semestre/.test(erroNiveis.message)) {
       throw new Error(traduz(erroNiveis.message))
+    }
+    // Caça aos professores (migração 041), também antes de apagar as
+    // matrículas: o papel de quem tem turma vem dela. Sem a migração a
+    // função não existe e o semestre fecha sem congelar; outro erro
+    // interrompe antes de qualquer coisa ser apagada.
+    try {
+      await this.guardarCacaDoSemestre(await cacaParaCongelar(this))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!/guardar_caca_do_semestre/.test(msg)) throw new Error(traduz(msg))
     }
     const perfis = await this.listProfiles()
     const comTurma = perfis.filter((p) => p.turmas.length > 0)

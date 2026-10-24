@@ -4,6 +4,7 @@ import {
   marcosDaCaca,
   papelEfetivo,
   progressoCaca,
+  resultadosDaCaca,
 } from '../../src/lib/caca'
 import type { ProfessorCaca } from '../../src/lib/caca'
 import type { PapelDanca, PerfilPublico, Turma } from '../../src/lib/types'
@@ -187,5 +188,56 @@ describe('marcosDaCaca', () => {
 
   it('meta zero nao tem marcos, nem o secreto', () => {
     expect(marcosDaCaca(0, 5, true)).toEqual([])
+  })
+})
+
+describe('resultadosDaCaca', () => {
+  // 4 professores (2 condutores, 2 conduzidos) e 3 alunos
+  const perfis: PerfilPublico[] = [
+    perfil('c1', ['Professor'], COND),
+    perfil('c2', ['Professora'], COND),
+    perfil('d1', ['Professor'], CONDZ),
+    perfil('d2', ['Professora'], CONDZ),
+    // Na turma, conduzida — vale a turma, não o papel principal
+    { ...perfil('a1', [], COND), turmas: [{ turma: 'Iniciante', papel_danca: CONDZ }] },
+    // Sem turma e sem papel: fora da caça
+    perfil('a2', [], null),
+    // Com turma mas sem papel: fora, mesmo com papel principal
+    { ...perfil('a3', [], CONDZ), turmas: [{ turma: 'Iniciante', papel_danca: null }] },
+  ]
+  const turmas: Turma[] = [{ id: 't', nome: 'Iniciante', nivel: 'iniciante' }]
+  // Dupla confirmada tem as duas direções
+  const par = (a: string, b: string) => [
+    { de_user: a, para_user: b },
+    { de_user: b, para_user: a },
+  ]
+  const duplas = [
+    ...par('a1', 'c1'),
+    ...par('a1', 'c2'),
+    ...par('a2', 'c1'),
+    ...par('a3', 'd1'),
+    ...par('c1', 'c2'),
+    ...par('c1', 'd1'),
+    ...par('c1', 'd2'),
+  ]
+
+  it('congela a equipe e só quem chegou a algum nível', () => {
+    const { equipe, resultados } = resultadosDaCaca(perfis, turmas, duplas)
+    expect(equipe).toEqual([
+      { user_id: 'c1', papel: COND },
+      { user_id: 'c2', papel: COND },
+      { user_id: 'd1', papel: CONDZ },
+      { user_id: 'd2', papel: CONDZ },
+    ])
+    const de = (id: string) => resultados.find((r) => r.user_id === id)
+    expect(de('a1')).toEqual({ user_id: 'a1', nivel: 3, pegos: 2, meta: 2, total_equipe: 4 })
+    expect(de('a2')).toBeUndefined()
+    expect(de('a3')).toBeUndefined()
+    // O professor também caça: dançou com os outros 3, equipe inteira
+    expect(de('c1')).toEqual({ user_id: 'c1', nivel: 4, pegos: 2, meta: 2, total_equipe: 3 })
+    // c2 (só com c1, mesmo papel) e d2 (só com c1) — d2 pegou 1 de 2
+    expect(de('c2')).toBeUndefined()
+    expect(de('d2')).toEqual({ user_id: 'd2', nivel: 1, pegos: 1, meta: 2, total_equipe: 3 })
+    expect(resultados.every((r) => r.nivel >= 1)).toBe(true)
   })
 })

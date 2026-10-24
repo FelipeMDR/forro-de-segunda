@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { CARGO_DJ, LIMITE_DJS } from '../../lib/dj'
 import { ordenarTurmas } from '../../lib/forrodex'
-import type { Profile } from '../../lib/types'
+import type { PapelDanca, Profile } from '../../lib/types'
 import { Dica, EscolherPessoa, usePainel } from './contexto'
 
 /** Etiqueta de pessoa com o ✕ para tirar. */
@@ -282,6 +282,7 @@ export function CargosPage() {
             }
           }}
         />
+        <CacaProfessores perfis={perfis} onPapel={(p, papel) => void agir(() => api.definirPapelPrincipal(p.id, papel))} />
       </div>
 
       <EscolherPessoa
@@ -326,6 +327,86 @@ export function CargosPage() {
         }}
         onVoltar={() => setApagando(null)}
       />
+    </div>
+  )
+}
+
+const PAPEIS_CACA: { papel: PapelDanca; rotulo: string }[] = [
+  { papel: 'Condutor(a)', rotulo: '🕺 Conduz' },
+  { papel: 'Conduzido(a)', rotulo: '💃 Conduzido(a)' },
+]
+
+/**
+ * Caça aos professores: quem tem cargo de professor só entra na caça
+ * (como caçado) com o papel marcado. O papel é o `papel_principal`, o
+ * mesmo que a pessoa escolhe no perfil quando está sem turma.
+ */
+function CacaProfessores({
+  perfis,
+  onPapel,
+}: {
+  perfis: Profile[]
+  onPapel: (p: Profile, papel: PapelDanca) => void
+}) {
+  const profs = perfis
+    .filter((p) => p.cargos.some((c) => c.toLowerCase().includes('professor')))
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+  const semPapel = profs.filter((p) => !p.papel_principal).length
+  return (
+    <div className="mt-4 flex flex-col gap-2.5">
+      <div className="flex flex-col gap-0.5 px-1">
+        <span className="text-lg font-extrabold">Caça aos professores</span>
+        <span className="text-[13px] leading-snug text-ink3">
+          Quem tem o cargo Professor(a) entra na caça. Marque como cada um dança.
+        </span>
+      </div>
+      {semPapel > 0 && (
+        <div className="flex items-start gap-2.5 rounded-[14px] bg-brasa-500/10 px-3 py-2.5 text-[13px] font-semibold leading-snug text-or-t">
+          <span className="mt-px shrink-0">
+            <Icone nome="alerta" tamanho={18} />
+          </span>
+          {semPapel} professor(es) sem papel — eles ainda não contam na caça de ninguém.
+        </div>
+      )}
+      {profs.length === 0 ? (
+        <Dica>Ninguém tem cargo de professor ainda.</Dica>
+      ) : (
+        <div className="flex flex-col overflow-hidden rounded-[18px] border border-linha bg-sf">
+          {profs.map((p) => (
+            <div key={p.id} className="flex items-center gap-2.5 border-b border-linha px-3 py-2.5 last:border-b-0">
+              <Avatar nome={p.nome} url={p.avatar_url} tamanho={34} borda={false} />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[15px] font-extrabold">{p.nome}</span>
+                {p.turmas_ensino.length > 0 && (
+                  <span className="truncate text-xs text-ink3">{ordenarTurmas(p.turmas_ensino).join(' · ')}</span>
+                )}
+              </div>
+              <div role="group" aria-label={`Papel de ${p.nome} na caça`} className="flex shrink-0 gap-0.5 rounded-full bg-chip p-[3px]">
+                {PAPEIS_CACA.map((o) => {
+                  const ativo = p.papel_principal === o.papel
+                  return (
+                    <button
+                      key={o.papel}
+                      type="button"
+                      aria-pressed={ativo}
+                      onClick={() => !ativo && onPapel(p, o.papel)}
+                      className={`min-h-9 whitespace-nowrap rounded-full px-2.5 text-xs font-extrabold ${
+                        ativo ? 'bg-sf text-ink shadow-[0_1px_3px_rgb(0_5_7/0.18)]' : 'text-ink3'
+                      }`}
+                    >
+                      {o.rotulo}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <Dica>
+        Ao encerrar o semestre, essa lista fica guardada com os emblemas — mudar depois não altera o
+        passado.
+      </Dica>
     </div>
   )
 }

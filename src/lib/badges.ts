@@ -353,6 +353,7 @@ function cacaCongelada(c: CacaCongelada): Badge {
     ref.setMonth(ref.getMonth() - 4)
   }
   const marcos = marcosDaCaca(c.meta, c.total_equipe, c.nivel === 4)
+  const valor = c.nivel === 4 ? c.total_equipe : c.pegos
   const marco =
     marcos.find((m) => m.titulo === TITULO_DO_NIVEL[c.nivel]) ?? marcos[marcos.length - 1]
   return {
@@ -362,7 +363,8 @@ function cacaCongelada(c: CacaCongelada): Badge {
     descricao: `${c.pegos} de ${c.meta} ${professores(c.meta)}`,
     tipo: `${TIPO_CACA} · ${rotuloDoSemestre(ref)}`,
     regra: REGRA_CACA,
-    trilha: trilhaDe(emTuplas(marcos), c.pegos, professores(c.pegos)),
+    // No 🏆 `pegos` guarda só a meta; a trilha vai até a equipe inteira
+    trilha: trilhaDe(emTuplas(marcos), valor, professores(valor)),
   }
 }
 

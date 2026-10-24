@@ -177,6 +177,20 @@ describe('distintivo da caça aos professores', () => {
     expect(out[0].progresso).toBeUndefined()
   })
 
+  it('caça congelada no nível 4 mostra a trilha cheia até 🏆', () => {
+    const [b] = computeBadges({
+      userId: 'u',
+      turmas: [],
+      checkinDates: [],
+      cacasCongeladas: [
+        { inicio: INICIO, fim: '2026-12-14T22:00:00Z', nivel: 4, pegos: 7, meta: 7, total_equipe: 14 },
+      ],
+    }).filter((b) => b.id.startsWith('caca'))
+    expect(b.emoji).toBe('🏆')
+    expect(b.trilha?.marcos).toHaveLength(4)
+    expect(b.trilha?.valor).toBe(14)
+  })
+
   it('caça congelada sem inicio rotula pelo semestre que fechou', () => {
     const tipo = (fim: string) =>
       computeBadges({

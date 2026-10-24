@@ -1,3 +1,4 @@
+import type { ForroApi } from './api'
 import { pesoTurma } from './forrodex'
 import type {
   PapelDanca,
@@ -169,4 +170,72 @@ export function progressoCaca(
     if (pegosEquipe === totalEquipe) nivel = 4
   }
   return { meta, pegos, faltam, totalEquipe, pegosEquipe, nivel }
+}
+
+export interface ResultadosDaCaca {
+  equipe: { user_id: string; papel: PapelDanca }[]
+  resultados: {
+    user_id: string
+    nivel: number
+    pegos: number
+    meta: number
+    total_equipe: number
+  }[]
+}
+
+/**
+ * A foto da caça no fim do semestre: a equipe e o nível de cada um que
+ * chegou a algum degrau. Professores caçam também. `pegos` é sempre a
+ * contagem da meta — no nível 4 o distintivo mostra a equipe inteira.
+ */
+export function resultadosDaCaca(
+  perfis: PerfilPublico[],
+  turmas: Turma[],
+  duplas: { de_user: string; para_user: string }[],
+): ResultadosDaCaca {
+  const equipe = equipeDaCaca(perfis)
+  const parceirosDe = new Map<string, Set<string>>()
+  for (const d of duplas) {
+    let s = parceirosDe.get(d.de_user)
+    if (!s) parceirosDe.set(d.de_user, (s = new Set()))
+    s.add(d.para_user)
+  }
+  const resultados: ResultadosDaCaca['resultados'] = []
+  for (const p of perfis) {
+    const papel = papelEfetivo(p.turmas, p.papel_principal, turmas)
+    if (!papel) continue
+    const r = progressoCaca(p.id, papel, equipe, parceirosDe.get(p.id) ?? new Set())
+    if (r.nivel < 1) continue
+    resultados.push({
+      user_id: p.id,
+      nivel: r.nivel,
+      pegos: r.pegos.length,
+      meta: r.meta.length,
+      total_equipe: r.totalEquipe,
+    })
+  }
+  return {
+    equipe: equipe.map((e) => ({ user_id: e.user_id, papel: e.papel })),
+    resultados,
+  }
+}
+
+/**
+ * O que congelar da caça do semestre que acaba. Roda no
+ * `encerrarSemestre` ANTES de apagar as matrículas: o papel de quem tem
+ * turma vem dela.
+ */
+export async function cacaParaCongelar(
+  api: Pick<
+    ForroApi,
+    'inicioSemestreAtual' | 'listPerfisPublicos' | 'listTurmas' | 'duplasConfirmadasEntre'
+  >,
+): Promise<ResultadosDaCaca & { inicio: string | null }> {
+  const inicio = await api.inicioSemestreAtual()
+  const [perfis, turmas, duplas] = await Promise.all([
+    api.listPerfisPublicos(),
+    api.listTurmas(),
+    api.duplasConfirmadasEntre(inicio, new Date().toISOString()),
+  ])
+  return { inicio, ...resultadosDaCaca(perfis, turmas, duplas) }
 }

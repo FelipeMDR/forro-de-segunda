@@ -1,6 +1,7 @@
 import { decidirPassada, LIMITE_BUSCA } from '../../supabase/functions/_shared/djPuro'
 import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { ForroApi } from './api'
+import { cacaParaCongelar } from './caca'
 import {
   addDays,
   diaDaNoite,
@@ -2021,6 +2022,10 @@ export class DemoApi implements ForroApi {
       else if (niveis.includes('intermediario')) acesso[p.id] = 'intermediario'
     }
     this.db.trilhaAcesso = acesso
+    // Caça aos professores (migração 041): congela antes de zerar as
+    // turmas, porque o papel de quem tem turma vem dela. Grava direto,
+    // sem a checagem de organizador: o encerramento do demo não tem.
+    this.gravarCaca(await cacaParaCongelar(this))
     const afetados = this.db.profiles.filter(
       (p) => p.turmas.length > 0 || p.turmas_ensino.length > 0,
     )
@@ -2141,6 +2146,10 @@ export class DemoApi implements ForroApi {
     if (this.db.roles[this.uid()] !== 'organizador') {
       throw new Error('Só a organização encerra o semestre')
     }
+    this.gravarCaca(p)
+  }
+
+  private gravarCaca(p: Parameters<DemoApi['guardarCacaDoSemestre']>[0]) {
     const id = uuid()
     this.db.cacaSemestres = [
       ...(this.db.cacaSemestres ?? []),
