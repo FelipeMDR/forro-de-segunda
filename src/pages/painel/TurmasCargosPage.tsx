@@ -351,6 +351,9 @@ function CacaProfessores({
   perfis: Profile[]
   onPapel: (p: Profile, papel: PapelDanca) => void
 }) {
+  // Sem a migração 041 a função vem indisponível (undefined) para todo
+  // mundo: não há onde salvar o papel, então a seção não aparece
+  if (perfis.some((p) => p.papel_principal === undefined)) return null
   const profs = perfis
     .filter((p) => p.cargos.some((c) => c.toLowerCase().includes('professor')))
     .sort((a, b) => a.nome.localeCompare(b.nome))
@@ -471,6 +474,7 @@ export function SemestrePage() {
               já estava sem turma volta para Iniciante
             </li>
             <li>a matrícula nova precisa ser importada, e quem dá aula remarcado</li>
+            <li>a Caça aos professores de cada um fica guardada como emblema do semestre</li>
             <li>contas, pontos, check-ins e distintivos não são tocados</li>
           </ul>
           <span className="text-sm font-extrabold text-or-t">Não dá para desfazer.</span>

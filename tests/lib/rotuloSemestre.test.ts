@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { inicioDoSemestreEncerrado, rotuloDoSemestre } from '../../src/lib/retrospectiva'
+import {
+  inicioDoSemestreEncerrado,
+  rotuloDoPeriodo,
+  rotuloDoSemestre,
+} from '../../src/lib/retrospectiva'
 
 const dia = (iso: string) => new Date(`${iso}T12:00:00`)
 
@@ -15,6 +19,21 @@ describe('rotuloDoSemestre', () => {
   it('encerrado em dezembro: o semestre que começa ali é o 1º do ano seguinte', () => {
     expect(rotuloDoSemestre(dia('2026-12-14'))).toBe('1º semestre de 2027')
     expect(rotuloDoSemestre(dia('2026-11-30'))).toBe('1º semestre de 2027')
+  })
+})
+
+describe('rotuloDoPeriodo', () => {
+  it('sem início (primeiro encerramento), rotula por 4 meses antes do fim', () => {
+    expect(rotuloDoPeriodo(null, '2026-12-14T22:00:00Z')).toBe('2º semestre de 2026')
+  })
+
+  it('com início, rotula pelo início', () => {
+    expect(rotuloDoPeriodo('2026-07-20T22:00:00Z', '2026-12-14T22:00:00Z')).toBe(
+      '2º semestre de 2026',
+    )
+    expect(rotuloDoPeriodo('2026-12-14T22:00:00Z', '2027-07-10T22:00:00Z')).toBe(
+      '1º semestre de 2027',
+    )
   })
 })
 

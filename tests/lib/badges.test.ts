@@ -81,6 +81,7 @@ describe('distintivo de função', () => {
       titulo: 'Conduzido(a)',
       descricao: 'Função principal na dança',
       tipo: 'Função',
+      regra: 'Função principal na dança, para quem está sem turma. Dá pra trocar no perfil.',
     })
   })
 
@@ -187,8 +188,29 @@ describe('distintivo da caça aos professores', () => {
       ],
     }).filter((b) => b.id.startsWith('caca'))
     expect(b.emoji).toBe('🏆')
+    expect(b.descricao).toBe('14 de 14 professores')
     expect(b.trilha?.marcos).toHaveLength(4)
     expect(b.trilha?.valor).toBe(14)
+  })
+
+  it('só a caça congelada é marcada como congelada', () => {
+    const [congelada] = computeBadges({
+      userId: 'u',
+      turmas: [],
+      checkinDates: [],
+      cacasCongeladas: [
+        { inicio: INICIO, fim: '2026-12-14T22:00:00Z', nivel: 2, pegos: 4, meta: 7, total_equipe: 14 },
+      ],
+    }).filter((b) => b.id.startsWith('caca'))
+    expect(congelada.congelado).toBe(true)
+    expect(caca(progresso(7, 4))[0].congelado).toBeUndefined()
+  })
+
+  it('o cartão de nível 0 e o convite à função ficam marcados como pendentes', () => {
+    expect(caca(progresso(7, 0), { proprio: true })[0].caca?.pendente).toBe(true)
+    expect(caca(null, { proprio: true, semPapel: true })[0].caca?.pendente).toBe(true)
+    expect(caca(progresso(7, 1))[0].caca?.pendente).toBeUndefined()
+    expect(caca(progresso(7, 4))[0].caca?.pendente).toBeUndefined()
   })
 
   it('caça congelada sem inicio rotula pelo semestre que fechou', () => {

@@ -521,8 +521,9 @@ export class SupabaseApi implements ForroApi {
       // `turmasEnsinoDe` / `ensinoPorUsuario`).
       turmas_ensino: [],
       // Idem: `papel_principal` é da migração 041 e fica fora do select
-      // (ver `papelPrincipalDe` / `papelPrincipalPorUsuario`).
-      papel_principal: null,
+      // (ver `papelPrincipalDe` / `papelPrincipalPorUsuario`). Até quem
+      // chama preencher, fica "indisponível".
+      papel_principal: undefined,
     }
   }
 
@@ -585,21 +586,31 @@ export class SupabaseApi implements ForroApi {
   /**
    * Função de dança de quem está sem turma. Consulta separada e tolerante
    * a falha: sem a migração 041 a coluna não existe, e pô-la no select do
-   * perfil derrubaria o perfil inteiro.
+   * perfil derrubaria o perfil inteiro. Com erro, devolve undefined
+   * ("indisponível"), não null ("não escolheu"): sem a coluna, a tela não
+   * pode convidar a escolher uma função que não tem onde ser salva.
    */
-  private async papelPrincipalDe(userId: string): Promise<PapelDanca | null> {
+  private async papelPrincipalDe(
+    userId: string,
+  ): Promise<PapelDanca | null | undefined> {
     const { data, error } = await this.sb
       .from('profiles')
       .select('papel_principal')
       .eq('id', userId)
       .maybeSingle()
-    if (error) return null
+    if (error) {
+      console.warn('[perfil] função de dança indisponível:', error)
+      return undefined
+    }
     return ((data as { papel_principal?: PapelDanca | null } | null)
       ?.papel_principal ?? null) as PapelDanca | null
   }
 
-  /** Todas as funções de uma vez, para as listas (mesma tolerância). */
-  private async papelPrincipalPorUsuario(): Promise<Map<string, PapelDanca>> {
+  /**
+   * Todas as funções de uma vez, para as listas (mesma tolerância). null =
+   * indisponível para todo mundo; quem não está no mapa não escolheu.
+   */
+  private async papelPrincipalPorUsuario(): Promise<Map<string, PapelDanca> | null> {
     const mapa = new Map<string, PapelDanca>()
     let linhas: Array<{ id: string; papel_principal: PapelDanca | null }>
     try {
@@ -613,7 +624,7 @@ export class SupabaseApi implements ForroApi {
       )
     } catch (e) {
       console.warn('[perfis] função de dança indisponível:', e)
-      return mapa
+      return null
     }
     for (const r of linhas) {
       if (r.papel_principal) mapa.set(r.id, r.papel_principal)
@@ -2838,7 +2849,7 @@ export class SupabaseApi implements ForroApi {
       return {
         ...publico,
         turmas_ensino: ensino.get(publico.id) ?? [],
-        papel_principal: papeis.get(publico.id) ?? null,
+        papel_principal: papeis ? (papeis.get(publico.id) ?? null) : undefined,
       }
     })
   }
@@ -2859,7 +2870,7 @@ export class SupabaseApi implements ForroApi {
     return data.map((p) => ({
       ...this.mapProfile(p),
       turmas_ensino: ensino.get(p.id as string) ?? [],
-      papel_principal: papeis.get(p.id as string) ?? null,
+      papel_principal: papeis ? (papeis.get(p.id as string) ?? null) : undefined,
     }))
   }
 

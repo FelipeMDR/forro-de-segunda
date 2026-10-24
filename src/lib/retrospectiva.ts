@@ -47,6 +47,24 @@ export function semestreDe(inicio: Date): { ano: number; numero: 1 | 2 } {
 }
 
 /**
+ * Data que nomeia um semestre encerrado: o início, ou, sem início
+ * (primeiro encerramento da história), 4 meses antes do fim — o `fim`
+ * direto jogaria um fechamento de dezembro no 1º semestre do ano
+ * seguinte. Serve ao rótulo e ao código do story.
+ */
+export function referenciaDoPeriodo(inicio: string | null, fim: string): Date {
+  if (inicio) return new Date(inicio)
+  const ref = new Date(fim)
+  ref.setMonth(ref.getMonth() - 4)
+  return ref
+}
+
+/** "2º semestre de 2026" de um semestre encerrado (ver `referenciaDoPeriodo`). */
+export function rotuloDoPeriodo(inicio: string | null, fim: string): string {
+  return rotuloDoSemestre(referenciaDoPeriodo(inicio, fim))
+}
+
+/**
  * Início do semestre que ACABOU de ser encerrado — o que a retrospectiva
  * conta. A retrospectiva só aparece depois do "Encerrar semestre", então
  * o último encerramento é o FIM do período; o início é o penúltimo.
@@ -63,7 +81,10 @@ export function inicioDoSemestreEncerrado(
 export function montarRetrospectiva(
   checkins: CheckinComReacoes[],
   parceiros: ParceiroDanca[],
-  inicio: Date,
+  // `desde` recorta os dados; `rotulo` nomeia o semestre, que nem sempre
+  // sai de `desde` (sem penúltimo encerramento, `desde` é a criação da
+  // conta, e o nome vem do fim — ver `rotuloDoPeriodo`)
+  periodo: { desde: Date; rotulo: string },
   // Presença = check-in que marcou ponto em algum desafio. A foto que
   // não marcou continua entrando em "reações recebidas" e pode até ser
   // o destaque do semestre — ela existiu, só não foi uma noite de forró.
@@ -78,8 +99,8 @@ export function montarRetrospectiva(
     null,
   )
   return {
-    desde: inicio.toISOString(),
-    rotuloPeriodo: rotuloDoSemestre(inicio),
+    desde: periodo.desde.toISOString(),
+    rotuloPeriodo: periodo.rotulo,
     presencas: diasDistintos(datas),
     streak: computeStreak(datas, agora),
     parceiros: parceiros.length,

@@ -45,8 +45,12 @@ export interface Profile {
    * anterior à exigência, que ainda precisa aceitar (LGPD).
    */
   termos_aceitos_em?: string | null
-  /** Papel que a pessoa dança quando não tem turma (Caça aos professores). */
-  papel_principal: PapelDanca | null
+  /**
+   * Papel que a pessoa dança quando não tem turma (Caça aos professores).
+   * null = ainda não escolheu; undefined = função indisponível (banco sem
+   * a migração 041), e aí nada de função aparece na tela.
+   */
+  papel_principal: PapelDanca | null | undefined
   criado_em: string
 }
 
@@ -559,7 +563,17 @@ export interface Badge {
     faltam: ProfessorCaca[]
     /** Sem função escolhida: o cartão leva à escolha. */
     abrirFuncao?: boolean
+    /**
+     * Nível 0 e convite à função: o cartão aparece, mas ainda não é
+     * conquista (fica fora da contagem de conquistados).
+     */
+    pendente?: boolean
   }
+  /**
+   * Distintivo de um semestre já encerrado: não muda mais, então o
+   * detalhe não mostra próximo marco nem total até agora.
+   */
+  congelado?: boolean
 }
 
 /**

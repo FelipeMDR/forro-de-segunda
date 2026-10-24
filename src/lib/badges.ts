@@ -1,7 +1,7 @@
 import { diasDistintos, toISODate } from './dates'
 import { marcosDaCaca } from './caca'
 import type { MarcoCaca, ProgressoCaca } from './caca'
-import { rotuloDoSemestre } from './retrospectiva'
+import { rotuloDoPeriodo, rotuloDoSemestre } from './retrospectiva'
 import { emojiCargo } from './types'
 import type { Badge, CacaCongelada, PapelDanca, TurmaMembro } from './types'
 
@@ -200,7 +200,7 @@ export function computeBadges(input: {
       titulo: input.papelPrincipal,
       descricao: 'Função principal na dança',
       tipo: 'Função',
-      regra: 'Escolhida por você na conta. Quem tem turma usa a função da turma.',
+      regra: 'Função principal na dança, para quem está sem turma. Dá pra trocar no perfil.',
     })
   }
 
@@ -299,7 +299,7 @@ function cacaViva(atual: NonNullable<Parameters<typeof computeBadges>[0]['cacaAt
       descricao: 'Escolha sua função para entrar',
       tipo,
       regra: REGRA_CACA,
-      caca: { pegos: [], faltam: [], abrirFuncao: true },
+      caca: { pegos: [], faltam: [], abrirFuncao: true, pendente: true },
     }
   }
   if (p.meta.length === 0) return null
@@ -326,7 +326,18 @@ function cacaViva(atual: NonNullable<Parameters<typeof computeBadges>[0]['cacaAt
     : undefined
 
   if (!anterior) {
-    return { id: 'caca-atual', emoji: '🎯', titulo: TIPO_CACA, descricao, progresso, tipo, regra: REGRA_CACA, trilha, caca }
+    // Nível 0 (só no próprio perfil): ainda não é conquista
+    return {
+      id: 'caca-atual',
+      emoji: '🎯',
+      titulo: TIPO_CACA,
+      descricao,
+      progresso,
+      tipo,
+      regra: REGRA_CACA,
+      trilha,
+      caca: { ...caca, pendente: true },
+    }
   }
   return {
     id: 'caca-atual',
@@ -343,15 +354,6 @@ function cacaViva(atual: NonNullable<Parameters<typeof computeBadges>[0]['cacaAt
 
 /** Cartão de uma caça já encerrada: só o resultado, sem listas nem progresso. */
 function cacaCongelada(c: CacaCongelada): Badge {
-  // Sem `inicio` (primeiro semestre da história), o rótulo vem de 4 meses
-  // antes do fechamento — `fim` direto jogaria um fechamento de dezembro
-  // no 1º semestre do ano seguinte.
-  let ref: Date
-  if (c.inicio) ref = new Date(c.inicio)
-  else {
-    ref = new Date(c.fim)
-    ref.setMonth(ref.getMonth() - 4)
-  }
   const marcos = marcosDaCaca(c.meta, c.total_equipe, c.nivel === 4)
   const valor = c.nivel === 4 ? c.total_equipe : c.pegos
   const marco =
@@ -360,9 +362,15 @@ function cacaCongelada(c: CacaCongelada): Badge {
     id: `caca-${c.inicio ?? 'inicio'}`,
     emoji: marco?.emoji ?? '🎯',
     titulo: marco?.titulo ?? TITULO_DO_NIVEL[c.nivel],
-    descricao: `${c.pegos} de ${c.meta} ${professores(c.meta)}`,
-    tipo: `${TIPO_CACA} · ${rotuloDoSemestre(ref)}`,
+    // No 🏆, igual ao cartão ao vivo: conta a equipe inteira
+    descricao:
+      c.nivel === 4
+        ? `${c.total_equipe} de ${c.total_equipe} ${professores(c.total_equipe)}`
+        : `${c.pegos} de ${c.meta} ${professores(c.meta)}`,
+    // Sem `inicio` (primeiro semestre da história), o nome sai do fim
+    tipo: `${TIPO_CACA} · ${rotuloDoPeriodo(c.inicio, c.fim)}`,
     regra: REGRA_CACA,
+    congelado: true,
     // No 🏆 `pegos` guarda só a meta; a trilha vai até a equipe inteira
     trilha: trilhaDe(emTuplas(marcos), valor, professores(valor)),
   }

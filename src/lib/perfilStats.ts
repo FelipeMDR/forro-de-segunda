@@ -39,13 +39,17 @@ export async function carregarPerfilStats(
   turmas: TurmaMembro[],
   cargos: string[] = [],
   opcoes: {
-    /** Função principal de quem está sem turma (migração 041). */
+    /**
+     * Função principal de quem está sem turma (migração 041). undefined =
+     * indisponível (banco sem a migração): sem convite a escolher.
+     */
     papelPrincipal?: PapelDanca | null
     /** Próprio perfil: mostra a caça no nível 0 e o convite à função. */
     proprio?: boolean
   } = {},
 ): Promise<{ stats: PerfilStats; badges: Badge[] }> {
   const papelPrincipal = opcoes.papelPrincipal ?? null
+  const funcaoDisponivel = opcoes.papelPrincipal !== undefined
   // A caça vale no semestre em curso: as duplas são recortadas no último
   // "Encerrar semestre" (nunca encerrado = desde sempre). É um pedido à
   // parte do histórico completo, que o rodízio continua usando.
@@ -127,6 +131,7 @@ export async function carregarPerfilStats(
         turmasCadastradas,
         cacaSemestre,
         opcoes.proprio ?? false,
+        funcaoDisponivel,
       ),
       cacasCongeladas,
     }),
@@ -146,6 +151,7 @@ function montarCacaAtual(
   turmasCadastradas: Turma[] | null,
   semestre: { inicio: string | null; parceiros: ParceiroDanca[] },
   proprio: boolean,
+  funcaoDisponivel: boolean,
 ) {
   const base = { inicio: semestre.inicio, proprio }
   if (!perfis || !turmasCadastradas) {
@@ -153,7 +159,8 @@ function montarCacaAtual(
   }
   const papel = papelEfetivo(turmas, papelPrincipal, turmasCadastradas)
   if (!papel) {
-    return { ...base, progresso: null, semPapel: turmas.length === 0 }
+    // Sem a coluna da função não há o que escolher: nada de convite
+    return { ...base, progresso: null, semPapel: turmas.length === 0 && funcaoDisponivel }
   }
   const parceiros = new Set(semestre.parceiros.map((p) => p.user_id))
   return {

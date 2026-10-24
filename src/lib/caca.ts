@@ -202,7 +202,7 @@ export function resultadosDaCaca(
   }
   const resultados: ResultadosDaCaca['resultados'] = []
   for (const p of perfis) {
-    const papel = papelEfetivo(p.turmas, p.papel_principal, turmas)
+    const papel = papelEfetivo(p.turmas, p.papel_principal ?? null, turmas)
     if (!papel) continue
     const r = progressoCaca(p.id, papel, equipe, parceirosDe.get(p.id) ?? new Set())
     if (r.nivel < 1) continue

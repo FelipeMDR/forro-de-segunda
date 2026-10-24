@@ -297,8 +297,9 @@ export function ContaPage() {
           </button>
         </LinhaConta>
 
-        {/* Só sem turma: quem tem turma dança o papel da turma */}
-        {profile.turmas.length === 0 && (
+        {/* Só sem turma: quem tem turma dança o papel da turma. Sem a
+            migração 041 (undefined) não há onde salvar: a linha some. */}
+        {profile.turmas.length === 0 && profile.papel_principal !== undefined && (
           <LinhaConta
             rotulo="Função na dança"
             valor={profile.papel_principal}
@@ -354,7 +355,7 @@ export function ContaPage() {
       <FolhaFuncao
         aberta={escolherFuncao}
         onFechar={() => setEscolherFuncao(false)}
-        atual={profile.papel_principal}
+        atual={profile.papel_principal ?? null}
         onSalvar={salvarFuncao}
       />
     </div>

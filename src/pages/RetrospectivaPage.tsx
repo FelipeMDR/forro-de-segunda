@@ -15,6 +15,8 @@ import {
   inicioDoSemestreEncerrado,
   montarRetrospectiva,
   musicaMaisTocada,
+  referenciaDoPeriodo,
+  rotuloDoSemestre,
   type MusicaDoSemestre,
   type Retrospectiva,
 } from '../lib/retrospectiva'
@@ -36,6 +38,8 @@ export function RetrospectivaPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [r, setR] = useState<Retrospectiva | null>(null)
+  /** Data que nomeia o semestre (rótulo e código do story). */
+  const [referencia, setReferencia] = useState<Date | null>(null)
   const [parceiros, setParceiros] = useState<ParceiroDanca[]>([])
   const [musica, setMusica] = useState<MusicaDoSemestre | null>(null)
   const [badges, setBadges] = useState<Badge[]>([])
@@ -73,7 +77,16 @@ export function RetrospectivaPage() {
           carregarPerfilStats(api, userId, profile.turmas, profile.cargos).catch(() => null),
         ])
         if (cancelado) return
-        const retro = montarRetrospectiva(checkins, ps, new Date(desde), {
+        // O nome do semestre sai do mesmo período do emblema da caça
+        // (`referenciaDoPeriodo`): sem penúltimo encerramento, `desde` é
+        // a criação da conta, que pode ser de outro semestre; aí o nome
+        // vem do último encerramento. Os dados seguem recortados em `desde`.
+        const fim = encerramentos.at(-1)
+        const ref = fim
+          ? referenciaDoPeriodo(encerramentos.at(-2) ?? null, fim)
+          : new Date(desde)
+        const periodo = { desde: new Date(desde), rotulo: rotuloDoSemestre(ref) }
+        const retro = montarRetrospectiva(checkins, ps, periodo, {
           desafios,
           suspensos: diasSuspensos(feriados),
           aberturas: mapaAberturas(aberturas),
@@ -81,6 +94,7 @@ export function RetrospectivaPage() {
         setParceiros([...ps].sort((a, b) => b.noites - a.noites))
         setMusica(musicaMaisTocada(tocadas))
         setBadges(stats?.badges ?? [])
+        setReferencia(ref)
         setR(retro)
         inicio.current = Date.now()
         // As reações por emoji da foto destaque (o resumo só tem o total)
@@ -103,7 +117,7 @@ export function RetrospectivaPage() {
     }
   }, [api, userId, profile])
 
-  const codigo = r ? codigoDoSemestre(new Date(r.desde)) : ''
+  const codigo = r && referencia ? codigoDoSemestre(referencia) : ''
   const primeiroNome = profile?.nome.split(/\s+/)[0] ?? ''
   const top = parceiros.slice(0, 5)
 

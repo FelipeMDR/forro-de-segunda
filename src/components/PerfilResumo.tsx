@@ -176,13 +176,15 @@ export function BadgeGrid({
 }) {
   const [aberto, setAberto] = useState<Badge | null>(null)
   const fechar = useCallback(() => setAberto(null), [])
+  // A caça no nível 0 e o convite à função aparecem, mas não são conquista
+  const conquistados = badges?.filter((b) => !b.caca?.pendente).length ?? 0
   return (
     <section className="flex flex-col gap-2.5 pt-6">
       <div className="flex items-baseline justify-between px-5">
         <span className="text-[19px] font-extrabold">Distintivos</span>
-        {contagem && badges && badges.length > 0 && (
+        {contagem && conquistados > 0 && (
           <span className="whitespace-nowrap text-[13px] text-ink3">
-            {badges.length} {badges.length === 1 ? 'conquistado' : 'conquistados'}
+            {conquistados} {conquistados === 1 ? 'conquistado' : 'conquistados'}
           </span>
         )}
       </div>
@@ -266,8 +268,11 @@ function DetalheDistintivo({ b, onFechar }: { b: Badge; onFechar: () => void }) 
       valor: formatarDia(b.alcancadoEm),
     })
   }
-  if (proximo) linhas.push({ rotulo: 'Próximo marco', valor: `${proximo.emoji} ${proximo.titulo}` })
-  if (t) linhas.push({ rotulo: 'Total até agora', valor: `${t.valor} ${t.unidade}` })
+  // Semestre encerrado não anda mais: sem próximo marco nem total "até agora"
+  if (!b.congelado) {
+    if (proximo) linhas.push({ rotulo: 'Próximo marco', valor: `${proximo.emoji} ${proximo.titulo}` })
+    if (t) linhas.push({ rotulo: 'Total até agora', valor: `${t.valor} ${t.unidade}` })
+  }
 
   return (
     <div

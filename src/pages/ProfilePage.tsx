@@ -57,15 +57,21 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!userId || !profile) return
+    // O perfil muda depois de salvar a função (refreshProfile): sem isso,
+    // um pedido anterior, mais pesado, podia chegar por último e trazer
+    // de volta os distintivos velhos.
+    let cancelado = false
     void carregarPerfilStats(api, userId, profile.turmas, profile.cargos, {
       papelPrincipal: profile.papel_principal,
       proprio: true,
     })
       .then((r) => {
+        if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
       })
       .catch((e) => {
+        if (cancelado) return
         console.error('[perfil] falha ao carregar estatísticas', e)
         // Sem estatísticas, mostra ao menos os distintivos de turma
         setStats({ streak: 0, presencas: 0, desafios: 0, parceiros: 0 })
@@ -95,6 +101,9 @@ export function ProfilePage() {
     void carregarParceiros(api, userId, profile.criado_em ?? undefined)
       .then((parceiros) => setDexSemestre(parceiros.length))
       .catch(() => setDexSemestre(null))
+    return () => {
+      cancelado = true
+    }
   }, [api, userId, profile])
 
   useEffect(() => {
@@ -190,8 +199,9 @@ export function ProfilePage() {
       </div>
 
       {/* Só quem está sem turma escolhe a função: quem tem turma usa o
-          papel da turma. Some assim que a pessoa escolhe. */}
-      {profile.turmas.length === 0 && !profile.papel_principal && (
+          papel da turma. Some assim que a pessoa escolhe, e também sem a
+          migração 041 (undefined), quando não há onde salvar. */}
+      {profile.turmas.length === 0 && profile.papel_principal === null && (
         <div className="px-4 pb-3">
           <button
             type="button"
@@ -308,7 +318,7 @@ export function ProfilePage() {
       <FolhaFuncao
         aberta={escolherFuncao}
         onFechar={() => setEscolherFuncao(false)}
-        atual={profile.papel_principal}
+        atual={profile.papel_principal ?? null}
         onSalvar={salvarFuncao}
       />
 
