@@ -1,3 +1,5 @@
+import type { ProfessorCaca } from './caca'
+
 export type Papel = 'aluno' | 'organizador'
 
 /** Papel na dança dentro de uma turma. */
@@ -550,6 +552,13 @@ export interface Badge {
     valor: number
     /** "dias", "pessoas", "músicas" */
     unidade: string
+  }
+  /** Caça aos professores ao vivo: quem já dançou e quem falta. */
+  caca?: {
+    pegos: ProfessorCaca[]
+    faltam: ProfessorCaca[]
+    /** Sem função escolhida: o cartão leva à escolha. */
+    abrirFuncao?: boolean
   }
 }
 

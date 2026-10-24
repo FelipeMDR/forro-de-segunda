@@ -1,6 +1,16 @@
 import { diasDistintos, toISODate } from './dates'
+import { marcosDaCaca } from './caca'
+import type { MarcoCaca, ProgressoCaca } from './caca'
+import { rotuloDoSemestre } from './retrospectiva'
 import { emojiCargo } from './types'
-import type { Badge, TurmaMembro } from './types'
+import type { Badge, CacaCongelada, PapelDanca, TurmaMembro } from './types'
+
+const REGRA_CACA =
+  'Conta professores diferentes do papel oposto ao seu, com dupla confirmada pelos dois lados. Vale o semestre todo.'
+
+const TITULO_DO_NIVEL = ['', 'Primeiro professor', 'Meia equipe', 'Caça completa', 'Equipe inteira']
+
+const professores = (n: number) => (n === 1 ? 'professor' : 'professores')
 
 /**
  * Distintivos do perfil vêm de duas fontes: os DERIVADOS automaticamente
@@ -125,6 +135,20 @@ export function computeBadges(input: {
   primeirasNoites?: string[]
   /** Pedidos de música que tocaram no Espaço Livre (migração 029). */
   musicasTocadas?: number
+  /** Função principal na dança; só vira distintivo para quem está sem turma. */
+  papelPrincipal?: PapelDanca | null
+  /**
+   * Caça aos professores do semestre em curso. `proprio`: o cartão de
+   * nível 0 e o convite à função só aparecem no próprio perfil.
+   */
+  cacaAtual?: {
+    progresso: ProgressoCaca | null
+    inicio: string | null
+    proprio: boolean
+    semPapel: boolean
+  }
+  /** Caças de semestres já encerrados. */
+  cacasCongeladas?: CacaCongelada[]
 }): Badge[] {
   const badges: Badge[] = []
 
@@ -167,6 +191,26 @@ export function computeBadges(input: {
       regra: 'Vem da turma e da função do semestre. Muda junto quando a turma ou a função mudar.',
     })
   }
+
+  // 1.5 Função principal — só para quem está sem turma (com turma, vale a da turma)
+  if (input.turmas.length === 0 && input.papelPrincipal) {
+    badges.push({
+      id: 'funcao',
+      emoji: input.papelPrincipal === 'Condutor(a)' ? '🕺' : '💃',
+      titulo: input.papelPrincipal,
+      descricao: 'Função principal na dança',
+      tipo: 'Função',
+      regra: 'Escolhida por você na conta. Quem tem turma usa a função da turma.',
+    })
+  }
+
+  // 1.6 Caça aos professores — ao vivo e depois as de semestres encerrados
+  const viva = cacaViva(input.cacaAtual)
+  if (viva) badges.push(viva)
+  const congeladas = [...(input.cacasCongeladas ?? [])].sort((a, b) =>
+    b.fim.localeCompare(a.fim),
+  )
+  for (const c of congeladas) badges.push(cacaCongelada(c))
 
   // 2. Marco de presença — conta DIAS, não fotos (várias fotos no
   // mesmo dia valem uma presença, igual ao ranking). Só o maior
@@ -236,3 +280,91 @@ export function computeBadges(input: {
 
   return badges
 }
+
+const TIPO_CACA = 'Caça aos professores'
+
+/** Cartão da caça do semestre em curso (ou nada, se não há o que mostrar). */
+function cacaViva(atual: NonNullable<Parameters<typeof computeBadges>[0]['cacaAtual']> | undefined): Badge | null {
+  if (!atual) return null
+  const tipo = `${TIPO_CACA} · ${rotuloDoSemestre(atual.inicio ? new Date(atual.inicio) : new Date())}`
+  const p = atual.progresso
+
+  if (!p) {
+    // Sem papel não há equipe calculada: só convida, e só no próprio perfil
+    if (!(atual.semPapel && atual.proprio)) return null
+    return {
+      id: 'caca-atual',
+      emoji: '🎯',
+      titulo: TIPO_CACA,
+      descricao: 'Escolha sua função para entrar',
+      tipo,
+      regra: REGRA_CACA,
+      caca: { pegos: [], faltam: [], abrirFuncao: true },
+    }
+  }
+  if (p.meta.length === 0) return null
+  if (p.nivel === 0 && !atual.proprio) return null
+
+  const secreto = p.nivel === 4
+  const marcos = marcosDaCaca(p.meta.length, p.totalEquipe, secreto)
+  const valor = secreto ? p.pegosEquipe : p.pegos.length
+  const trilha = trilhaDe(emTuplas(marcos), valor, professores(valor))
+  const caca = { pegos: p.pegos, faltam: p.faltam }
+  const descricao = secreto
+    ? `${p.pegosEquipe} de ${p.totalEquipe} ${professores(p.totalEquipe)}`
+    : `${p.pegos.length} de ${p.meta.length} ${professores(p.meta.length)}`
+
+  // Próximo marco NÃO secreto: o 🏆 nunca é anunciado
+  const proximo = secreto ? undefined : marcos.find((m) => m.minimo > valor)
+  const anterior = [...marcos].reverse().find((m) => m.minimo <= valor)
+  const progresso = proximo
+    ? {
+        atual: valor - (anterior?.minimo ?? 0),
+        meta: proximo.minimo - (anterior?.minimo ?? 0),
+        rotulo: `faltam ${proximo.minimo - valor} para ${proximo.emoji} ${proximo.titulo}`,
+      }
+    : undefined
+
+  if (!anterior) {
+    return { id: 'caca-atual', emoji: '🎯', titulo: TIPO_CACA, descricao, progresso, tipo, regra: REGRA_CACA, trilha, caca }
+  }
+  return {
+    id: 'caca-atual',
+    emoji: anterior.emoji,
+    titulo: anterior.titulo,
+    descricao,
+    progresso,
+    tipo,
+    regra: REGRA_CACA,
+    trilha,
+    caca,
+  }
+}
+
+/** Cartão de uma caça já encerrada: só o resultado, sem listas nem progresso. */
+function cacaCongelada(c: CacaCongelada): Badge {
+  // Sem `inicio` (primeiro semestre da história), o rótulo vem de 4 meses
+  // antes do fechamento — `fim` direto jogaria um fechamento de dezembro
+  // no 1º semestre do ano seguinte.
+  let ref: Date
+  if (c.inicio) ref = new Date(c.inicio)
+  else {
+    ref = new Date(c.fim)
+    ref.setMonth(ref.getMonth() - 4)
+  }
+  const marcos = marcosDaCaca(c.meta, c.total_equipe, c.nivel === 4)
+  const marco =
+    marcos.find((m) => m.titulo === TITULO_DO_NIVEL[c.nivel]) ?? marcos[marcos.length - 1]
+  return {
+    id: `caca-${c.inicio ?? 'inicio'}`,
+    emoji: marco?.emoji ?? '🎯',
+    titulo: marco?.titulo ?? TITULO_DO_NIVEL[c.nivel],
+    descricao: `${c.pegos} de ${c.meta} ${professores(c.meta)}`,
+    tipo: `${TIPO_CACA} · ${rotuloDoSemestre(ref)}`,
+    regra: REGRA_CACA,
+    trilha: trilhaDe(emTuplas(marcos), c.pegos, professores(c.pegos)),
+  }
+}
+
+const emTuplas = (marcos: MarcoCaca[]): Marco[] =>
+  marcos.map((m) => [m.minimo, m.emoji, m.titulo])
