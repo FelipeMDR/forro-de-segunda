@@ -85,6 +85,12 @@ begin
     raise exception 'Só a organização encerra o semestre';
   end if;
 
+  -- Idempotente: se o encerramento falhar depois daqui e a organização
+  -- tentar de novo, o mesmo semestre (mesmo início) é substituído, e não
+  -- duplicado. O cascade leva a equipe e os resultados antigos.
+  delete from caca_semestres
+  where inicio is not distinct from nullif(p->>'inicio', '')::timestamptz;
+
   insert into caca_semestres (inicio)
   values (nullif(p->>'inicio', '')::timestamptz)
   returning id into sid;

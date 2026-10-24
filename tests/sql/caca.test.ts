@@ -51,6 +51,34 @@ describe('caça aos professores — congelamento do semestre', () => {
     expect(s.rows[0]).toEqual({ inicio: null })
   })
 
+  it('gravar de novo o mesmo início substitui, sem duplicar', async () => {
+    const db = await comTime()
+    await comoUsuario(db, IDS.org)
+    await guardar(db, PAYLOAD)
+    const segundo = {
+      ...PAYLOAD,
+      equipe: [PAYLOAD.equipe[0]],
+      resultados: [{ user_id: IDS.a, nivel: 3, pegos: 2, meta: 2, total_equipe: 2 }],
+    }
+    const { rows } = await guardar(db, segundo)
+    const s = await db.query<{ id: string }>(`select id from caca_semestres`)
+    expect(s.rows).toEqual([{ id: rows[0].id }])
+    const r = await db.query(`select semestre_id, user_id, nivel, pegos from caca_resultados`)
+    expect(r.rows).toEqual([{ semestre_id: rows[0].id, user_id: IDS.a, nivel: 3, pegos: 2 }])
+    const e = await db.query(`select 1 from caca_equipe`)
+    expect(e.rows).toHaveLength(1)
+  })
+
+  it('início nulo também é substituído; outro início fica', async () => {
+    const db = await comTime()
+    await comoUsuario(db, IDS.org)
+    await guardar(db, { ...PAYLOAD, inicio: null })
+    await guardar(db, { ...PAYLOAD, inicio: null })
+    await guardar(db, PAYLOAD)
+    const s = await db.query(`select 1 from caca_semestres`)
+    expect(s.rows).toHaveLength(2)
+  })
+
   it('aluno não grava', async () => {
     const db = await comTime()
     await comoUsuario(db, IDS.a)

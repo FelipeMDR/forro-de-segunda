@@ -282,7 +282,10 @@ export function CargosPage() {
             }
           }}
         />
-        <CacaProfessores perfis={perfis} onPapel={(p, papel) => void agir(() => api.definirPapelPrincipal(p.id, papel))} />
+        <CacaProfessores
+          perfis={perfis}
+          onPapel={(p, papel) => void agir(() => api.definirPapelPrincipal(p.id, papel))}
+        />
       </div>
 
       <EscolherPessoa
@@ -378,10 +381,16 @@ function CacaProfessores({
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[15px] font-extrabold">{p.nome}</span>
                 {p.turmas_ensino.length > 0 && (
-                  <span className="truncate text-xs text-ink3">{ordenarTurmas(p.turmas_ensino).join(' · ')}</span>
+                  <span className="truncate text-xs text-ink3">
+                    {ordenarTurmas(p.turmas_ensino).join(' · ')}
+                  </span>
                 )}
               </div>
-              <div role="group" aria-label={`Papel de ${p.nome} na caça`} className="flex shrink-0 gap-0.5 rounded-full bg-chip p-[3px]">
+              <div
+                role="group"
+                aria-label={`Papel de ${p.nome} na caça`}
+                className="flex shrink-0 gap-0.5 rounded-full bg-chip p-[3px]"
+              >
                 {PAPEIS_CACA.map((o) => {
                   const ativo = p.papel_principal === o.papel
                   return (

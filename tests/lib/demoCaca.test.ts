@@ -84,6 +84,41 @@ describe('DemoApi — caça aos professores', () => {
     expect(typeof lista[0].fim).toBe('string')
   })
 
+  it('guardar de novo o mesmo semestre substitui, sem duplicar', async () => {
+    const { api, uid } = await novaApi('11 98888-0003') // Ana, organizadora
+    const inicio = '2026-02-01T00:00:00.000Z'
+    const linha = { user_id: uid, nivel: 1, pegos: 1, meta: 4, total_equipe: 7 }
+    await api.guardarCacaDoSemestre({ inicio, equipe: [], resultados: [linha] })
+    await api.guardarCacaDoSemestre({ inicio, equipe: [], resultados: [{ ...linha, nivel: 2, pegos: 2 }] })
+    const lista = await api.cacaCongeladaDe(uid)
+    expect(lista).toHaveLength(1)
+    expect(lista[0]).toMatchObject({ inicio, nivel: 2, pegos: 2 })
+  })
+
+  it('encerrar de novo depois de uma falha não duplica o emblema', async () => {
+    const { api, banco } = await novaApi('11 98888-0003')
+    const maria = banco.db.profiles.find((p) => p.telefone === '11 98888-0001')!
+    const joao = banco.db.profiles.find((p) => p.telefone === '11 98888-0002')!
+    for (const p of banco.db.profiles) {
+      p.cargos = []
+      p.papel_principal = null
+    }
+    joao.cargos = ['Professor']
+    joao.papel_principal = 'Condutor(a)'
+    maria.turmas = [{ turma: 'Intermediário', papel_danca: 'Conduzido(a)' }]
+    banco.db.semestres = []
+    banco.db.duplas = [
+      { id: '1', data: '2026-10-19', de_user: maria.id, para_user: joao.id, confirmada: true, criado_em: '' },
+      { id: '2', data: '2026-10-19', de_user: joao.id, para_user: maria.id, confirmada: true, criado_em: '' },
+    ]
+    // Primeira tentativa congelou e "falhou" antes do carimbo do semestre
+    await api.encerrarSemestre()
+    banco.db.semestres = []
+    maria.turmas = [{ turma: 'Intermediário', papel_danca: 'Conduzido(a)' }]
+    await api.encerrarSemestre()
+    expect(await api.cacaCongeladaDe(maria.id)).toHaveLength(1)
+  })
+
   it('guardarCacaDoSemestre é só da organização', async () => {
     const { api, uid } = await novaApi()
     await expect(
