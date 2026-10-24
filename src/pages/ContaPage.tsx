@@ -2,12 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { CartaoInstalar } from '../components/BotaoInstalar'
 import { ConexaoSpotify } from '../components/ConexaoSpotify'
+import { FolhaFuncao } from '../components/FolhaFuncao'
 import { Icone } from '../components/Icone'
 import { Spinner } from '../components/Spinner'
 import { Cabecalho, LinhaInterruptor } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { enablePush, isPushEnabled, pushSupported } from '../lib/push'
+import type { PapelDanca } from '../lib/types'
 
 /**
  * Uma linha do cartão de dados: rótulo à esquerda, valor à direita.
@@ -31,13 +33,15 @@ function LinhaConta({
   acao?: string
   aberta: boolean
   onAlternar: () => void
-  children: ReactNode
+  /** Sem editor embaixo: a linha só dispara `onAlternar` (ex.: abre uma folha). */
+  children?: ReactNode
 }) {
   return (
     <div>
       <button
         onClick={onAlternar}
-        aria-expanded={aberta}
+        aria-expanded={children ? aberta : undefined}
+        aria-haspopup={children ? undefined : 'dialog'}
         className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
       >
         <span className="shrink-0 text-[15px] text-ink3">{rotulo}</span>
@@ -49,7 +53,7 @@ function LinhaConta({
           {acao ?? valor ?? '—'}
         </span>
       </button>
-      {aberta && <div className="flex flex-col gap-2.5 px-4 pb-4">{children}</div>}
+      {aberta && children && <div className="flex flex-col gap-2.5 px-4 pb-4">{children}</div>}
     </div>
   )
 }
@@ -63,7 +67,7 @@ function LinhaConta({
  * ganhou endereço próprio, atrás da engrenagem.
  */
 export function ContaPage() {
-  const { api, profile, refreshProfile } = useAuth()
+  const { api, userId, profile, refreshProfile } = useAuth()
   const toast = useToast()
 
   const [aberta, setAberta] = useState<'nome' | 'email' | 'senha' | null>(null)
@@ -76,6 +80,7 @@ export function ContaPage() {
   // como aviso fixo, não toast: é uma instrução de vários passos.
   const [aguardandoLink, setAguardandoLink] = useState<string | null>(null)
   const [pushAtivo, setPushAtivo] = useState(false)
+  const [escolherFuncao, setEscolherFuncao] = useState(false)
 
   useEffect(() => {
     setNome(profile?.nome ?? '')
@@ -140,6 +145,18 @@ export function ContaPage() {
       toast((e as Error).message, 'erro')
     } finally {
       setSalvando(null)
+    }
+  }
+
+  const salvarFuncao = async (p: PapelDanca) => {
+    if (!userId) return
+    try {
+      await api.definirPapelPrincipal(userId, p)
+      await refreshProfile()
+      setEscolherFuncao(false)
+      toast('Função salva!')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
     }
   }
 
@@ -279,6 +296,17 @@ export function ContaPage() {
             {salvando === 'senha' ? 'Salvando…' : 'Trocar senha'}
           </button>
         </LinhaConta>
+
+        {/* Só sem turma: quem tem turma dança o papel da turma */}
+        {profile.turmas.length === 0 && (
+          <LinhaConta
+            rotulo="Função na dança"
+            valor={profile.papel_principal}
+            acao={profile.papel_principal ? undefined : 'Escolher'}
+            aberta={false}
+            onAlternar={() => setEscolherFuncao(true)}
+          />
+        )}
       </div>
 
       <ConexaoSpotify />
@@ -322,6 +350,13 @@ export function ContaPage() {
         )}
       </div>
       </div>
+
+      <FolhaFuncao
+        aberta={escolherFuncao}
+        onFechar={() => setEscolherFuncao(false)}
+        atual={profile.papel_principal}
+        onSalvar={salvarFuncao}
+      />
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useCallback, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
+import { Avatar } from './Avatar'
 import { Icone } from './Icone'
 import { Spinner } from './Spinner'
 import { BotaoIcone, Folha } from './ui'
+import { EMOJI_CACA, type ProfessorCaca } from '../lib/caca'
 import { formatRelative } from '../lib/dates'
 import type { PerfilStats } from '../lib/perfilStats'
 import {
@@ -163,11 +165,14 @@ export function BadgeGrid({
   badges,
   vazio,
   contagem = false,
+  onAbrirFuncao,
 }: {
   badges: Badge[] | null
   vazio: string
   /** Mostra "N conquistados" ao lado do título. */
   contagem?: boolean
+  /** Cartão da caça sem função escolhida: abre a escolha em vez do detalhe. */
+  onAbrirFuncao?: () => void
 }) {
   const [aberto, setAberto] = useState<Badge | null>(null)
   const fechar = useCallback(() => setAberto(null), [])
@@ -191,7 +196,9 @@ export function BadgeGrid({
             <button
               key={b.id}
               type="button"
-              onClick={() => setAberto(b)}
+              onClick={() =>
+                b.caca?.abrirFuncao && onAbrirFuncao ? onAbrirFuncao() : setAberto(b)
+              }
               aria-haspopup="dialog"
               className="flex flex-col gap-2.5 rounded-[18px] border border-linha bg-sf p-3 text-left transition-transform active:scale-[0.97]"
             >
@@ -372,6 +379,18 @@ function DetalheDistintivo({ b, onFechar }: { b: Badge; onFechar: () => void }) 
         </div>
       )}
 
+      {/* No nível 4 (🏆) a equipe toda já foi: as listas não dizem mais nada */}
+      {b.caca && !b.caca.abrirFuncao && b.emoji !== EMOJI_CACA.equipe && (
+        <div className="distintivo-entra mt-[22px] flex flex-col gap-4" style={atraso(0.44)}>
+          {b.caca.pegos.length > 0 && (
+            <ListaProfessores titulo="Já dançou com" pessoas={b.caca.pegos} onFechar={onFechar} />
+          )}
+          {b.caca.faltam.length > 0 && (
+            <ListaProfessores titulo="Faltam" pessoas={b.caca.faltam} faltando onFechar={onFechar} />
+          )}
+        </div>
+      )}
+
       {linhas.length > 0 && (
         <dl className="distintivo-entra mt-[22px] flex flex-col border-t border-linha" style={atraso(0.48)}>
           {linhas.map((l) => (
@@ -392,6 +411,53 @@ function DetalheDistintivo({ b, onFechar }: { b: Badge; onFechar: () => void }) 
           {b.regra}
         </p>
       )}
+    </div>
+  )
+}
+
+/** Professores da caça no detalhe: quem já foi (avatar cheio) e quem falta (tracejado). */
+function ListaProfessores({
+  titulo,
+  pessoas,
+  faltando = false,
+  onFechar,
+}: {
+  titulo: string
+  pessoas: ProfessorCaca[]
+  faltando?: boolean
+  onFechar: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <span className="text-[15px] font-extrabold">
+        {titulo} · {pessoas.length}
+      </span>
+      <ul className="flex flex-wrap gap-x-2 gap-y-3">
+        {pessoas.map((p) => (
+          <li key={p.user_id}>
+            <Link
+              to={`/perfil/${p.user_id}`}
+              onClick={onFechar}
+              className="flex w-14 flex-col items-center gap-1.5"
+            >
+              {faltando ? (
+                <span className="rounded-full border-2 border-dashed border-ink3/70 p-[3px]">
+                  <Avatar nome={p.nome} url={p.avatar_url} tamanho={42} borda={false} className="opacity-60" />
+                </span>
+              ) : (
+                <span className="p-[5px]">
+                  <Avatar nome={p.nome} url={p.avatar_url} tamanho={42} />
+                </span>
+              )}
+              <span
+                className={`w-full truncate text-center text-xs font-bold ${faltando ? 'text-ink3' : ''}`}
+              >
+                {p.nome.split(' ')[0]}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

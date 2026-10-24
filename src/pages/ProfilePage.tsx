@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { FolhaFuncao } from '../components/FolhaFuncao'
 import { Icone } from '../components/Icone'
 import {
   BadgeGrid,
@@ -17,7 +18,7 @@ import { carregarParceiros } from '../lib/forrodex'
 import { compressImage, LIMITE_AVATAR } from '../lib/image'
 import { carregarPerfilStats, type PerfilStats } from '../lib/perfilStats'
 import { useTema } from '../lib/tema'
-import type { Badge, CheckinFavorito } from '../lib/types'
+import type { Badge, CheckinFavorito, PapelDanca } from '../lib/types'
 import { usePodeSerDJ } from '../lib/usePodeSerDJ'
 import { useLembrado } from '../lib/memoriaTelas'
 
@@ -44,6 +45,7 @@ export function ProfilePage() {
   const [djLigado, setDjLigado] = useLembrado('perfil:djLigado', false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const [saindo, setSaindo] = useState(false)
+  const [escolherFuncao, setEscolherFuncao] = useState(false)
 
   // O perfil da sessão é carregado no login e fica em cache. Se a
   // organização mudar sua turma ou seus cargos depois disso, a tela
@@ -55,7 +57,10 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!userId || !profile) return
-    void carregarPerfilStats(api, userId, profile.turmas, profile.cargos)
+    void carregarPerfilStats(api, userId, profile.turmas, profile.cargos, {
+      papelPrincipal: profile.papel_principal,
+      proprio: true,
+    })
       .then((r) => {
         setStats(r.stats)
         setBadges(r.badges)
@@ -70,6 +75,7 @@ export function ProfilePage() {
             turmas: profile.turmas,
             cargos: profile.cargos,
             checkinDates: [],
+            papelPrincipal: profile.papel_principal,
           }),
         )
       })
@@ -131,6 +137,18 @@ export function ProfilePage() {
     }
   }
 
+  const salvarFuncao = async (p: PapelDanca) => {
+    if (!userId) return
+    try {
+      await api.definirPapelPrincipal(userId, p)
+      await refreshProfile()
+      setEscolherFuncao(false)
+      toast('Função salva!')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    }
+  }
+
   const sair = async () => {
     setSaindo(true)
     try {
@@ -171,6 +189,32 @@ export function ProfilePage() {
         <ChipsPerfil cargos={profile.cargos} turmas={profile.turmas} />
       </div>
 
+      {/* Só quem está sem turma escolhe a função: quem tem turma usa o
+          papel da turma. Some assim que a pessoa escolhe. */}
+      {profile.turmas.length === 0 && !profile.papel_principal && (
+        <div className="px-4 pb-3">
+          <button
+            type="button"
+            onClick={() => setEscolherFuncao(true)}
+            aria-haspopup="dialog"
+            className="flex w-full items-center gap-3 rounded-[20px] border-[1.5px] border-brasa-500 bg-sf p-3.5 text-left transition-transform active:scale-[.98]"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-chip text-[24px] leading-none">
+              🕺
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-[15px] font-extrabold leading-tight">
+                Qual a sua função na dança?
+              </span>
+              <span className="text-[13px] leading-snug text-ink3">
+                Escolha pra ganhar o seu distintivo de função
+              </span>
+            </span>
+            <Icone nome="avancar" tamanho={20} className="shrink-0 text-ink3" />
+          </button>
+        </div>
+      )}
+
       <div className="px-4">
         <StatsRow stats={stats} duplasHref="/perfil/duplas" />
       </div>
@@ -179,6 +223,7 @@ export function ProfilePage() {
         badges={badges}
         contagem
         vazio="Faça seu primeiro check-in para começar a colecionar!"
+        onAbrirFuncao={() => setEscolherFuncao(true)}
       />
 
       <div className={`grid gap-3 px-4 pt-2.5 ${semestreEncerrado ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -259,6 +304,13 @@ export function ProfilePage() {
           Sair
         </button>
       </div>
+
+      <FolhaFuncao
+        aberta={escolherFuncao}
+        onFechar={() => setEscolherFuncao(false)}
+        atual={profile.papel_principal}
+        onSalvar={salvarFuncao}
+      />
 
       <Confirmar
         aberto={confirmarSaida}

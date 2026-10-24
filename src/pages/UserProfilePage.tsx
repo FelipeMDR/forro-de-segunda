@@ -155,7 +155,9 @@ export function UserProfilePage() {
         if (cancelado) return
         setPerfil(p)
         if (!p) return
-        const r = await carregarPerfilStats(api, id, p.turmas, p.cargos)
+        const r = await carregarPerfilStats(api, id, p.turmas, p.cargos, {
+          papelPrincipal: p.papel_principal,
+        })
         if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
