@@ -309,7 +309,11 @@ function cacaViva(atual: NonNullable<Parameters<typeof computeBadges>[0]['cacaAt
   const marcos = marcosDaCaca(p.meta.length, p.totalEquipe, secreto)
   const valor = secreto ? p.pegosEquipe : p.pegos.length
   const trilha = trilhaDe(emTuplas(marcos), valor, professores(valor))
-  const caca = { pegos: p.pegos, faltam: p.faltam }
+  // Com quem a pessoa dançou (e quem falta) só ela vê: no perfil dos
+  // outros a lista viraria assunto de fofoca — fica só a contagem.
+  const caca = atual.proprio
+    ? { pegos: p.pegos, faltam: p.faltam }
+    : { pegos: [], faltam: [] }
   const descricao = secreto
     ? `${p.pegosEquipe} de ${p.totalEquipe} ${professores(p.totalEquipe)}`
     : `${p.pegos.length} de ${p.meta.length} ${professores(p.meta.length)}`

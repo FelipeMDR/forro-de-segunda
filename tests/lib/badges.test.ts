@@ -108,7 +108,7 @@ describe('distintivo de função', () => {
 
 describe('distintivo da caça aos professores', () => {
   it('nível 2 ao vivo', () => {
-    const [b] = caca(progresso(7, 4))
+    const [b] = caca(progresso(7, 4), { proprio: true })
     expect(b).toMatchObject({
       id: 'caca-atual',
       emoji: '🌗',
@@ -151,6 +151,18 @@ describe('distintivo da caça aos professores', () => {
     expect(b.descricao).toBe('Escolha sua função para entrar')
     expect(b.caca?.abrirFuncao).toBe(true)
     expect(caca(null, { proprio: false, semPapel: true })).toEqual([])
+  })
+
+  it('com quem dançou e quem falta só aparecem no próprio perfil', () => {
+    const [meu] = caca(progresso(7, 4), { proprio: true })
+    expect(meu.caca?.pegos).toHaveLength(4)
+    expect(meu.caca?.faltam).toHaveLength(3)
+
+    // No perfil dos outros, só o emblema e a contagem — sem nomes
+    const [deOutro] = caca(progresso(7, 4), { proprio: false })
+    expect(deOutro).toMatchObject({ titulo: 'Meia equipe', descricao: '4 de 7 professores' })
+    expect(deOutro.caca?.pegos ?? []).toEqual([])
+    expect(deOutro.caca?.faltam ?? []).toEqual([])
   })
 
   it('meta zero não mostra nada', () => {
