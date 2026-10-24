@@ -9,6 +9,7 @@ const MIGRACOES = [
   '036-trilha-de-videos.sql',
   '038-videos-do-drive.sql',
   '039-aulas-sem-video.sql',
+  '041-caca-aos-professores.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
@@ -79,6 +80,10 @@ create table public.challenges (
 );
 create table public.turma_professores (
   user_id uuid not null, turma text not null, primary key (user_id, turma)
+);
+create table public.profile_turmas (
+  user_id uuid not null, turma text not null, papel_danca text,
+  primary key (user_id, turma)
 );
 `
 

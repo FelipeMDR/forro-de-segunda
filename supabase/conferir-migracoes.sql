@@ -168,6 +168,10 @@ from (values
         and table_name = 'feriados'
         and column_name = 'cancela_aulas'
     )
+  ),
+  (
+    '041 — caça aos professores',
+    exists (select 1 from pg_proc where proname = 'guardar_caca_do_semestre')
   )
 ) as t(migracao, aplicada)
 order by migracao;
