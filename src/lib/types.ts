@@ -43,6 +43,8 @@ export interface Profile {
    * anterior à exigência, que ainda precisa aceitar (LGPD).
    */
   termos_aceitos_em?: string | null
+  /** Papel que a pessoa dança quando não tem turma (Caça aos professores). */
+  papel_principal?: PapelDanca | null
   criado_em: string
 }
 

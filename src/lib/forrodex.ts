@@ -86,7 +86,7 @@ const DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'doming
  * "iniciante sabado" caem no mesmo lugar, e a ordem sobrevive às turmas
  * serem renomeadas no semestre seguinte.
  */
-function pesoTurma(nome: string): number {
+export function pesoTurma(nome: string): number {
   const n = nome
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
