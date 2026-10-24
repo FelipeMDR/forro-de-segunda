@@ -124,6 +124,19 @@ describe('progressoCaca', () => {
     expect(p.pegosEquipe).toBe(1)
   })
 
+  it('meta 1: o unico professor ja e a caca completa (nivel 3)', () => {
+    const equipe = [prof('d1', CONDZ), prof('c1', COND), prof('c2', COND)]
+    const p = progressoCaca('eu', COND, equipe, new Set(['d1']))
+    expect(p.meta).toHaveLength(1)
+    expect(p.nivel).toBe(3)
+  })
+
+  it('meta 2: um pego e o primeiro (1), os dois sao a caca completa (3)', () => {
+    const equipe = [prof('d1', CONDZ), prof('d2', CONDZ), prof('c1', COND)]
+    expect(progressoCaca('eu', COND, equipe, new Set(['d1'])).nivel).toBe(1)
+    expect(progressoCaca('eu', COND, equipe, new Set(['d1', 'd2'])).nivel).toBe(3)
+  })
+
   it('meta zero fica no nivel 0', () => {
     const soCond = [1, 2, 3].map((i) => prof(`c${i}`, COND))
     const p = progressoCaca('eu', COND, soCond, new Set(['c1', 'c2', 'c3']))
@@ -164,6 +177,12 @@ describe('marcosDaCaca', () => {
     const m = marcosDaCaca(2, 4, false)
     expect(minimos(m)).toEqual([1, 2])
     expect(m.map((x) => x.titulo)).toEqual(['Primeiro professor', 'Caça completa'])
+  })
+
+  it('meta igual a equipe com secreto: a colisao fica com Equipe inteira', () => {
+    const m = marcosDaCaca(4, 4, true)
+    expect(minimos(m)).toEqual([1, 2, 4])
+    expect(m[m.length - 1].titulo).toBe('Equipe inteira')
   })
 
   it('meta zero nao tem marcos, nem o secreto', () => {

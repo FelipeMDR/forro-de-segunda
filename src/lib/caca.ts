@@ -9,7 +9,7 @@ import type {
 /**
  * Caça aos professores: dançar com a equipe de professores do papel
  * OPOSTO ao seu. A meta é o lado oposto (sem a própria pessoa, se ela
- * for professora); a escada é 🎯 primeiro, 🌗 metade, 🏅 todos do lado
+ * for professora); a escada é 🎯 primeiro, 🌗 metade (só com meta ≥ 3), 🏅 todos do lado
  * oposto e, secreto, 🏆 a equipe inteira (os dois lados).
  *
  * Só dupla confirmada conta — quem monta o conjunto `parceiros` já
@@ -51,6 +51,13 @@ export interface MarcoCaca {
   titulo: string
 }
 
+/** Degrau de cada título na escada (1 a 3; o 4 é decidido em progressoCaca). */
+const DEGRAU: Record<string, number> = {
+  'Primeiro professor': 1,
+  'Meia equipe': 2,
+  'Caça completa': 3,
+}
+
 /** Ordem de nível da turma (menor = mais alto), igual ao `pesoTurma`. */
 const ORDEM_NIVEL = { avancado: 0, intermediario: 1, iniciante: 2 } as const
 
@@ -65,6 +72,9 @@ export function papelEfetivo(
   turmasCadastradas: Turma[],
 ): PapelDanca | null {
   if (turmas.length === 0) return papelPrincipal
+  // Duas escalas na mesma comparação: o nível cadastrado vira 0/1/2 e,
+  // sem ele, vale o pesoTurma (avançado 0, inter 1, iniciante 2+). Bate
+  // porque o pesoTurma foi desenhado nessa mesma ordem.
   const peso = (nome: string) => {
     const nivel = turmasCadastradas.find((t) => t.nome === nome)?.nivel
     return nivel ? ORDEM_NIVEL[nivel] : pesoTurma(nome)
@@ -152,8 +162,10 @@ export function progressoCaca(
   let nivel: ProgressoCaca['nivel'] = 0
   if (meta.length > 0) {
     const marcos = marcosDaCaca(meta.length, totalEquipe, false)
-    const alcancados = marcos.filter((m) => pegos.length >= m.minimo).length
-    nivel = Math.min(alcancados, 3) as ProgressoCaca['nivel']
+    // O nível é o degrau do TÍTULO do maior marco alcançado, não a
+    // contagem de marcos: com meta 1, o único professor já é a caça completa.
+    const alcancado = marcos.filter((m) => pegos.length >= m.minimo).pop()
+    if (alcancado) nivel = DEGRAU[alcancado.titulo] as ProgressoCaca['nivel']
     if (pegosEquipe === totalEquipe) nivel = 4
   }
   return { meta, pegos, faltam, totalEquipe, pegosEquipe, nivel }
