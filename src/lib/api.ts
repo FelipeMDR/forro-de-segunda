@@ -2,6 +2,7 @@ import type { Coordenada } from './geo'
 import type { MusicaTocada } from './retrospectiva'
 import type { PessoaMatricula } from './matricula'
 import type {
+  CacaCongelada,
   AberturaAntecipada,
   AberturaAntecipadaInput,
   AgendaEvent,
@@ -378,6 +379,32 @@ export interface ForroApi {
    * fecha o período no fim — é o recorte da Forródex presa a um desafio.
    */
   parceirosDe(userId: string, desde?: string, ate?: string): Promise<ParceiroDanca[]>
+
+  // ---- Caça aos professores (migração 041) ----
+  /** Função de dança de quem está sem turma. Só a própria pessoa ou a organização. */
+  definirPapelPrincipal(userId: string, papel: PapelDanca | null): Promise<void>
+  /**
+   * Duplas confirmadas de todo mundo no período (`desde` ISO ou null =
+   * desde sempre; `ate` data ou ISO). Uma linha por dupla-noite.
+   */
+  duplasConfirmadasEntre(
+    desde: string | null,
+    ate: string,
+  ): Promise<{ de_user: string; para_user: string }[]>
+  /** Caças de semestres encerrados da pessoa, a mais recente primeiro; [] sem a 041. */
+  cacaCongeladaDe(userId: string): Promise<CacaCongelada[]>
+  /** Congela a caça do semestre que acaba de fechar. Só a organização. */
+  guardarCacaDoSemestre(p: {
+    inicio: string | null
+    equipe: { user_id: string; papel: PapelDanca }[]
+    resultados: {
+      user_id: string
+      nivel: number
+      pegos: number
+      meta: number
+      total_equipe: number
+    }[]
+  }): Promise<void>
 
   // ---- Trilha de vídeo-aulas (migração 036) ----
   /** Todos os passos de todos os níveis (poucas dezenas de linhas). */

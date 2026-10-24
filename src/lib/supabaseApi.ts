@@ -63,6 +63,7 @@ import type {
   SessaoDJ,
   Turma,
   TurmaMembro,
+  CacaCongelada,
   LiberacaoTrilha,
   NivelTrilha,
   PassoTrilha,
@@ -518,6 +519,9 @@ export class SupabaseApi implements ForroApi {
       // inteira do perfil. Quem chama preenche depois (ver
       // `turmasEnsinoDe` / `ensinoPorUsuario`).
       turmas_ensino: [],
+      // Idem: `papel_principal` é da migração 041 e fica fora do select
+      // (ver `papelPrincipalDe` / `papelPrincipalPorUsuario`).
+      papel_principal: null,
     }
   }
 
@@ -577,6 +581,45 @@ export class SupabaseApi implements ForroApi {
     return mapa
   }
 
+  /**
+   * Função de dança de quem está sem turma. Consulta separada e tolerante
+   * a falha: sem a migração 041 a coluna não existe, e pô-la no select do
+   * perfil derrubaria o perfil inteiro.
+   */
+  private async papelPrincipalDe(userId: string): Promise<PapelDanca | null> {
+    const { data, error } = await this.sb
+      .from('profiles')
+      .select('papel_principal')
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) return null
+    return ((data as { papel_principal?: PapelDanca | null } | null)
+      ?.papel_principal ?? null) as PapelDanca | null
+  }
+
+  /** Todas as funções de uma vez, para as listas (mesma tolerância). */
+  private async papelPrincipalPorUsuario(): Promise<Map<string, PapelDanca>> {
+    const mapa = new Map<string, PapelDanca>()
+    let linhas: Array<{ id: string; papel_principal: PapelDanca | null }>
+    try {
+      linhas = await todasAsLinhas((de, ate) =>
+        this.sb
+          .from('profiles')
+          .select('id, papel_principal')
+          .not('papel_principal', 'is', null)
+          .order('id')
+          .range(de, ate),
+      )
+    } catch (e) {
+      console.warn('[perfis] função de dança indisponível:', e)
+      return mapa
+    }
+    for (const r of linhas) {
+      if (r.papel_principal) mapa.set(r.id, r.papel_principal)
+    }
+    return mapa
+  }
+
   async getProfile(id: string): Promise<Profile | null> {
     // Só o dono vê o próprio telefone e e-mail. Chamado tanto pelo
     // AuthContext (a própria sessão) quanto por /perfil/:id (qualquer
@@ -596,14 +639,16 @@ export class SupabaseApi implements ForroApi {
     // (ver `turmasEnsinoDe`) e não dependem do resultado daqui — em
     // sequência, isso viraria uma ida a mais à rede em cada abertura de
     // perfil, no celular, de graça.
-    const [{ data, error }, turmasEnsino] = await Promise.all([
+    const [{ data, error }, turmasEnsino, papelPrincipal] = await Promise.all([
       this.sb.from('profiles').select(colunas).eq('id', id).maybeSingle(),
       this.turmasEnsinoDe(id),
+      this.papelPrincipalDe(id),
     ])
     if (data) {
       return {
         ...this.mapProfile(data as unknown as Record<string, unknown>),
         turmas_ensino: turmasEnsino,
+        papel_principal: papelPrincipal,
       }
     }
 
@@ -641,6 +686,7 @@ export class SupabaseApi implements ForroApi {
           turmas,
           cargos,
           turmas_ensino: turmasEnsino,
+          papel_principal: papelPrincipal,
         }
       }
     }
@@ -2186,6 +2232,79 @@ export class SupabaseApi implements ForroApi {
     })
   }
 
+  // ---- Caça aos professores (migração 041) ----
+
+  async definirPapelPrincipal(userId: string, papel: PapelDanca | null) {
+    const eu = await this.getSessionUserId()
+    // A RLS também barra, mas a mensagem clara sai antes de ir ao banco
+    if (userId !== eu && (await this.getMyRole()) !== 'organizador') {
+      throw new Error('Só a organização define a função de outra pessoa')
+    }
+    ok(
+      await this.sb
+        .from('profiles')
+        .update({ papel_principal: papel })
+        .eq('id', userId),
+    )
+  }
+
+  async duplasConfirmadasEntre(desde: string | null, ate: string) {
+    // Paginado: um semestre de duplas passa folgado de 1000 linhas
+    return todasAsLinhas<{ de_user: string; para_user: string }>((de, fim) => {
+      let consulta = this.sb
+        .from('duplas')
+        .select('de_user, para_user')
+        .eq('confirmada', true)
+        .lte('data', ate.slice(0, 10))
+      if (desde) consulta = consulta.gte('data', desde.slice(0, 10))
+      return consulta.order('id').range(de, fim)
+    })
+  }
+
+  async cacaCongeladaDe(userId: string): Promise<CacaCongelada[]> {
+    const { data, error } = await this.sb
+      .from('caca_resultados')
+      .select(
+        'nivel, pegos, meta, total_equipe, semestre:caca_semestres(inicio, fim)',
+      )
+      .eq('user_id', userId)
+    if (error) return []
+    return (
+      (data ?? []) as unknown as Array<{
+        nivel: 1 | 2 | 3 | 4
+        pegos: number
+        meta: number
+        total_equipe: number
+        semestre: { inicio: string | null; fim: string } | null
+      }>
+    )
+      .filter((r) => r.semestre)
+      .map((r) => ({
+        inicio: r.semestre!.inicio,
+        fim: r.semestre!.fim,
+        nivel: r.nivel,
+        pegos: r.pegos,
+        meta: r.meta,
+        total_equipe: r.total_equipe,
+      }))
+      .sort((a, b) => b.fim.localeCompare(a.fim))
+  }
+
+  async guardarCacaDoSemestre(p: {
+    inicio: string | null
+    equipe: { user_id: string; papel: PapelDanca }[]
+    resultados: {
+      user_id: string
+      nivel: number
+      pegos: number
+      meta: number
+      total_equipe: number
+    }[]
+  }) {
+    const { error } = await this.sb.rpc('guardar_caca_do_semestre', { p })
+    if (error) throw new Error(error.message)
+  }
+
   async listPassosTrilha(): Promise<PassoTrilha[]> {
     const { data, error } = await this.sb
       .from('trilha_passos')
@@ -2695,14 +2814,21 @@ export class SupabaseApi implements ForroApi {
         .order('id')
         .range(de, ate),
     )) as unknown as Array<Record<string, unknown>>
-    const ensino = await this.ensinoPorUsuario()
+    const [ensino, papeis] = await Promise.all([
+      this.ensinoPorUsuario(),
+      this.papelPrincipalPorUsuario(),
+    ])
     return data.map((p) => {
       const {
         telefone: _semTelefone,
         email: _semEmail,
         ...publico
       } = this.mapProfile(p)
-      return { ...publico, turmas_ensino: ensino.get(publico.id) ?? [] }
+      return {
+        ...publico,
+        turmas_ensino: ensino.get(publico.id) ?? [],
+        papel_principal: papeis.get(publico.id) ?? null,
+      }
     })
   }
 
@@ -2715,10 +2841,14 @@ export class SupabaseApi implements ForroApi {
         .order('id')
         .range(de, ate),
     )) as unknown as Array<Record<string, unknown>>
-    const ensino = await this.ensinoPorUsuario()
+    const [ensino, papeis] = await Promise.all([
+      this.ensinoPorUsuario(),
+      this.papelPrincipalPorUsuario(),
+    ])
     return data.map((p) => ({
       ...this.mapProfile(p),
       turmas_ensino: ensino.get(p.id as string) ?? [],
+      papel_principal: papeis.get(p.id as string) ?? null,
     }))
   }
 

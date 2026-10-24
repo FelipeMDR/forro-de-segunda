@@ -24,6 +24,7 @@ const perfil = (
   turmas: turmas.map((turma) => ({ turma, papel_danca: null })),
   turmas_ensino: ensino,
   cargos: [],
+  papel_principal: null,
   criado_em: '2026-01-01T00:00:00Z',
 })
 

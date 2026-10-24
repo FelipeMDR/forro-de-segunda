@@ -29,6 +29,7 @@ import {
   turmaLabel,
 } from './types'
 import type {
+  CacaCongelada,
   AberturaAntecipada,
   AberturaAntecipadaInput,
   AgendaEvent,
@@ -182,6 +183,16 @@ interface DB {
   trilhaRegras?: RegrasTrilha
   /** Nível de acesso de quem está sem turma (migração 040); sem entrada = Iniciante. */
   trilhaAcesso?: Record<string, NivelTrilha>
+  /** Caça aos professores (migração 041) — ausentes em bancos demo antigos. */
+  cacaSemestres?: Array<{ id: string; inicio: string | null; fim: string }>
+  cacaResultados?: Array<{
+    semestre_id: string
+    user_id: string
+    nivel: 1 | 2 | 3 | 4
+    pegos: number
+    meta: number
+    total_equipe: number
+  }>
   alunos: AlunoCadastrado[]
   turmas: Turma[]
   cargos: Cargo[]
@@ -266,6 +277,7 @@ function seed(): DB {
     semanas: number,
     cargos: string[] = [],
     turmasEnsino: string[] = [],
+    papelPrincipal: Profile['papel_principal'] = null,
   ): Profile => ({
     id: uuid(),
     nome,
@@ -277,6 +289,7 @@ function seed(): DB {
     // Contas de exemplo nascem sem e-mail, como as contas antigas de
     // produção: dá para exercitar o "cadastre seu e-mail" do perfil.
     email: null,
+    papel_principal: papelPrincipal,
     criado_em: addDays(now, -7 * semanas).toISOString(),
   })
 
@@ -310,6 +323,8 @@ function seed(): DB {
     // Dá aula nas duas iniciantes e estuda no Avançado/Inter — no feed
     // ela vê as quatro turmas na mesma aba
     ['Iniciante 01', 'Iniciante 02'],
+    // Professora de exemplo da Caça aos professores
+    'Condutor(a)',
   )
   const pedro = mkProfile(
     'Pedro Baião',
@@ -605,6 +620,8 @@ export class DemoApi implements ForroApi {
       // quem está com o demo aberto perderia tudo que criou.
       for (const p of this.db.profiles) {
         if (!p.turmas_ensino) p.turmas_ensino = []
+        // Campo da migração 041: banco demo antigo não tem a função
+        if (p.papel_principal === undefined) p.papel_principal = null
       }
     } else {
       // Versões antigas do banco demo são descartadas
@@ -791,6 +808,7 @@ export class DemoApi implements ForroApi {
         .filter((m): m is typeof m & { turma: string } => m.turma !== null)
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       turmas_ensino: [],
+      papel_principal: null,
       cargos: [],
       telefone: telefone.trim(),
       email: email.trim() || null,
@@ -851,6 +869,7 @@ export class DemoApi implements ForroApi {
         .filter((m): m is typeof m & { turma: string } => m.turma !== null)
         .map((m) => ({ turma: m.turma, papel_danca: m.papel_danca })),
       turmas_ensino: [],
+      papel_principal: null,
       cargos: [],
       telefone: telefone.trim() || null,
       email: null,
@@ -2063,6 +2082,82 @@ export class DemoApi implements ForroApi {
     }
     this.persist()
     this.notifyFeed()
+  }
+
+  // ---- Caça aos professores (migração 041) ----
+
+  async definirPapelPrincipal(userId: string, papel: PapelDanca | null) {
+    const eu = this.uid()
+    if (userId !== eu && this.db.roles[eu] !== 'organizador') {
+      throw new Error('Só a organização define a função de outra pessoa')
+    }
+    const p = this.db.profiles.find((x) => x.id === userId)
+    if (!p) throw new Error('Aluno não encontrado')
+    p.papel_principal = papel
+    this.persist()
+    this.notifyFeed()
+  }
+
+  async duplasConfirmadasEntre(desde: string | null, ate: string) {
+    const desdeData = desde?.slice(0, 10)
+    const ateData = ate.slice(0, 10)
+    return (this.db.duplas ?? [])
+      .filter(
+        (d) =>
+          d.confirmada && (!desdeData || d.data >= desdeData) && d.data <= ateData,
+      )
+      .map((d) => ({ de_user: d.de_user, para_user: d.para_user }))
+  }
+
+  async cacaCongeladaDe(userId: string): Promise<CacaCongelada[]> {
+    const semestres = new Map((this.db.cacaSemestres ?? []).map((s) => [s.id, s]))
+    return (this.db.cacaResultados ?? [])
+      .filter((r) => r.user_id === userId && semestres.has(r.semestre_id))
+      .map((r) => {
+        const s = semestres.get(r.semestre_id)!
+        return {
+          inicio: s.inicio,
+          fim: s.fim,
+          nivel: r.nivel,
+          pegos: r.pegos,
+          meta: r.meta,
+          total_equipe: r.total_equipe,
+        }
+      })
+      .sort((a, b) => b.fim.localeCompare(a.fim))
+  }
+
+  async guardarCacaDoSemestre(p: {
+    inicio: string | null
+    equipe: { user_id: string; papel: PapelDanca }[]
+    resultados: {
+      user_id: string
+      nivel: number
+      pegos: number
+      meta: number
+      total_equipe: number
+    }[]
+  }) {
+    if (this.db.roles[this.uid()] !== 'organizador') {
+      throw new Error('Só a organização encerra o semestre')
+    }
+    const id = uuid()
+    this.db.cacaSemestres = [
+      ...(this.db.cacaSemestres ?? []),
+      { id, inicio: p.inicio, fim: new Date().toISOString() },
+    ]
+    this.db.cacaResultados = [
+      ...(this.db.cacaResultados ?? []),
+      ...p.resultados.map((r) => ({
+        semestre_id: id,
+        user_id: r.user_id,
+        nivel: r.nivel as 1 | 2 | 3 | 4,
+        pegos: r.pegos,
+        meta: r.meta,
+        total_equipe: r.total_equipe,
+      })),
+    ]
+    this.persist()
   }
 
   async removeTurmaEnsino(userId: string, turma: string) {

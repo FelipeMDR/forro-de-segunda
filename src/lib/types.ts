@@ -44,8 +44,18 @@ export interface Profile {
    */
   termos_aceitos_em?: string | null
   /** Papel que a pessoa dança quando não tem turma (Caça aos professores). */
-  papel_principal?: PapelDanca | null
+  papel_principal: PapelDanca | null
   criado_em: string
+}
+
+/** Resultado da Caça aos professores de um semestre já encerrado (migração 041). */
+export interface CacaCongelada {
+  inicio: string | null
+  fim: string
+  nivel: 1 | 2 | 3 | 4
+  pegos: number
+  meta: number
+  total_equipe: number
 }
 
 /**
