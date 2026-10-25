@@ -21,6 +21,7 @@ import { NOME_PADRAO } from './nome'
 import { ordenarFila } from './filaMusica'
 import { ordenarPassos, REGRAS_PADRAO, somaDias, videoDoYoutube } from './trilha'
 import { compactarNotificacoes } from './notificacoes'
+import { noitesNaoAnuladas } from './presenca'
 import type { MusicaTocada } from './retrospectiva'
 import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
@@ -2874,12 +2875,21 @@ export class DemoApi implements ForroApi {
       .map((p) => this.comPerfil(p))
   }
 
+  /** Pedidos que tocaram numa noite cujo check-in não foi anulado. */
+  private tocadasQueContam(userId: string) {
+    const valem = noitesNaoAnuladas(
+      this.db.checkins
+        .filter((c) => c.user_id === userId)
+        .map((c) => ({ criado_em: c.criado_em, presencaAnulada: c.presenca_anulada === true })),
+    )
+    return (this.db.pedidosMusica ?? []).filter(
+      (p) => p.user_id === userId && p.status === 'tocou' && valem.has(p.noite),
+    )
+  }
+
   async musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]> {
-    return (this.db.pedidosMusica ?? [])
-      .filter(
-        (p) =>
-          p.user_id === userId && p.status === 'tocou' && p.tocou_em !== null && p.tocou_em >= desde,
-      )
+    return this.tocadasQueContam(userId)
+      .filter((p) => p.tocou_em !== null && p.tocou_em >= desde)
       .map((p) => ({
         uri: p.uri,
         titulo: p.titulo,
@@ -2890,9 +2900,7 @@ export class DemoApi implements ForroApi {
   }
 
   async musicasTocadasDe(userId: string) {
-    return (this.db.pedidosMusica ?? []).filter(
-      (p) => p.user_id === userId && p.status === 'tocou',
-    ).length
+    return this.tocadasQueContam(userId).length
   }
 
   async savePushSubscription() {

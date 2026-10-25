@@ -99,6 +99,16 @@ describe('DemoApi — pedidos de música', () => {
     )
     // A foto de quem pediu acompanha o nome (Maria do seed não tem foto)
     expect((await api.sessaoDJAberta())!.tocando).toHaveProperty('pedido_por_avatar', null)
+
+    // A organização anula o check-in de Maria: os pedidos daquela noite
+    // saem do distintivo e da retrospectiva; desfazer devolve tudo
+    await api.signInTelefone('11 98888-0003', 'forro123')
+    await api.anularPresenca(`ck-${maria}`, true)
+    expect(await api.musicasTocadasDe(maria)).toBe(0)
+    expect(await api.musicasTocadasDesde(maria, '2026-01-01T00:00:00.000Z')).toEqual([])
+    expect(await api.musicasTocadasDe(joao)).toBe(1)
+    await api.anularPresenca(`ck-${maria}`, false)
+    expect(await api.musicasTocadasDe(maria)).toBe(3)
   })
 
   it('aluno não liga o Modo DJ', async () => {

@@ -1,4 +1,4 @@
-import { janelaDoCheckin } from './dates'
+import { diaDaNoite, janelaDoCheckin } from './dates'
 import type { Challenge } from './types'
 
 /**
@@ -122,4 +122,21 @@ export function datasDePresenca(
     if (janela) noites.add(janela)
   }
   return [...noites].map((dia) => new Date(`${dia}T12:00:00`))
+}
+
+/**
+ * As noites ("AAAA-MM-DD") em que a pessoa tem check-in que a
+ * organização NÃO anulou. É a mesma condição que `pedir_musica` exige
+ * para aceitar um pedido (migração 029): pedido de noite cujo check-in
+ * foi anulado depois deixa de contar — no distintivo de DJ e na
+ * retrospectiva — mas a foto continua no perfil.
+ */
+export function noitesNaoAnuladas(
+  checkins: Array<{ criado_em: string; presencaAnulada?: boolean }>,
+): Set<string> {
+  const noites = new Set<string>()
+  for (const c of checkins) {
+    if (!c.presencaAnulada) noites.add(diaDaNoite(new Date(c.criado_em)))
+  }
+  return noites
 }

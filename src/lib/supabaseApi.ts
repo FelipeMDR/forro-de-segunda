@@ -13,6 +13,7 @@ import { extensionFor } from './image'
 import type { Coordenada } from './geo'
 import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
+import { noitesNaoAnuladas } from './presenca'
 import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
 import { REGRAS_PADRAO, videoDoYoutube } from './trilha'
@@ -3312,33 +3313,40 @@ export class SupabaseApi implements ForroApi {
     }))
   }
 
-  async musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]> {
+  /**
+   * Pedidos da pessoa que tocaram E cuja noite ainda vale: se a
+   * organização anulou o check-in daquela noite, os pedidos dela saem
+   * da conta junto (ver `noitesNaoAnuladas`).
+   */
+  private async tocadasQueContam(userId: string, desde?: string) {
     // Um semestre de pedidos de uma pessoa fica longe das 1000 linhas
-    const rows = ok(
-      await this.sb
-        .from('pedidos_musica')
-        .select('track_uri, titulo, artista, capa_url, tocou_em')
-        .eq('user_id', userId)
-        .eq('status', 'tocou')
-        .gte('tocou_em', desde),
-    ) as Array<{
+    let consulta = this.sb
+      .from('pedidos_musica')
+      .select('noite, track_uri, titulo, artista, capa_url, tocou_em')
+      .eq('user_id', userId)
+      .eq('status', 'tocou')
+    if (desde) consulta = consulta.gte('tocou_em', desde)
+    const [rows, checkins] = await Promise.all([consulta, this.checkinsDe(userId)])
+    const valem = noitesNaoAnuladas(checkins)
+    return (ok(rows) as Array<{
+      noite: string
       track_uri: string
       titulo: string
       artista: string
       capa_url: string | null
       tocou_em: string
-    }>
-    return rows.map(({ track_uri, ...r }) => ({ ...r, uri: track_uri }))
+    }>).filter((r) => valem.has(r.noite))
+  }
+
+  async musicasTocadasDesde(userId: string, desde: string): Promise<MusicaTocada[]> {
+    return (await this.tocadasQueContam(userId, desde)).map(({ noite: _, track_uri, ...r }) => ({
+      ...r,
+      uri: track_uri,
+    }))
   }
 
   async musicasTocadasDe(userId: string) {
-    const { count, error } = await this.sb
-      .from('pedidos_musica')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'tocou')
-    if (error) throw new Error(traduz(error.message))
-    return count ?? 0
+    return (await this.tocadasQueContam(userId)).length
   }
 
   async savePushSubscription(sub: PushSubscriptionJSON) {
