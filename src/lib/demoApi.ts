@@ -2,6 +2,7 @@ import { decidirPassada, LIMITE_BUSCA } from '../../supabase/functions/_shared/d
 import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { ForroApi } from './api'
 import { cacaParaCongelar } from './caca'
+import { MAX_DESTAQUES } from './destaques'
 import {
   addDays,
   diaDaNoite,
@@ -125,6 +126,8 @@ interface ChallengeRow {
 
 interface DB {
   profiles: Profile[]
+  /** Destaques do perfil (migração 042), por pessoa. Opcional: banco demo antigo. */
+  destaques?: Record<string, string[]>
   roles: Record<string, Papel>
   /** telefone normalizado → senha (só no demo; produção usa Supabase Auth) */
   senhas: Record<string, string>
@@ -2102,6 +2105,21 @@ export class DemoApi implements ForroApi {
     p.papel_principal = papel
     this.persist()
     this.notifyFeed()
+  }
+
+  // ---- Destaques do perfil (migração 042) ----
+
+  async destaquesDe(userId: string) {
+    return this.db.destaques?.[userId] ?? null
+  }
+
+  async definirDestaques(chaves: string[] | null) {
+    const eu = this.uid()
+    const todos = { ...(this.db.destaques ?? {}) }
+    if (chaves) todos[eu] = chaves.slice(0, MAX_DESTAQUES)
+    else delete todos[eu]
+    this.db.destaques = todos
+    this.persist()
   }
 
   async duplasConfirmadasEntre(desde: string | null, ate: string) {

@@ -18,6 +18,7 @@ import { ResistenciaPage } from './pages/ResistenciaPage'
 import { CheckinPage } from './pages/CheckinPage'
 import { ConfirmadoPage } from './pages/ConfirmadoPage'
 import { ContaPage } from './pages/ContaPage'
+import { DistintivosPerfilPage } from './pages/DistintivosPerfilPage'
 import { FavoritosPage } from './pages/FavoritosPage'
 import { AgendaPage } from './pages/AgendaPage'
 import { FeedPage } from './pages/FeedPage'
@@ -96,8 +97,10 @@ export default function App() {
               {/* Antes de /perfil/:id, senão "conta" viraria um id */}
               <Route path="/perfil/conta" element={<ContaPage />} />
               <Route path="/perfil/duplas" element={<ForrodexPage />} />
+              <Route path="/perfil/distintivos" element={<DistintivosPerfilPage />} />
               <Route path="/perfil/:id" element={<UserProfilePage />} />
               <Route path="/perfil/:id/favoritos" element={<FavoritosPage />} />
+              <Route path="/perfil/:id/distintivos" element={<DistintivosPerfilPage />} />
               <Route path="/organizador" element={<PainelLayout />}>
                 <Route index element={<PainelHome />} />
                 <Route path="pessoas" element={<PessoasHub />} />

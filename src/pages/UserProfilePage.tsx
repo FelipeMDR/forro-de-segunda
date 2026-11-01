@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ErrorState } from '../components/ErrorState'
-import { BadgeGrid, ChipsPerfil, FavoritosGrid, StatsRow } from '../components/PerfilResumo'
+import { ChipsPerfil, DestaquesPerfil, FavoritosGrid, StatsRow } from '../components/PerfilResumo'
 import { Spinner } from '../components/Spinner'
 import { BotaoIcone, BotaoSuave, useVoltar } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
@@ -133,6 +133,10 @@ export function UserProfilePage() {
   )
   const [stats, setStats] = useLembrado<PerfilStats | null>(`perfil:${id}:stats`, null)
   const [badges, setBadges] = useLembrado<Badge[] | null>(`perfil:${id}:badges`, null)
+  const [destaques, setDestaques] = useLembrado<string[] | null | undefined>(
+    `perfil:${id}:destaques`,
+    undefined,
+  )
   const [favoritos, setFavoritos] = useLembrado<CheckinFavorito[] | null>(
     `perfil:${id}:favoritos`,
     null,
@@ -161,6 +165,7 @@ export function UserProfilePage() {
         if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
+        setDestaques(r.destaques)
         const favs = await api.favoritosDe(id).catch((e) => {
           // Sem a migração 005 a coluna não existe — o resto do perfil vale
           console.error('[perfil público] falha ao carregar favoritos', e)
@@ -221,7 +226,11 @@ export function UserProfilePage() {
         <h1 className="m-0 mt-1.5 text-[30px] font-extrabold leading-none tracking-[-.02em]">
           {perfil.nome}
         </h1>
-        <ChipsPerfil cargos={perfil.cargos} turmas={perfil.turmas} />
+        <ChipsPerfil
+          cargos={perfil.cargos}
+          turmas={perfil.turmas}
+          papelPrincipal={perfil.papel_principal}
+        />
       </div>
 
       <div className="px-4">
@@ -230,9 +239,11 @@ export function UserProfilePage() {
       <VocesDois noites={noitesJuntos} />
       <DanceiCom perfilId={perfil.id} nome={primeiroNome} />
 
-      <BadgeGrid
+      <DestaquesPerfil
         badges={badges}
+        salvos={destaques}
         vazio={`${primeiroNome} ainda não tem distintivos. Chama pra dançar!`}
+        todosHref={`/perfil/${perfil.id}/distintivos`}
       />
 
       <FavoritosGrid

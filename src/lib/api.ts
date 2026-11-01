@@ -383,6 +383,15 @@ export interface ForroApi {
   // ---- Caça aos professores (migração 041) ----
   /** Função de dança de quem está sem turma. Só a própria pessoa ou a organização. */
   definirPapelPrincipal(userId: string, papel: PapelDanca | null): Promise<void>
+  // ---- Destaques do perfil (migração 042) ----
+  /**
+   * Chaves dos distintivos em destaque, em ordem (ver `lib/destaques.ts`).
+   * null = nunca escolheu; undefined = indisponível (banco sem a 042).
+   */
+  destaquesDe(userId: string): Promise<string[] | null | undefined>
+  /** Salva os destaques do próprio perfil (até 3). null = volta ao automático. */
+  definirDestaques(chaves: string[] | null): Promise<void>
+
   /**
    * Duplas confirmadas de todo mundo no período (`desde` ISO ou null =
    * desde sempre; `ate` data ou ISO). Uma linha por dupla-noite.

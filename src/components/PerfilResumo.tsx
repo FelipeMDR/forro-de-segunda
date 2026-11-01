@@ -7,10 +7,12 @@ import { BotaoIcone, Folha } from './ui'
 import { EMOJI_CACA, type ProfessorCaca } from '../lib/caca'
 import { formatRelative } from '../lib/dates'
 import type { PerfilStats } from '../lib/perfilStats'
+import { colecao, conquistado, escolherDestaques } from '../lib/destaques'
 import {
   LIMITE_FAVORITOS,
   type Badge,
   type CheckinFavorito,
+  type PapelDanca,
   type TurmaMembro,
 } from '../lib/types'
 
@@ -20,34 +22,39 @@ function rotuloTurma(m: TurmaMembro): string {
 }
 
 /**
- * Cargos (pêssego, com contorno: é o reconhecimento mais forte) e
- * turmas com o papel na dança, numa fileira só.
+ * Cargos (pêssego, com contorno: é o reconhecimento mais forte, num chip
+ * só) e turmas com o papel na dança. Sem turma, a função escolhida faz
+ * as vezes da turma. É por estarem aqui que cargo, turma e função não
+ * se repetem como distintivo nos destaques.
  */
 export function ChipsPerfil({
   cargos,
   turmas,
+  papelPrincipal,
 }: {
   cargos: string[]
   turmas: TurmaMembro[]
+  papelPrincipal?: PapelDanca | null
 }) {
-  if (cargos.length === 0 && turmas.length === 0) {
+  const funcao = turmas.length === 0 ? papelPrincipal : null
+  if (cargos.length === 0 && turmas.length === 0 && !funcao) {
     return <p className="text-[13px] text-ink3">Turma ainda não definida</p>
   }
   return (
     <div className="flex flex-wrap justify-center gap-1.5">
-      {cargos.map((c) => (
-        <span
-          key={c}
-          className="rounded-full border-[1.5px] border-preto bg-brasa-300 px-2.5 py-1 text-[13px] font-extrabold text-preto"
-        >
-          {c}
+      {cargos.length > 0 && (
+        <span className="rounded-full border-[1.5px] border-preto bg-brasa-300 px-2.5 py-1 text-[13px] font-extrabold text-preto">
+          {cargos.join(' · ')}
         </span>
-      ))}
+      )}
       {turmas.map((m) => (
         <span key={m.turma} className="rounded-full bg-chip px-2.5 py-1 text-[13px] font-bold">
           {rotuloTurma(m)}
         </span>
       ))}
+      {funcao && (
+        <span className="rounded-full bg-chip px-2.5 py-1 text-[13px] font-bold">{funcao}</span>
+      )}
     </div>
   )
 }
@@ -165,12 +172,15 @@ export function BadgeGrid({
   badges,
   vazio,
   contagem = false,
+  semTitulo = false,
   onAbrirFuncao,
 }: {
   badges: Badge[] | null
   vazio: string
   /** Mostra "N conquistados" ao lado do título. */
   contagem?: boolean
+  /** Na tela "Todos os distintivos" o título já está no cabeçalho. */
+  semTitulo?: boolean
   /** Cartão da caça sem função escolhida: abre a escolha em vez do detalhe. */
   onAbrirFuncao?: () => void
 }) {
@@ -179,15 +189,17 @@ export function BadgeGrid({
   // A caça no nível 0 e o convite à função aparecem, mas não são conquista
   const conquistados = badges?.filter((b) => !b.caca?.pendente).length ?? 0
   return (
-    <section className="flex flex-col gap-2.5 pt-6">
-      <div className="flex items-baseline justify-between px-5">
-        <span className="text-[19px] font-extrabold">Distintivos</span>
-        {contagem && conquistados > 0 && (
-          <span className="whitespace-nowrap text-[13px] text-ink3">
-            {conquistados} {conquistados === 1 ? 'conquistado' : 'conquistados'}
-          </span>
-        )}
-      </div>
+    <section className={`flex flex-col gap-2.5 ${semTitulo ? 'pt-1' : 'pt-6'}`}>
+      {!semTitulo && (
+        <div className="flex items-baseline justify-between px-5">
+          <span className="text-[19px] font-extrabold">Distintivos</span>
+          {contagem && conquistados > 0 && (
+            <span className="whitespace-nowrap text-[13px] text-ink3">
+              {conquistados} {conquistados === 1 ? 'conquistado' : 'conquistados'}
+            </span>
+          )}
+        </div>
+      )}
       {badges === null ? (
         <Spinner />
       ) : badges.length === 0 ? (
@@ -228,6 +240,111 @@ export function BadgeGrid({
               )}
             </button>
           ))}
+        </div>
+      )}
+      <Folha aberta={aberto !== null} onFechar={fechar}>
+        {aberto && <DetalheDistintivo b={aberto} onFechar={fechar} />}
+      </Folha>
+    </section>
+  )
+}
+
+/**
+ * Até 3 distintivos em destaque e, embaixo, a entrada para todos. Os
+ * destaques são os que a pessoa escolheu ou, sem escolha, os mais raros
+ * (ver `lib/destaques.ts`). Tocar num destaque abre o detalhe.
+ */
+export function DestaquesPerfil({
+  badges,
+  salvos,
+  vazio,
+  todosHref,
+  onEditar,
+}: {
+  badges: Badge[] | null
+  salvos: string[] | null | undefined
+  vazio: string
+  /** Tela "Todos os distintivos" dessa pessoa. */
+  todosHref: string
+  /** Só no próprio perfil (e com a migração 042): abre a escolha. */
+  onEditar?: () => void
+}) {
+  const [aberto, setAberto] = useState<Badge | null>(null)
+  const fechar = useCallback(() => setAberto(null), [])
+  const todos = badges ? colecao(badges) : []
+  const destaques = badges ? escolherDestaques(badges, salvos) : []
+  const nTodos = todos.filter(conquistado).length
+  // Prévia do que está em "Todos": primeiro o que não está em destaque
+  const previa = [
+    ...todos.filter((b) => !destaques.includes(b)),
+    ...destaques,
+  ].slice(0, 3)
+
+  return (
+    <section className="flex flex-col gap-2.5 pt-6">
+      <div className="flex items-baseline justify-between px-5">
+        <span className="text-[19px] font-extrabold">Destaques</span>
+        {onEditar && destaques.length > 0 && (
+          <button
+            type="button"
+            onClick={onEditar}
+            aria-haspopup="dialog"
+            className="-my-2 -mr-2 flex items-center gap-1 p-2 text-[13px] font-extrabold text-or-t"
+          >
+            <Icone nome="editar" tamanho={15} traco={2.4} />
+            Editar
+          </button>
+        )}
+      </div>
+      {badges === null ? (
+        <Spinner />
+      ) : todos.length === 0 ? (
+        <p className="px-5 text-sm leading-snug text-ink3">{vazio}</p>
+      ) : (
+        <div className="flex flex-col gap-2.5 px-4">
+          {destaques.length > 0 && (
+            <div className="grid grid-cols-3 gap-2.5">
+              {destaques.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setAberto(b)}
+                  aria-haspopup="dialog"
+                  className="flex flex-col items-center gap-2 rounded-[18px] border border-linha bg-sf px-1.5 pb-3 pt-3.5 text-center transition-transform active:scale-[0.97]"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-[16px] bg-chip text-[30px] leading-none">
+                    {b.emoji}
+                  </span>
+                  <span
+                    lang="pt"
+                    className="line-clamp-2 text-[13px] font-extrabold leading-tight [hyphens:auto] [overflow-wrap:anywhere]"
+                  >
+                    {b.titulo}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <Link
+            to={todosHref}
+            className="flex items-center gap-3 rounded-[18px] border border-linha bg-sf py-2.5 pl-3 pr-2.5 transition-transform active:scale-[0.98]"
+          >
+            <span aria-hidden="true" className="flex shrink-0">
+              {previa.map((b, i) => (
+                <span
+                  key={b.id}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-sf bg-chip text-[17px] leading-none ${
+                    i > 0 ? '-ml-2.5' : ''
+                  }`}
+                >
+                  {b.emoji}
+                </span>
+              ))}
+            </span>
+            <span className="min-w-0 flex-1 text-[15px] font-bold">Todos os distintivos</span>
+            <span className="text-[15px] font-extrabold text-ink3">{nTodos}</span>
+            <Icone nome="avancar" tamanho={18} className="shrink-0 text-ink3" />
+          </Link>
         </div>
       )}
       <Folha aberta={aberto !== null} onFechar={fechar}>

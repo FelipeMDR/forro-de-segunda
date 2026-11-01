@@ -67,7 +67,7 @@ function abaDe(pathname: string): 'hoje' | 'feed' | 'avisos' | 'eu' {
   if (pathname.startsWith('/notificacoes')) return 'avisos'
   if (pathname.startsWith('/perfil') || pathname.startsWith('/organizador')) {
     // O perfil de OUTRA pessoa é navegação, não "Eu"
-    return /^\/perfil\/(?!conta|duplas)[^/]+/.test(pathname) ? 'hoje' : 'eu'
+    return /^\/perfil\/(?!conta|duplas|distintivos)[^/]+/.test(pathname) ? 'hoje' : 'eu'
   }
   return 'hoje'
 }

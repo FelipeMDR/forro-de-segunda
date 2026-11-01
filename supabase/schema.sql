@@ -986,6 +986,15 @@ $$;
 
 grant execute on function public.guardar_caca_do_semestre(jsonb) to authenticated;
 
+-- ---------- Destaques do perfil (migração 042) ----------
+-- Até 3 distintivos escolhidos, em ordem; nulo = o app escolhe
+alter table public.profiles
+  add column if not exists destaques text[];
+
+alter table public.profiles drop constraint if exists profiles_destaques_check;
+alter table public.profiles add constraint profiles_destaques_check
+  check (destaques is null or cardinality(destaques) <= 3);
+
 -- ============================================================
 -- PASSOS PÓS-INSTALAÇÃO
 --

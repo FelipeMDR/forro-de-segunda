@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { FolhaDestaques } from '../components/FolhaDestaques'
 import { FolhaFuncao } from '../components/FolhaFuncao'
 import { Icone } from '../components/Icone'
 import {
-  BadgeGrid,
   ChipsPerfil,
+  DestaquesPerfil,
   FavoritosGrid,
   StatsRow,
 } from '../components/PerfilResumo'
@@ -32,6 +33,10 @@ export function ProfilePage() {
 
   const [stats, setStats] = useLembrado<PerfilStats | null>('perfil:stats', null)
   const [badges, setBadges] = useLembrado<Badge[] | null>('perfil:badges', null)
+  const [destaques, setDestaques] = useLembrado<string[] | null | undefined>(
+    'perfil:destaques',
+    undefined,
+  )
   const [favoritos, setFavoritos] = useLembrado<CheckinFavorito[] | null>(
     'perfil:favoritos',
     null,
@@ -46,6 +51,7 @@ export function ProfilePage() {
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const [saindo, setSaindo] = useState(false)
   const [escolherFuncao, setEscolherFuncao] = useState(false)
+  const [editarDestaques, setEditarDestaques] = useState(false)
 
   // O perfil da sessão é carregado no login e fica em cache. Se a
   // organização mudar sua turma ou seus cargos depois disso, a tela
@@ -69,6 +75,7 @@ export function ProfilePage() {
         if (cancelado) return
         setStats(r.stats)
         setBadges(r.badges)
+        setDestaques(r.destaques)
       })
       .catch((e) => {
         if (cancelado) return
@@ -158,6 +165,17 @@ export function ProfilePage() {
     }
   }
 
+  const salvarDestaques = async (chaves: string[] | null) => {
+    try {
+      await api.definirDestaques(chaves)
+      setDestaques(chaves)
+      setEditarDestaques(false)
+      toast(chaves ? 'Destaques salvos!' : 'Destaques automáticos')
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    }
+  }
+
   const sair = async () => {
     setSaindo(true)
     try {
@@ -195,7 +213,11 @@ export function ProfilePage() {
         <h1 className="m-0 mt-1.5 text-[30px] font-extrabold leading-none tracking-[-.02em]">
           {profile.nome}
         </h1>
-        <ChipsPerfil cargos={profile.cargos} turmas={profile.turmas} />
+        <ChipsPerfil
+          cargos={profile.cargos}
+          turmas={profile.turmas}
+          papelPrincipal={profile.papel_principal}
+        />
       </div>
 
       {/* Só quem está sem turma escolhe a função: quem tem turma usa o
@@ -229,11 +251,13 @@ export function ProfilePage() {
         <StatsRow stats={stats} duplasHref="/perfil/duplas" />
       </div>
 
-      <BadgeGrid
+      <DestaquesPerfil
         badges={badges}
-        contagem
+        salvos={destaques}
         vazio="Faça seu primeiro check-in para começar a colecionar!"
-        onAbrirFuncao={() => setEscolherFuncao(true)}
+        todosHref="/perfil/distintivos"
+        // Sem a migração 042 não há onde salvar: fica o automático
+        onEditar={destaques === undefined ? undefined : () => setEditarDestaques(true)}
       />
 
       <div className={`grid gap-3 px-4 pt-2.5 ${semestreEncerrado ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -314,6 +338,16 @@ export function ProfilePage() {
           Sair
         </button>
       </div>
+
+      {badges && (
+        <FolhaDestaques
+          aberta={editarDestaques}
+          onFechar={() => setEditarDestaques(false)}
+          badges={badges}
+          salvos={destaques}
+          onSalvar={salvarDestaques}
+        />
+      )}
 
       <FolhaFuncao
         aberta={escolherFuncao}

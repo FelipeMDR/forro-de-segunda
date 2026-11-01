@@ -16,6 +16,7 @@ const apiVazia = {
   listPerfisPublicos: async () => [],
   listTurmas: async () => [],
   cacaCongeladaDe: async () => [],
+  destaquesDe: async () => null,
 } as unknown as ForroApi
 
 const convite = async (papelPrincipal: 'Condutor(a)' | null | undefined) => {

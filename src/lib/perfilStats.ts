@@ -47,7 +47,12 @@ export async function carregarPerfilStats(
     /** Próprio perfil: mostra a caça no nível 0 e o convite à função. */
     proprio?: boolean
   } = {},
-): Promise<{ stats: PerfilStats; badges: Badge[] }> {
+): Promise<{
+  stats: PerfilStats
+  badges: Badge[]
+  /** Destaques escolhidos (null = automático; undefined = sem a migração 042). */
+  destaques: string[] | null | undefined
+}> {
   const papelPrincipal = opcoes.papelPrincipal ?? null
   const funcaoDisponivel = opcoes.papelPrincipal !== undefined
   // A caça vale no semestre em curso: as duplas são recortadas no último
@@ -75,6 +80,7 @@ export async function carregarPerfilStats(
     turmasCadastradas,
     cacaSemestre,
     cacasCongeladas,
+    destaques,
   ] = await Promise.all([
     api.checkinsDe(userId),
     api.contarDesafios(userId),
@@ -94,6 +100,8 @@ export async function carregarPerfilStats(
     caca,
     // Sem a migração 041 não há caças guardadas
     api.cacaCongeladaDe(userId).catch(() => [] as CacaCongelada[]),
+    // Sem a migração 042: destaques automáticos
+    api.destaquesDe(userId).catch(() => undefined),
   ])
 
   // Uma noite só entra na conta se a foto marcou ponto em algum desafio
@@ -135,6 +143,7 @@ export async function carregarPerfilStats(
       ),
       cacasCongeladas,
     }),
+    destaques,
   }
 }
 

@@ -7,6 +7,7 @@ import {
   mapaAberturas,
 } from './dates'
 import { cacaParaCongelar } from './caca'
+import { MAX_DESTAQUES } from './destaques'
 import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
@@ -2258,6 +2259,34 @@ export class SupabaseApi implements ForroApi {
         .from('profiles')
         .update({ papel_principal: papel })
         .eq('id', userId),
+    )
+  }
+
+  // ---- Destaques do perfil (migração 042) ----
+
+  async destaquesDe(userId: string) {
+    // Consulta à parte, como `papelPrincipalDe`: sem a 042 a coluna não
+    // existe, e o perfil continua valendo com os destaques automáticos
+    const { data, error } = await this.sb
+      .from('profiles')
+      .select('destaques')
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) {
+      console.warn('[perfil] destaques indisponíveis:', error)
+      return undefined
+    }
+    return (data as { destaques?: string[] | null } | null)?.destaques ?? null
+  }
+
+  async definirDestaques(chaves: string[] | null) {
+    const eu = await this.getSessionUserId()
+    if (!eu) throw new Error('Entre na sua conta para escolher os destaques')
+    ok(
+      await this.sb
+        .from('profiles')
+        .update({ destaques: chaves ? chaves.slice(0, MAX_DESTAQUES) : null })
+        .eq('id', eu),
     )
   }
 
