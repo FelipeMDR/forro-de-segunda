@@ -202,6 +202,13 @@ export function AlunoPage() {
   const { perfis, turmas, cargos, recarregar } = usePainel()
   const perfil: Profile | undefined = perfis.find((p) => p.id === id)
   const nomesTurmas = ordenarTurmas(turmas.map((t) => t.nome))
+  // Vínculo com turma que não existe mais (apagada ou com outro nome):
+  // sem cartão próprio ele ficava invisível no seletor e não tinha
+  // como desmarcar. Vem do perfil salvo, não do rascunho, para o cartão
+  // não sumir ao desmarcar.
+  const turmasOrfas = (perfil?.turmas ?? [])
+    .map((t) => t.turma)
+    .filter((t) => !nomesTurmas.includes(t))
 
   const [mapa, setMapa] = useState<MapaTurmas>({})
   const [cargosSel, setCargosSel] = useState<Set<string>>(new Set())
@@ -309,8 +316,14 @@ export function AlunoPage() {
         <Dica>Telefone e e-mail não aparecem para outras pessoas. O nome, quem troca é a própria pessoa.</Dica>
 
         <Campo rotulo="Turmas e papel de dança">
-          <SeletorTurmas turmas={nomesTurmas} valor={mapa} onChange={setMapa} />
+          <SeletorTurmas turmas={[...nomesTurmas, ...turmasOrfas]} valor={mapa} onChange={setMapa} />
         </Campo>
+        {turmasOrfas.length > 0 && (
+          <Dica>
+            {turmasOrfas.join(', ')} não {turmasOrfas.length === 1 ? 'existe' : 'existem'} mais em Turmas
+            do semestre. Desmarque para tirar do perfil.
+          </Dica>
+        )}
 
         {Object.keys(mapa).length === 0 && (
           <Campo
