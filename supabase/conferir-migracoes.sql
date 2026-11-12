@@ -172,6 +172,15 @@ from (values
   (
     '041 — caça aos professores',
     exists (select 1 from pg_proc where proname = 'guardar_caca_do_semestre')
+  ),
+  (
+    '043 — desafio de ingresso',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'challenges'
+        and column_name = 'evento_data'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

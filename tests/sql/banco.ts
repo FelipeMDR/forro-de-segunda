@@ -10,6 +10,7 @@ const MIGRACOES = [
   '038-videos-do-drive.sql',
   '039-aulas-sem-video.sql',
   '041-caca-aos-professores.sql',
+  '043-desafio-de-ingresso.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**
@@ -26,7 +27,7 @@ create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('teste.uid', true), '')::uuid
 $$;
 create table public.profiles (
-  id uuid primary key, nome text not null, avatar_url text
+  id uuid primary key, nome text not null, avatar_url text, telefone text
 );
 create table public.roles (
   user_id uuid primary key references public.profiles(id), papel text not null
@@ -76,8 +77,65 @@ create table public.challenges (
   id uuid primary key default gen_random_uuid(),
   titulo text not null default 'Desafio',
   data_inicio date not null, data_fim date not null,
-  forrodex boolean not null default false
+  forrodex boolean not null default false,
+  entrada_restrita boolean not null default false
 );
+create table public.challenge_members (
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  entrou_em timestamptz not null default now(),
+  primary key (challenge_id, user_id)
+);
+create table public.challenge_convidados (
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  telefone text not null,
+  telefone_exibicao text,
+  nome text,
+  criado_em timestamptz not null default now(),
+  primary key (challenge_id, telefone)
+);
+create table public.alunos_cadastrados (
+  telefone text, nome text, turma text, papel_danca text
+);
+-- Cópias de schema.sql (normalizar_telefone) e da migração 022
+create function public.normalizar_telefone(t text) returns text
+language sql immutable as $$
+  select case
+    when t is null then ''
+    when length(regexp_replace(t, '\\D', '', 'g')) > 10
+      then right(regexp_replace(t, '\\D', '', 'g'), 10)
+    else regexp_replace(t, '\\D', '', 'g')
+  end;
+$$;
+create function public.telefone_ddd(t text) returns text
+language sql immutable as $$
+  select case length(regexp_replace(coalesce(t, ''), '\\D', '', 'g'))
+    when 11 then left(regexp_replace(coalesce(t, ''), '\\D', '', 'g'), 2)
+    when 10 then left(regexp_replace(coalesce(t, ''), '\\D', '', 'g'), 2)
+    else null
+  end;
+$$;
+create function public.telefone_linha(t text) returns text
+language sql immutable as $$
+  select case length(regexp_replace(coalesce(t, ''), '\\D', '', 'g'))
+    when 11 then substring(regexp_replace(coalesce(t, ''), '\\D', '', 'g') from 4 for 8)
+    when 10 then right(regexp_replace(coalesce(t, ''), '\\D', '', 'g'), 8)
+    when 9 then right(regexp_replace(coalesce(t, ''), '\\D', '', 'g'), 8)
+    when 8 then regexp_replace(coalesce(t, ''), '\\D', '', 'g')
+    else ''
+  end;
+$$;
+create function public.telefones_batem(a text, b text) returns boolean
+language sql immutable as $$
+  select
+    public.telefone_linha(a) <> ''
+    and public.telefone_linha(a) = public.telefone_linha(b)
+    and (
+      public.telefone_ddd(a) is null
+      or public.telefone_ddd(b) is null
+      or public.telefone_ddd(a) = public.telefone_ddd(b)
+    );
+$$;
 create table public.turma_professores (
   user_id uuid not null, turma text not null, primary key (user_id, turma)
 );
@@ -171,4 +229,35 @@ export async function fila(db: PGlite, noite: string) {
     [noite],
   )
   return r.rows
+}
+
+/**
+ * Insere um desafio de ingresso (festa 05/12/2026, 18:00 → 04:00 do dia
+ * seguinte, entrada restrita) e devolve o id.
+ */
+export async function desafioIngresso(
+  db: PGlite,
+  opcoes: {
+    titulo?: string
+    data?: string
+    inicio?: string
+    fim?: string
+    ingressoTitulo?: string | null
+    presencaTitulo?: string | null
+  } = {},
+): Promise<string> {
+  const r = await db.query<{ id: string }>(
+    `insert into challenges (titulo, data_inicio, data_fim, entrada_restrita,
+       evento_data, evento_inicio, evento_fim, ingresso_titulo, presenca_titulo)
+     values ($1, '2026-11-01', '2026-12-05', true, $2, $3, $4, $5, $6) returning id`,
+    [
+      opcoes.titulo ?? 'Forró na Rep 2026.2',
+      opcoes.data ?? '2026-12-05',
+      opcoes.inicio ?? '18:00',
+      opcoes.fim ?? '04:00',
+      opcoes.ingressoTitulo ?? null,
+      opcoes.presencaTitulo ?? null,
+    ],
+  )
+  return r.rows[0].id
 }
