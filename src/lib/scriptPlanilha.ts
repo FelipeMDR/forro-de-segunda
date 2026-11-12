@@ -44,18 +44,46 @@ function sincronizar() {
   var r = JSON.parse(resposta.getContentText());
   if (r.coluna_marcar === null || r.coluna_marcar === undefined) return;
   var linhas = r.linhas || [];
+  if (linhas.length === 0 || grade.length === 0) return;
+
+  // Uma leitura so da coluna das caixas. O gatilho roda 288 vezes por
+  // dia: ler e escrever celula por celula estoura a cota do Google.
+  // getValues traz booleanos (a tela mostra VERDADEIRO/FALSO numa
+  // planilha em portugues, por isso nada de comparar o texto exibido).
+  var col = r.coluna_marcar;
+  var atuais = aba.getRange(1, col + 1, grade.length, 1).getValues();
+  var marcar = [];
+  var desmarcar = [];
   for (var i = 0; i < linhas.length; i++) {
+    var k = linhas[i].indice;
+    if (k < 0 || k >= atuais.length) continue;
     var dentro = linhas[i].situacao === 'dentro';
-    var celula = aba.getRange(linhas[i].indice + 1, r.coluna_marcar + 1);
-    // So escreve se mudou; quem so tem leitura nao derruba a sincronizacao
-    if (celula.getValue() !== dentro) {
-      try {
-        celula.setValue(dentro);
-      } catch (e) {
-        return;
-      }
+    // So o que mudou; linha fora da resposta nem entra na lista
+    if (atuais[k][0] !== dentro) {
+      (dentro ? marcar : desmarcar).push(celulaA1(k, col));
     }
   }
+  // No maximo duas escritas, so nas celulas que mudaram: formulas e
+  // edicoes feitas a mao no resto da coluna ficam como estao.
+  // Quem so tem leitura nao derruba a sincronizacao.
+  try {
+    if (marcar.length > 0) aba.getRangeList(marcar).setValue(true);
+    if (desmarcar.length > 0) aba.getRangeList(desmarcar).setValue(false);
+  } catch (e) {
+    return;
+  }
+}
+
+// Linha e coluna 0-based para A1 (coluna 0 = A, 26 = AA)
+function celulaA1(linha, coluna) {
+  var letras = '';
+  var n = coluna + 1;
+  while (n > 0) {
+    var resto = (n - 1) % 26;
+    letras = String.fromCharCode(65 + resto) + letras;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letras + (linha + 1);
 }
 
 function instalar() {
