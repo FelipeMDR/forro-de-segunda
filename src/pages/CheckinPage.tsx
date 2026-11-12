@@ -10,7 +10,7 @@ import { fimDaJanela, horaCurta, useNoite } from '../context/NoiteContext'
 import { useToast } from '../context/ToastContext'
 import {
   aberturaDoDia,
-  challengePhase,
+  ativoAgora,
   desafiosQueContam,
   diaDaNoite,
   diasSuspensos,
@@ -119,9 +119,11 @@ export function CheckinPage() {
   const suspensos = useMemo(() => diasSuspensos(feriados), [feriados])
   const aberturasMapa = useMemo(() => mapaAberturas(aberturas), [aberturas])
 
+  // `ativoAgora`, não só o calendário: a festa que vira a noite no último
+  // dia do desafio segue aberta na madrugada
   const ativos = useMemo(
-    () => desafios.filter((c) => challengePhase(c) === 'ativo'),
-    [desafios],
+    () => desafios.filter((c) => ativoAgora(c, agora)),
+    [desafios, agora],
   )
   const meusAtivos = useMemo(() => ativos.filter((c) => c.sou_membro), [ativos])
 

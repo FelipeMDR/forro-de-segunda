@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { toISODate } from '../lib/dates'
 import { mensagemForrodexOcupada } from '../lib/forrodex'
 import { obterPosicao } from '../lib/geo'
-import { alvosDaNoiteExtra, textosPadraoIngresso } from '../lib/ingresso'
+import { alvosDaNoiteExtra, fimQueCobreAFesta, textosPadraoIngresso } from '../lib/ingresso'
 import {
   DIAS_ABREV,
   MODALIDADES,
@@ -109,15 +109,37 @@ export function ChallengeForm({
           : f.ingresso,
     }))
 
-  const alternarIngresso = (ligar: boolean) =>
-    setForm((f) => {
-      if (!ligar) {
-        return {
-          ...f,
-          ingresso: null,
-          entrada_restrita: desafio && !desafio.ingresso ? desafio.entrada_restrita : false,
-        }
+  // O que ligar o desafio de ingresso apaga do formulário (janelas, local,
+  // disputas, entrada): guardado para voltar igual se a organização
+  // desligar antes de salvar
+  const antesDoIngresso = useRef<Pick<
+    ChallengeInput,
+    'janelas' | 'local' | 'modalidades' | 'entrada_restrita'
+  > | null>(null)
+
+  const alternarIngresso = (ligar: boolean) => {
+    if (!ligar) {
+      // Sem o que guardar (o desafio já era de ingresso): volta ao
+      // desafio comum de partida
+      const antes = antesDoIngresso.current ?? {
+        janelas: [],
+        local: null,
+        modalidades: ['checkin'] as Modalidade[],
+        entrada_restrita: false,
       }
+      antesDoIngresso.current = null
+      setForm((f) => ({ ...f, ...antes, ingresso: null }))
+      return
+    }
+    if (!form.ingresso) {
+      antesDoIngresso.current = {
+        janelas: form.janelas,
+        local: form.local,
+        modalidades: form.modalidades,
+        entrada_restrita: form.entrada_restrita,
+      }
+    }
+    setForm((f) => {
       return {
         ...f,
         ingresso: desafio?.ingresso ?? {
@@ -133,6 +155,7 @@ export function ChallengeForm({
         modalidades: ['checkin'],
       }
     })
+  }
 
   const alternarAlvo = (id: string) => {
     setAlvosEditados(true)
@@ -296,6 +319,9 @@ export function ChallengeForm({
       const entrada: ChallengeInput = ingresso
         ? {
             ...form,
+            // Festa que vira a noite no último dia: o desafio vai até a
+            // madrugada, senão à 00:00 ele já conta como encerrado
+            data_fim: fimQueCobreAFesta(form.data_fim, ingresso),
             entrada_restrita: true,
             janelas: [],
             local: null,
@@ -470,6 +496,8 @@ export function ChallengeForm({
                 <p className="text-xs text-bl-t">
                   🌙 Vira a noite: termina às {ingresso.evento_fim} da madrugada
                   seguinte.
+                  {fimQueCobreAFesta(form.data_fim, ingresso) !== form.data_fim &&
+                    ' O fim do desafio passa para o dia seguinte ao salvar, para cobrir a madrugada.'}
                 </p>
               )}
 

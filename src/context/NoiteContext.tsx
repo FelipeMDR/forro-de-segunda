@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { useAuth } from './AuthContext'
 import {
-  challengePhase,
+  ativoAgora,
   desafiosQueContam,
   diaDaNoite,
   diasSuspensos,
@@ -181,7 +181,8 @@ export function NoiteProvider({ children }: { children: ReactNode }) {
     const noite = diaDaNoite(agora)
     const suspensos = diasSuspensos(feriados)
     const mapa = mapaAberturas(aberturas)
-    const ativos = desafios.filter((c) => challengePhase(c, agora) === 'ativo')
+    // Inclui a noite extra aberta: a madrugada da festa no último dia
+    const ativos = desafios.filter((c) => ativoAgora(c, agora))
     const abertos = desafiosQueContam(agora, ativos, suspensos, mapa)
     const valendo = abertos.filter((c) => c.sou_membro)
     const fora = abertos.filter((c) => !c.sou_membro)

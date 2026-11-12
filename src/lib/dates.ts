@@ -170,21 +170,8 @@ export function janelaDoCheckin(
     return abertura !== undefined && abertura < inicio ? abertura : inicio
   }
 
-  // Noite extra (ex.: Forró na Rep): festa avulsa, fora da grade semanal.
-  // Vale só na própria data, não depende do período do desafio e vale
-  // mesmo com o dia suspenso — a organização marcou o evento de propósito.
-  // Se atravessa a meia-noite, a madrugada seguinte ainda é da noite.
-  for (const n of c.noites_extras ?? []) {
-    const inicio = parseTime(n.hora_inicio)
-    const fim = parseTime(n.hora_fim)
-    const hoje = toISODate(d)
-    if (fim < inicio) {
-      if (hoje === n.data && minutos >= inicio) return n.data
-      if (minutos <= fim && toISODate(addDays(d, -1)) === n.data) return n.data
-    } else if (hoje === n.data && minutos >= inicio && minutos <= fim) {
-      return n.data
-    }
-  }
+  const extra = noiteExtraAberta(d, c)
+  if (extra !== null) return extra
 
   for (const j of c.janelas) {
     const inicio = parseTime(j.hora_inicio)
@@ -218,6 +205,46 @@ export function janelaDoCheckin(
     }
   }
   return null
+}
+
+/**
+ * A data da noite extra aberta no instante `d`, ou null.
+ *
+ * Noite extra (ex.: Forró na Rep): festa avulsa, fora da grade semanal.
+ * Vale só na própria data, não depende do período do desafio e vale
+ * mesmo com o dia suspenso — a organização marcou o evento de propósito.
+ * Se atravessa a meia-noite, a madrugada seguinte ainda é da noite.
+ */
+export function noiteExtraAberta(
+  d: Date,
+  c: Pick<Challenge, 'noites_extras'>,
+): string | null {
+  const minutos = d.getHours() * 60 + d.getMinutes()
+  const hoje = toISODate(d)
+  for (const n of c.noites_extras ?? []) {
+    const inicio = parseTime(n.hora_inicio)
+    const fim = parseTime(n.hora_fim)
+    if (fim < inicio) {
+      if (hoje === n.data && minutos >= inicio) return n.data
+      if (minutos <= fim && toISODate(addDays(d, -1)) === n.data) return n.data
+    } else if (hoje === n.data && minutos >= inicio && minutos <= fim) {
+      return n.data
+    }
+  }
+  return null
+}
+
+/**
+ * O desafio está valendo agora? É o período do calendário
+ * (`challengePhase`) OU uma noite extra aberta neste instante: a festa
+ * que vira a noite no último dia do desafio continua aceitando check-in
+ * na madrugada, quando o calendário já diz "encerrado".
+ */
+export function ativoAgora(
+  c: Pick<Challenge, 'data_inicio' | 'data_fim' | 'noites_extras'>,
+  agora = new Date(),
+): boolean {
+  return challengePhase(c, agora) === 'ativo' || noiteExtraAberta(agora, c) !== null
 }
 
 /** True se o instante `d` cai na janela do desafio (período + dia + horário). */

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { janelaDoCheckin } from '../../src/lib/dates'
+import { ativoAgora, janelaDoCheckin } from '../../src/lib/dates'
 import {
   alvosDaNoiteExtra,
   aplicarNoitesExtras,
   badgeDeIngresso,
+  fimQueCobreAFesta,
   noiteDoEvento,
   rotuloFesta,
   textosPadraoIngresso,
@@ -155,6 +156,53 @@ describe('alvosDaNoiteExtra', () => {
 
   it('nunca oferece o próprio desafio', () => {
     expect(alvosDaNoiteExtra([espacoLivre], '2026-12-05', 'livre')).toEqual([])
+  })
+})
+
+describe('ativoAgora', () => {
+  // A festa de 05/12 vira a noite; o desafio termina no dia da festa
+  const rep = aplicarNoitesExtras([ingresso])[0]
+
+  it('vale no período, como challengePhase', () => {
+    expect(ativoAgora(rep, new Date(2026, 11, 5, 12, 0))).toBe(true)
+    expect(ativoAgora(rep, new Date(2026, 11, 4, 12, 0))).toBe(false)
+  })
+  it('na madrugada seguinte, com a noite extra aberta, ainda vale', () => {
+    expect(ativoAgora(rep, new Date(2026, 11, 6, 1, 30))).toBe(true)
+    expect(ativoAgora(rep, new Date(2026, 11, 6, 4, 0))).toBe(true)
+  })
+  it('depois que a noite fecha, encerrou', () => {
+    expect(ativoAgora(rep, new Date(2026, 11, 6, 4, 1))).toBe(false)
+    expect(ativoAgora(rep, new Date(2026, 11, 6, 12, 0))).toBe(false)
+  })
+  it('vale para o desafio que ganhou a noite, mesmo fora do período dele', () => {
+    const livre = aplicarNoitesExtras([
+      { ...espacoLivre, data_fim: '2026-12-05' },
+      ingresso,
+    ]).find((c) => c.id === 'livre')!
+    expect(ativoAgora(livre, new Date(2026, 11, 6, 2, 0))).toBe(true)
+  })
+  it('sem noite extra, é só o período', () => {
+    expect(ativoAgora(espacoLivre, new Date(2026, 11, 21, 1, 0))).toBe(false)
+  })
+})
+
+describe('fimQueCobreAFesta', () => {
+  it('festa que vira a noite no último dia: o fim passa para o dia seguinte', () => {
+    expect(fimQueCobreAFesta('2026-12-05', cfg([]))).toBe('2026-12-06')
+  })
+  it('na virada de mês e de ano', () => {
+    expect(fimQueCobreAFesta('2026-12-31', { ...cfg([]), evento_data: '2026-12-31' })).toBe(
+      '2027-01-01',
+    )
+  })
+  it('fim já depois da festa fica como está', () => {
+    expect(fimQueCobreAFesta('2026-12-20', cfg([]))).toBe('2026-12-20')
+  })
+  it('festa que não vira a noite não mexe no fim', () => {
+    expect(
+      fimQueCobreAFesta('2026-12-05', { ...cfg([]), evento_inicio: '14:00', evento_fim: '22:00' }),
+    ).toBe('2026-12-05')
   })
 })
 

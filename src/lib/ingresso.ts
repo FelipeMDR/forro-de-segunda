@@ -1,3 +1,4 @@
+import { toISODate } from './dates'
 import type {
   Badge,
   Challenge,
@@ -71,6 +72,19 @@ export function alvosDaNoiteExtra(
       c.data_inicio <= eventoData &&
       eventoData <= c.data_fim,
   )
+}
+
+/**
+ * O fim do desafio que cobre a festa inteira: se ela vira a noite e o
+ * desafio acaba no dia dela (ou antes), o fim passa para o dia seguinte.
+ * Sem isso, da meia-noite às 04:00 o calendário já dá o desafio como
+ * encerrado no meio da festa.
+ */
+export function fimQueCobreAFesta(dataFim: string, cfg: IngressoConfig): string {
+  if (cfg.evento_fim >= cfg.evento_inicio) return dataFim
+  const [a, m, d] = cfg.evento_data.split('-').map(Number)
+  const seguinte = toISODate(new Date(a, m - 1, d + 1))
+  return dataFim < seguinte ? seguinte : dataFim
 }
 
 /** "Festa em 05/12, das 18:00 às 04:00" */
