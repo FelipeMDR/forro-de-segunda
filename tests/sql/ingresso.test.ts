@@ -473,6 +473,39 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     expect((await resumo(db, desafio))?.ambiguos).toEqual([{ linha: 8, nome: 'Fábio Teste' }])
   })
 
+  it('mesma linha com outro DDD não casa, nem com conta nem com convite', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    // Beto é de outra cidade (11); o convite manual também
+    await telefone(db, IDS.b, '11999998888')
+    await db.query(
+      `insert into challenge_convidados (challenge_id, telefone, nome) values ($1, '1199997777', 'Ivo')`,
+      [desafio],
+    )
+    const r = await sincronizar(
+      db,
+      segredo,
+      grade([
+        ['Beto Teste', '35 99999-8888'],
+        ['Ivo Teste', '35 99999-7777'],
+      ]),
+    )
+    expect(situacao(r, 7)).toBe('aguardando_conta')
+    expect(situacao(r, 8)).toBe('aguardando_conta')
+    expect((await membros(db, desafio)).map((m) => m.user_id)).not.toContain(IDS.b)
+    const c = await convidados(db, desafio)
+    expect(c.map((x) => [x.telefone, x.origem])).toEqual([
+      ['1199997777', 'manual'],
+      ['3599997777', 'planilha'],
+      ['3599998888', 'planilha'],
+    ])
+    // E a remoção também separa pelo DDD: tirar o 35 não leva o 11
+    await sincronizar(db, segredo, grade([['Beto Teste', '35 99999-8888']]))
+    expect((await convidados(db, desafio)).map((x) => x.telefone)).toEqual([
+      '1199997777',
+      '3599998888',
+    ])
+  })
+
   it('membro manual na planilha passa a ser da planilha; fora dela, nunca sai', async () => {
     const { db, desafio, segredo } = await comPlanilha()
     // Ana (comFesta) é manual e não está na planilha; Beto é manual e está
@@ -721,6 +754,20 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     expect(JSON.stringify(r)).not.toMatch(/Teste|9999/)
   })
 
+  it('tirar 4 de uma base de 25 passa direto (16%, abaixo dos 20% da trava)', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    const vinteCinco: [string, string][] = Array.from({ length: 25 }, (_, i) => [
+      `Pessoa Teste ${i + 1}`,
+      `35 99000-${String(i + 1).padStart(4, '0')}`,
+    ])
+    await sincronizar(db, segredo, grade(vinteCinco))
+    expect(await convidados(db, desafio)).toHaveLength(25)
+    const r = await sincronizar(db, segredo, grade(vinteCinco.slice(4)))
+    expect(r.removidos).toBe(4)
+    expect(r.remocoes_travadas).toBe(0)
+    expect(await convidados(db, desafio)).toHaveLength(21)
+  })
+
   it('anon chama a sincronização, mas não a remoção interna nem a confirmação', async () => {
     const db = await bancoComMigracao()
     const r = await db.query<{ sync: boolean; conf: boolean; interna: boolean }>(
@@ -730,5 +777,143 @@ describe('desafio de ingresso — sincronização da planilha', () => {
          has_function_privilege('anon', 'remover_fora_da_planilha(uuid, text[], boolean)', 'execute') as interna`,
     )
     expect(r.rows[0]).toEqual({ sync: true, conf: false, interna: false })
+  })
+})
+
+// ---------- Permissões ----------
+
+/** Quem pode executar a função: anon, authenticated e PUBLIC (entrada "=X" no ACL). */
+async function quemExecuta(db: Banco, assinatura: string) {
+  const r = await db.query<{ anon: boolean; autenticado: boolean; publico: boolean }>(
+    `select
+       has_function_privilege('anon', $1, 'execute') as anon,
+       has_function_privilege('authenticated', $1, 'execute') as autenticado,
+       coalesce(
+         (select bool_or(a.grantee = 0)
+            from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+           where p.oid = $1::regprocedure and a.privilege_type = 'EXECUTE'),
+         false) as publico`,
+    [assinatura],
+  )
+  return r.rows[0]
+}
+
+describe('desafio de ingresso — permissões', () => {
+  it('authenticated não executa a remoção interna nem o convite-vira-membro', async () => {
+    const db = await bancoComMigracao()
+    expect(await quemExecuta(db, 'remover_fora_da_planilha(uuid, text[], boolean)')).toEqual({
+      anon: false,
+      autenticado: false,
+      publico: false,
+    })
+    expect(await quemExecuta(db, 'membro_por_convite(uuid, text)')).toEqual({
+      anon: false,
+      autenticado: false,
+      publico: false,
+    })
+  })
+
+  it('ingressos_do_perfil: só authenticated', async () => {
+    const db = await bancoComMigracao()
+    expect(await quemExecuta(db, 'ingressos_do_perfil(uuid)')).toEqual({
+      anon: false,
+      autenticado: true,
+      publico: false,
+    })
+  })
+
+  it('presencas_do_clube: só authenticated', async () => {
+    const db = await bancoComMigracao()
+    expect(await quemExecuta(db, 'presencas_do_clube(uuid)')).toEqual({
+      anon: false,
+      autenticado: true,
+      publico: false,
+    })
+  })
+})
+
+describe('desafio de ingresso — data da festa no distintivo', () => {
+  it('ingressos_do_perfil traz a data da festa', async () => {
+    const { db } = await comFesta()
+    const r = await db.query<{ evento_data: string }>(
+      `select to_char(evento_data, 'YYYY-MM-DD') as evento_data from ingressos_do_perfil($1)`,
+      [IDS.a],
+    )
+    expect(r.rows).toEqual([{ evento_data: '2026-12-05' }])
+  })
+})
+
+describe('desafio de ingresso — presenças do clube', () => {
+  async function presencas(db: Banco, desafio: string) {
+    const r = await db.query<{ user_id: string; presente: boolean }>(
+      `select * from presencas_do_clube($1) order by user_id`,
+      [desafio],
+    )
+    return r.rows
+  }
+
+  it('membro sem check-in não está presente; check-in no horário está', async () => {
+    const { db, desafio } = await comFesta()
+    await db.query(`insert into challenge_members (challenge_id, user_id) values ($1, $2)`, [
+      desafio,
+      IDS.b,
+    ])
+    await checkinNaNoite(db, IDS.b, '2026-12-06T01:30:00-03:00')
+    expect(await presencas(db, desafio)).toEqual([
+      { user_id: IDS.a, presente: false },
+      { user_id: IDS.b, presente: true },
+    ])
+  })
+
+  it('check-in anulado ou fora do horário não conta', async () => {
+    const { db, desafio } = await comFesta()
+    await checkinNaNoite(db, IDS.a, '2026-12-05T22:00:00-03:00', true)
+    await checkinNaNoite(db, IDS.a, '2026-12-06T04:01:00-03:00')
+    expect(await presencas(db, desafio)).toEqual([{ user_id: IDS.a, presente: false }])
+  })
+
+  it('a correção da organização vence, nos dois sentidos', async () => {
+    const { db, desafio } = await comFesta()
+    await db.query(`insert into challenge_members (challenge_id, user_id) values ($1, $2)`, [
+      desafio,
+      IDS.b,
+    ])
+    // Ana sem check-in, corrigida para presente; Beto com check-in, corrigido para ausente
+    await checkinNaNoite(db, IDS.b, '2026-12-05T22:00:00-03:00')
+    await comoUsuario(db, IDS.org)
+    await db.query(`select marcar_presenca_ingresso($1, $2, true)`, [desafio, IDS.a])
+    await db.query(`select marcar_presenca_ingresso($1, $2, false)`, [desafio, IDS.b])
+    await comoUsuario(db, IDS.a)
+    expect(await presencas(db, desafio)).toEqual([
+      { user_id: IDS.a, presente: true },
+      { user_id: IDS.b, presente: false },
+    ])
+  })
+
+  it('só membros, só deste desafio, e nada além de user_id e presente', async () => {
+    const { db, desafio } = await comFesta()
+    await db.query(`update profiles set telefone = '35999998888'`)
+    const outro = await desafioIngresso(db, { titulo: 'Outra festa' })
+    await db.query(`insert into challenge_members (challenge_id, user_id) values ($1, $2)`, [
+      outro,
+      IDS.b,
+    ])
+    const r = await db.query(`select * from presencas_do_clube($1)`, [desafio])
+    expect(r.fields.map((f) => f.name)).toEqual(['user_id', 'presente'])
+    expect(r.rows).toEqual([{ user_id: IDS.a, presente: false }])
+    expect(JSON.stringify(r.rows)).not.toContain('9999')
+  })
+
+  it('desafio comum não tem presenças de clube', async () => {
+    const db = await bancoComMigracao()
+    await pessoa(db, IDS.a, 'Ana')
+    const comum = await db.query<{ id: string }>(
+      `insert into challenges (data_inicio, data_fim) values ('2026-11-01', '2026-11-30') returning id`,
+    )
+    await db.query(`insert into challenge_members (challenge_id, user_id) values ($1, $2)`, [
+      comum.rows[0].id,
+      IDS.a,
+    ])
+    expect(await presencas(db, comum.rows[0].id)).toEqual([])
   })
 })

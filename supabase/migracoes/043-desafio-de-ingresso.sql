@@ -29,7 +29,8 @@
 --    do horário da festa (a festa passa da meia-noite: 18:00 até 04:00
 --    do dia seguinte). A organização corrige casos à mão em
 --    `ingresso_presencas` (`marcar_presenca_ingresso`), e a correção
---    vence o automático.
+--    vence o automático. A lista do clube lê a mesma regra por
+--    `presencas_do_clube` (só user_id e presente).
 -- 5. `sincronizar_planilha_ingresso`: o Apps Script manda a aba crua e o
 --    banco acha o cabeçalho, casa os telefones, põe e tira gente. Duas
 --    proteções: a trava contra remoção em massa (a organização confirma
@@ -233,6 +234,9 @@ $$;
 
 -- ---------- Distintivo derivado ----------
 
+-- `evento_data` no fim: o app só comemora edições recentes. Mudar as
+-- colunas de retorno exige recriar a função.
+drop function if exists public.ingressos_do_perfil(uuid);
 create or replace function public.ingressos_do_perfil(p_user uuid)
 returns table (
   desafio_id uuid,
@@ -240,14 +244,15 @@ returns table (
   estado text,
   emoji text,
   titulo_distintivo text,
-  desde timestamptz
+  desde timestamptz,
+  evento_data date
 )
 language sql stable security definer
 set search_path = public
 as $$
   with festa as (
     select
-      c.id, c.titulo, m.entrou_em,
+      c.id, c.titulo, m.entrou_em, c.evento_data,
       c.ingresso_emoji, c.ingresso_titulo, c.presenca_emoji, c.presenca_titulo,
       -- A festa cruza a meia-noite quando o fim é antes do início
       ((c.evento_data + c.evento_inicio) at time zone 'America/Sao_Paulo') as abre,
@@ -282,12 +287,54 @@ as $$
          else coalesce(d.ingresso_titulo, d.titulo || ' · Ingresso garantido') end,
     -- Presença corrigida à mão sem check-in não tem instante de check-in:
     -- cai para a entrada no desafio
-    case when d.esteve then coalesce(d.primeiro, d.entrou_em) else d.entrou_em end
+    case when d.esteve then coalesce(d.primeiro, d.entrou_em) else d.entrou_em end,
+    d.evento_data
   from decidido d
   order by d.abre;
 $$;
 
+-- Só quem está logado: deslogado não tem por que ler o perfil de ninguém
+revoke execute on function public.ingressos_do_perfil(uuid) from public, anon;
 grant execute on function public.ingressos_do_perfil(uuid) to authenticated;
+
+-- Quem do clube marcou presença, para a lista pública do desafio. O
+-- aluno não lê `ingresso_presencas` (só a organização), e o ranking só
+-- vê check-ins: sem esta função, a correção à mão não aparecia na lista.
+-- Mesma regra de `ingressos_do_perfil`: a correção vence; sem ela, vale
+-- um check-in não anulado no horário da festa. Só user_id e presente,
+-- nada de telefone nem de outro dado.
+create or replace function public.presencas_do_clube(p_desafio uuid)
+returns table (user_id uuid, presente boolean)
+language sql stable security definer
+set search_path = public
+as $$
+  with festa as (
+    select
+      c.id,
+      ((c.evento_data + c.evento_inicio) at time zone 'America/Sao_Paulo') as abre,
+      ((c.evento_data + (c.evento_fim < c.evento_inicio)::int + c.evento_fim)
+        at time zone 'America/Sao_Paulo') as fecha
+    from challenges c
+    where c.id = p_desafio and c.evento_data is not null
+  )
+  select
+    m.user_id,
+    coalesce(
+      (select p.esteve from ingresso_presencas p
+        where p.challenge_id = f.id and p.user_id = m.user_id),
+      exists (
+        select 1 from checkins k
+        where k.user_id = m.user_id
+          and not k.presenca_anulada
+          and k.criado_em between f.abre and f.fecha
+      )
+    )
+  from festa f
+  join challenge_members m on m.challenge_id = f.id;
+$$;
+
+revoke execute on function public.presencas_do_clube(uuid) from public, anon;
+grant execute on function public.presencas_do_clube(uuid) to authenticated;
 
 create or replace function public.marcar_presenca_ingresso(
   p_desafio uuid, p_user uuid, p_esteve boolean
@@ -342,6 +389,11 @@ $$;
 -- definição. Com `p_apagar = false` só conta.
 -- Sair do desafio tira o distintivo derivado (é de quem é membro), mas
 -- `ingresso_presencas` fica: se a pessoa voltar, a correção volta junto.
+-- Custo: cada telefone (chave, membro, convite) vira (DDD, linha) uma
+-- vez só, e a comparação é pela linha, que o banco junta por hash. Com
+-- `telefones_batem` em cada par seriam membros × chaves expressões
+-- regulares, e a chamada anon tem poucos segundos. A regra é a mesma de
+-- `telefones_batem`: a linha bate sempre; o DDD, quando os dois têm.
 create or replace function public.remover_fora_da_planilha(
   p_desafio uuid, p_chaves text[], p_apagar boolean
 )
@@ -349,22 +401,40 @@ returns int
 language sql
 set search_path = public
 as $$
-  with fora_membros as (
-    select m.user_id from challenge_members m
-    where m.challenge_id = p_desafio
-      and m.origem = 'planilha'
-      and not exists (
-        select 1 from profiles p, unnest(p_chaves) k
-        where p.id = m.user_id and public.telefones_batem(p.telefone, k)
-      )
+  with chaves as (
+    select public.telefone_ddd(k) as ddd, public.telefone_linha(k) as linha
+    from unnest(p_chaves) k
+  ),
+  membros_tel as (
+    select m.user_id,
+           public.telefone_ddd(p.telefone) as ddd,
+           public.telefone_linha(p.telefone) as linha
+    from challenge_members m
+    left join profiles p on p.id = m.user_id
+    where m.challenge_id = p_desafio and m.origem = 'planilha'
+  ),
+  convidados_tel as (
+    select v.telefone,
+           public.telefone_ddd(v.telefone) as ddd,
+           public.telefone_linha(v.telefone) as linha
+    from challenge_convidados v
+    where v.challenge_id = p_desafio and v.origem = 'planilha'
+  ),
+  fora_membros as (
+    select t.user_id from membros_tel t
+    where not exists (
+      select 1 from chaves c
+      where t.linha <> '' and c.linha = t.linha
+        and (t.ddd is null or c.ddd is null or t.ddd = c.ddd)
+    )
   ),
   fora_convidados as (
-    select v.telefone from challenge_convidados v
-    where v.challenge_id = p_desafio
-      and v.origem = 'planilha'
-      and not exists (
-        select 1 from unnest(p_chaves) k where public.telefones_batem(v.telefone, k)
-      )
+    select t.telefone from convidados_tel t
+    where not exists (
+      select 1 from chaves c
+      where t.linha <> '' and c.linha = t.linha
+        and (t.ddd is null or c.ddd is null or t.ddd = c.ddd)
+    )
   ),
   apaga_membros as (
     delete from challenge_members m
@@ -409,7 +479,12 @@ declare
   v_cel text;
   v_tel text;
   v_chave text;
+  v_ddd text;
+  v_lin text;
   v_perfis uuid[];
+  v_convites text[];
+  v_perfis_por_linha jsonb;
+  v_convites_por_linha jsonb;
   v_sit text;
   v_status text;
   v_chaves text[] := '{}';
@@ -450,6 +525,45 @@ begin
            where challenge_id = v_desafio and origem = 'planilha')
     into n_da_planilha;
 
+  -- Telefones decompostos uma vez por chamada, não a cada linha da
+  -- planilha: cada perfil e cada convite deste desafio vira (DDD, linha)
+  -- uma vez só, num mapa pela linha. Por linha da planilha fica uma busca
+  -- no mapa, em vez de `telefones_batem` (várias expressões regulares)
+  -- contra todos os perfis; a chamada anon tem poucos segundos. A regra
+  -- de casar é a de `telefones_batem`: a linha bate sempre, e o DDD
+  -- quando os dois lados o têm (a chave da planilha sempre tem).
+  -- O mapa de convites não precisa ser refeito durante o laço: convite
+  -- novo tem a chave da própria linha, e outra linha com a mesma chave é
+  -- `repetido` antes de consultar o mapa.
+  select coalesce(jsonb_object_agg(x.linha, x.itens), '{}')
+    into v_perfis_por_linha
+  from (
+    select t.linha, jsonb_agg(jsonb_build_object('id', t.id, 'ddd', t.ddd)) as itens
+    from (
+      select p.id,
+             public.telefone_ddd(p.telefone) as ddd,
+             public.telefone_linha(p.telefone) as linha
+      from profiles p
+    ) t
+    where t.linha <> ''
+    group by t.linha
+  ) x;
+
+  select coalesce(jsonb_object_agg(x.linha, x.itens), '{}')
+    into v_convites_por_linha
+  from (
+    select t.linha, jsonb_agg(jsonb_build_object('tel', t.telefone, 'ddd', t.ddd)) as itens
+    from (
+      select v.telefone,
+             public.telefone_ddd(v.telefone) as ddd,
+             public.telefone_linha(v.telefone) as linha
+      from challenge_convidados v
+      where v.challenge_id = v_desafio
+    ) t
+    where t.linha <> ''
+    group by t.linha
+  ) x;
+
   -- Cabeçalho: a primeira linha com uma célula NOME e outra CELULAR ou
   -- TELEFONE (sem diferenciar maiúsculas e acentos). A coluna de marcar
   -- é a que começa com ADICIONADO, e é opcional.
@@ -487,22 +601,30 @@ begin
       continue when v_nome = '' and v_cel = '';
 
       v_tel := public.telefone_da_planilha(v_cel);
+      v_ddd := public.telefone_ddd(v_tel);
+      v_lin := public.telefone_linha(v_tel);
       v_sit := null;
 
-      if public.telefone_ddd(v_tel) is null or length(public.telefone_linha(v_tel)) <> 8 then
+      if v_ddd is null or length(v_lin) <> 8 then
         v_sit := 'telefone_invalido';
         v_invalidos := v_invalidos || jsonb_build_array(
           jsonb_build_object('linha', i + 1, 'nome', v_nome));
       else
-        v_chave := public.telefone_ddd(v_tel) || public.telefone_linha(v_tel);
+        v_chave := v_ddd || v_lin;
 
         if v_chave = any(v_chaves) then
           v_sit := 'repetido';
         else
           v_chaves := v_chaves || v_chave;
-          select array_agg(p.id) into v_perfis
-          from profiles p
-          where public.telefones_batem(p.telefone, v_chave);
+          -- = telefones_batem(p.telefone, v_chave), pelo mapa
+          select array_agg((e ->> 'id')::uuid) into v_perfis
+          from jsonb_array_elements(coalesce(v_perfis_por_linha -> v_lin, '[]')) e
+          where e ->> 'ddd' is null or e ->> 'ddd' = v_ddd;
+          -- = telefones_batem(telefone, v_chave) nos convites do desafio
+          select array_agg(e ->> 'tel') into v_convites
+          from jsonb_array_elements(coalesce(v_convites_por_linha -> v_lin, '[]')) e
+          where e ->> 'ddd' is null or e ->> 'ddd' = v_ddd;
+          n_convites := coalesce(cardinality(v_convites), 0);
 
           if coalesce(cardinality(v_perfis), 0) > 1 then
             -- Contas antigas sem DDD casam só pela linha: ninguém entra
@@ -527,17 +649,10 @@ begin
             end if;
           else
             if v_congelado then
-              if exists (select 1 from challenge_convidados
-                          where challenge_id = v_desafio
-                            and public.telefones_batem(telefone, v_chave)) then
+              if n_convites > 0 then
                 v_sit := 'aguardando_conta';
               end if;
             else
-              select count(*) into n_convites
-              from challenge_convidados
-              where challenge_id = v_desafio
-                and public.telefones_batem(telefone, v_chave);
-
               if n_convites = 1 then
                 -- Convite único que bate: passa a ser da planilha (como o
                 -- membro manual que está nela)
@@ -546,7 +661,7 @@ begin
                       nome = coalesce(nullif(v_nome, ''), nome),
                       telefone_exibicao = v_cel
                 where challenge_id = v_desafio
-                  and public.telefones_batem(telefone, v_chave);
+                  and telefone = v_convites[1];
               elsif n_convites = 0 then
                 -- Guarda a chave (DDD + linha), não os dígitos crus:
                 -- `normalizar_telefone` de um celular de 11 dígitos fica com
