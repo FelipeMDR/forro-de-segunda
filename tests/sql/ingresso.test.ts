@@ -335,9 +335,11 @@ async function resumo(db: Banco, desafio: string) {
   return r.rows[0]?.resumo
 }
 
-async function confirmar(db: Banco, desafio: string) {
-  const r = await db.query<{ n: number }>(`select confirmar_remocoes_ingresso($1) as n`, [
+/** `esperado`: as travadas que o painel mostrou para a organização. */
+async function confirmar(db: Banco, desafio: string, esperado: number) {
+  const r = await db.query<{ n: number }>(`select confirmar_remocoes_ingresso($1, $2) as n`, [
     desafio,
+    esperado,
   ])
   return r.rows[0].n
 }
@@ -486,10 +488,50 @@ describe('desafio de ingresso — sincronização da planilha', () => {
       { user_id: IDS.b, origem: 'planilha' },
     ])
     // Nem a planilha esvaziada, nem a confirmação de remoção tiram o manual
-    await sincronizar(db, segredo, grade([]))
+    expect((await sincronizar(db, segredo, grade([]))).remocoes_travadas).toBe(1)
     await comoUsuario(db, IDS.org)
-    await confirmar(db, desafio)
+    expect(await confirmar(db, desafio, 1)).toBe(1)
     expect(await membros(db, desafio)).toEqual([{ user_id: IDS.a, origem: 'manual' }])
+  })
+
+  it('convite manual único na planilha passa a ser da planilha, sem duplicar', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    await db.query(
+      `insert into challenge_convidados (challenge_id, telefone, nome) values ($1, '3599996666', 'Fábio')`,
+      [desafio],
+    )
+    const r = await sincronizar(db, segredo, grade([['Fábio Teste', '35 99999-6666']]))
+    expect(situacao(r, 7)).toBe('aguardando_conta')
+    expect(await convidados(db, desafio)).toEqual([
+      {
+        telefone: '3599996666',
+        telefone_exibicao: '35 99999-6666',
+        nome: 'Fábio Teste',
+        origem: 'planilha',
+      },
+    ])
+  })
+
+  it('dois convites manuais que batem com a linha ficam manuais e nunca saem', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    // Um antigo sem DDD casa só pela linha; os dois casam com 35 99999-6666
+    await db.query(
+      `insert into challenge_convidados (challenge_id, telefone, nome) values
+         ($1, '99996666', 'Fábio antigo'), ($1, '3599996666', 'Fábio')`,
+      [desafio],
+    )
+    const r = await sincronizar(db, segredo, grade([['Fábio Teste', '35 99999-6666']]))
+    expect(situacao(r, 7)).toBe('aguardando_conta')
+    const manuais = [
+      { telefone: '3599996666', telefone_exibicao: null, nome: 'Fábio', origem: 'manual' },
+      { telefone: '99996666', telefone_exibicao: null, nome: 'Fábio antigo', origem: 'manual' },
+    ]
+    expect(await convidados(db, desafio)).toEqual(manuais)
+
+    // Sai da planilha: os convites manuais continuam
+    const r2 = await sincronizar(db, segredo, grade([['Cida Teste', '35 98888-7777']]))
+    expect(r2).toMatchObject({ removidos: 0, remocoes_travadas: 0 })
+    expect((await convidados(db, desafio)).filter((c) => c.origem === 'manual')).toEqual(manuais)
   })
 
   it('quem sai da planilha sai do desafio, e a correção de presença fica', async () => {
@@ -542,12 +584,30 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     expect(await convidados(db, desafio)).toHaveLength(11)
 
     await comoUsuario(db, IDS.a)
-    await expect(confirmar(db, desafio)).rejects.toThrow('Só a organização confirma a remoção')
+    await expect(confirmar(db, desafio, 4)).rejects.toThrow(
+      'Só a organização confirma a remoção',
+    )
 
     await comoUsuario(db, IDS.org)
-    expect(await confirmar(db, desafio)).toBe(4)
+    expect(await confirmar(db, desafio, 4)).toBe(4)
     expect(await convidados(db, desafio)).toHaveLength(7)
-    expect(await resumo(db, desafio)).toMatchObject({ remocoes_travadas: 0 })
+    expect(await resumo(db, desafio)).toMatchObject({ remocoes_travadas: 0, removidos: 4 })
+  })
+
+  it('trava: se a lista mudou depois que a organização conferiu, ninguém sai', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    await sincronizar(db, segredo, grade(DEZ))
+    // O painel mostra 4 travadas…
+    expect((await sincronizar(db, segredo, grade(DEZ.slice(4)))).remocoes_travadas).toBe(4)
+    // …e, antes da confirmação, alguém esvazia a planilha
+    expect((await sincronizar(db, segredo, grade([]))).remocoes_travadas).toBe(10)
+
+    await comoUsuario(db, IDS.org)
+    await expect(confirmar(db, desafio, 4)).rejects.toThrow(
+      'A lista mudou desde que você conferiu. Confira de novo.',
+    )
+    expect(await convidados(db, desafio)).toHaveLength(10)
+    expect(await resumo(db, desafio)).toMatchObject({ removidos: 0, remocoes_travadas: 10 })
   })
 
   it('tirar 3 de 10 passa direto (a trava exige mais de 3 pessoas)', async () => {
@@ -576,7 +636,7 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     expect(await convidados(db, desafio)).toHaveLength(10)
     expect((await resumo(db, desafio))?.status).toBe('sem_cabecalho')
     await comoUsuario(db, IDS.org)
-    expect(await confirmar(db, desafio)).toBe(0)
+    expect(await confirmar(db, desafio, 0)).toBe(0)
     expect(await convidados(db, desafio)).toHaveLength(10)
   })
 
@@ -627,7 +687,7 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     const vazia = await sincronizar(db, segredo, grade([]))
     expect(vazia).toMatchObject({ status: 'congelado', removidos: 0, remocoes_travadas: 0 })
     await comoUsuario(db, IDS.org)
-    expect(await confirmar(db, desafio)).toBe(0)
+    expect(await confirmar(db, desafio, 0)).toBe(0)
     expect({ m: await membros(db, desafio), c: await convidados(db, desafio) }).toEqual(antes)
     expect((await resumo(db, desafio))?.status).toBe('congelado')
   })
@@ -666,7 +726,7 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     const r = await db.query<{ sync: boolean; conf: boolean; interna: boolean }>(
       `select
          has_function_privilege('anon', 'sincronizar_planilha_ingresso(text, jsonb)', 'execute') as sync,
-         has_function_privilege('anon', 'confirmar_remocoes_ingresso(uuid)', 'execute') as conf,
+         has_function_privilege('anon', 'confirmar_remocoes_ingresso(uuid, int)', 'execute') as conf,
          has_function_privilege('anon', 'remover_fora_da_planilha(uuid, text[], boolean)', 'execute') as interna`,
     )
     expect(r.rows[0]).toEqual({ sync: true, conf: false, interna: false })

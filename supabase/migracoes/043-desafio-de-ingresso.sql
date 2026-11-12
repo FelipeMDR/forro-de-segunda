@@ -418,6 +418,7 @@ declare
   v_ambiguos jsonb := '[]';
   n_dentro int := 0;
   n_aguardando int := 0;
+  n_convites int;
   n_da_planilha int;
   n_fora int := 0;
   n_removidos int := 0;
@@ -532,13 +533,21 @@ begin
                 v_sit := 'aguardando_conta';
               end if;
             else
-              update challenge_convidados
-                set origem = 'planilha',
-                    nome = coalesce(nullif(v_nome, ''), nome),
-                    telefone_exibicao = v_cel
+              select count(*) into n_convites
+              from challenge_convidados
               where challenge_id = v_desafio
                 and public.telefones_batem(telefone, v_chave);
-              if not found then
+
+              if n_convites = 1 then
+                -- Convite único que bate: passa a ser da planilha (como o
+                -- membro manual que está nela)
+                update challenge_convidados
+                  set origem = 'planilha',
+                      nome = coalesce(nullif(v_nome, ''), nome),
+                      telefone_exibicao = v_cel
+                where challenge_id = v_desafio
+                  and public.telefones_batem(telefone, v_chave);
+              elsif n_convites = 0 then
                 -- Guarda a chave (DDD + linha), não os dígitos crus:
                 -- `normalizar_telefone` de um celular de 11 dígitos fica com
                 -- os 10 últimos e perde o primeiro dígito do DDD, e aí o
@@ -549,6 +558,12 @@ begin
                   (v_desafio, public.normalizar_telefone(v_chave), v_cel,
                    nullif(v_nome, ''), 'planilha')
                 on conflict (challenge_id, telefone) do nothing;
+              else
+                -- Dois ou mais convites batem (um antigo sem DDD casa só
+                -- pela linha): nenhum vira da planilha, senão uma mudança
+                -- na planilha apagaria um convite manual; e nada de convite
+                -- novo, que seria duplicado. A pessoa já está convidada.
+                null;
               end if;
               v_sit := 'aguardando_conta';
             end if;
@@ -617,7 +632,11 @@ grant execute on function public.sincronizar_planilha_ingresso(text, jsonb) to a
 
 -- A organização confirma a remoção que a trava segurou. Mesma definição
 -- de "fora da planilha" da sincronização, com as chaves da última.
-create or replace function public.confirmar_remocoes_ingresso(p_desafio uuid)
+-- `p_esperado` é o número de travadas que o painel mostrou: o gatilho
+-- roda a cada 5 minutos, e se a planilha mudou nesse meio-tempo (4
+-- travadas viraram 100) a confirmação não vale para a lista nova.
+drop function if exists public.confirmar_remocoes_ingresso(uuid);
+create or replace function public.confirmar_remocoes_ingresso(p_desafio uuid, p_esperado int)
 returns int
 language plpgsql security definer
 set search_path = public
@@ -641,6 +660,10 @@ begin
   join challenges c on c.id = s.challenge_id
   where s.challenge_id = p_desafio;
 
+  if coalesce((v_resumo ->> 'remocoes_travadas')::int, 0) is distinct from p_esperado then
+    raise exception 'A lista mudou desde que você conferiu. Confira de novo.';
+  end if;
+
   -- Só sobre uma leitura boa da planilha: sem cabeçalho as chaves vêm
   -- vazias e tirariam todo mundo; depois da festa ninguém sai mais.
   if v_resumo is null or v_resumo ->> 'status' <> 'ok' or v_congelado then
@@ -654,12 +677,12 @@ begin
   );
 
   update ingresso_sincronizacoes
-    set resumo = jsonb_set(resumo, '{remocoes_travadas}', '0')
+    set resumo = resumo || jsonb_build_object('remocoes_travadas', 0, 'removidos', n)
   where challenge_id = p_desafio;
 
   return n;
 end;
 $$;
 
-revoke execute on function public.confirmar_remocoes_ingresso(uuid) from public, anon;
-grant execute on function public.confirmar_remocoes_ingresso(uuid) to authenticated;
+revoke execute on function public.confirmar_remocoes_ingresso(uuid, int) from public, anon;
+grant execute on function public.confirmar_remocoes_ingresso(uuid, int) to authenticated;
