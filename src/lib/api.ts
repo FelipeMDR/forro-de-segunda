@@ -54,6 +54,8 @@ import type {
   AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
+  StatusSincronizacao,
+  IngressoPerfil,
 } from './types'
 
 /**
@@ -315,6 +317,31 @@ export interface ForroApi {
     challengeId: string,
     linhas: { nome: string; telefone: string }[],
   ): Promise<{ adicionados: number; pendentes: number; jaEstavam: number }>
+  // ---- Desafio de ingresso (migração 043) ----
+  /**
+   * Gera o segredo que liga a planilha ao desafio (organizador). O texto
+   * só aparece aqui, uma vez; gerar de novo invalida o anterior.
+   */
+  gerarSegredoIngresso(desafioId: string): Promise<string>
+  /** Resumo da última sincronização da planilha. null = nunca sincronizou. */
+  statusSincronizacao(desafioId: string): Promise<StatusSincronizacao | null>
+  /**
+   * Confirma a remoção que a trava segurou. `esperado` é o número de
+   * remoções travadas que o painel mostrou; se a lista mudou, recusa.
+   * Devolve quantas pessoas saíram.
+   */
+  confirmarRemocoesIngresso(desafioId: string, esperado: number): Promise<number>
+  /** Distintivos de ingresso de um perfil (derivados, nada é gravado). */
+  ingressosDoPerfil(userId: string): Promise<IngressoPerfil[]>
+  /**
+   * Corrige à mão se a pessoa esteve na festa (organizador). null remove
+   * a correção e volta ao automático.
+   */
+  marcarPresencaIngresso(
+    desafioId: string,
+    userId: string,
+    esteve: boolean | null,
+  ): Promise<void>
   /** Em quantos desafios um aluno entrou (estatística do perfil). */
   contarDesafios(userId: string): Promise<number>
 

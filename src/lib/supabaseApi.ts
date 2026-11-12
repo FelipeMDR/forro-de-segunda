@@ -20,6 +20,7 @@ import { VERSAO_TERMOS } from './termos'
 import { REGRAS_PADRAO, videoDoYoutube } from './trilha'
 import { NOME_PADRAO } from './nome'
 import { CARGO_DJ } from './dj'
+import { aplicarNoitesExtras, textosPadraoIngresso } from './ingresso'
 import { MODALIDADES, PAGINA_FEED, turmaLabel } from './types'
 import type {
   AberturaAntecipada,
@@ -75,6 +76,8 @@ import type {
   AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
+  StatusSincronizacao,
+  IngressoPerfil,
 } from './types'
 
 /**
@@ -1370,6 +1373,28 @@ export class SupabaseApi implements ForroApi {
 
   // ---- Desafios ----
 
+  /** O desafio é de ingresso quando tem `evento_data`; textos nulos caem no padrão. */
+  private ingressoDaLinha(c: Record<string, unknown>): Challenge['ingresso'] {
+    if (c.evento_data == null) return null
+    const titulo = c.titulo as string
+    const padrao = textosPadraoIngresso(titulo)
+    const texto = (v: unknown, p: string) => (typeof v === 'string' && v ? v : p)
+    return {
+      evento_data: String(c.evento_data),
+      evento_inicio: horaCurta(c.evento_inicio),
+      evento_fim: horaCurta(c.evento_fim),
+      noite_extra_para: (c.noite_extra_para as string[] | null) ?? [],
+      garantido: {
+        emoji: texto(c.ingresso_emoji, padrao.garantido.emoji),
+        titulo: texto(c.ingresso_titulo, padrao.garantido.titulo),
+      },
+      presenca: {
+        emoji: texto(c.presenca_emoji, padrao.presenca.emoji),
+        titulo: texto(c.presenca_titulo, padrao.presenca.titulo),
+      },
+    }
+  }
+
   private mapChallenge(
     c: Record<string, unknown>,
     meusIds: Set<string>,
@@ -1394,8 +1419,9 @@ export class SupabaseApi implements ForroApi {
       modalidades: modalidadesValidas(c.modalidades),
       // Sem a migração 035 a coluna não existe: Forródex do semestre
       forrodex: c.forrodex === true,
-      // Task 4 preenche de verdade (vem da API)
-      ingresso: null,
+      // Sem a migração 043 as colunas não existem: não é desafio de ingresso
+      ingresso: this.ingressoDaLinha(c),
+      // Derivada de `ingresso` em `listChallenges` (aplicarNoitesExtras)
       noites_extras: [],
       // Ausente enquanto a migração 008 não roda — sem trava de local
       local:
@@ -1434,7 +1460,7 @@ export class SupabaseApi implements ForroApi {
         ) as Array<{ challenge_id: string }>) ?? [])
       : []
     const meusIds = new Set(meus.map((m) => m.challenge_id))
-    return data.map((c) => this.mapChallenge(c, meusIds))
+    return aplicarNoitesExtras(data.map((c) => this.mapChallenge(c, meusIds)))
   }
 
   async getChallenge(id: string) {
@@ -1456,6 +1482,15 @@ export class SupabaseApi implements ForroApi {
       // Nunca vazio: o banco recusa (constraint da migração 024), e o
       // formulário também não deixa desmarcar tudo.
       modalidades: data.modalidades.length > 0 ? data.modalidades : ['checkin'],
+      // Desafio de ingresso (migração 043); os demais gravam tudo nulo
+      evento_data: data.ingresso?.evento_data ?? null,
+      evento_inicio: data.ingresso?.evento_inicio ?? null,
+      evento_fim: data.ingresso?.evento_fim ?? null,
+      noite_extra_para: data.ingresso?.noite_extra_para ?? [],
+      ingresso_emoji: data.ingresso?.garantido.emoji ?? null,
+      ingresso_titulo: data.ingresso?.garantido.titulo ?? null,
+      presenca_emoji: data.ingresso?.presenca.emoji ?? null,
+      presenca_titulo: data.ingresso?.presenca.titulo ?? null,
     }
     let challengeId = data.id
     if (challengeId) {
@@ -1651,7 +1686,15 @@ export class SupabaseApi implements ForroApi {
     ids: string[],
   ): Promise<Map<string, Set<string>>> {
     const inicio = new Date(`${challenge.data_inicio}T00:00:00`).toISOString()
-    const fim = new Date(`${challenge.data_fim}T23:59:59`).toISOString()
+    // O fim vai até a madrugada da última noite extra, que pode passar
+    // da data_fim (a festa cruza a meia-noite)
+    let fimMs = new Date(`${challenge.data_fim}T23:59:59`).getTime()
+    for (const n of challenge.noites_extras ?? []) {
+      const dia = new Date(`${n.data}T${n.hora_fim}:00`)
+      if (n.hora_fim < n.hora_inicio) dia.setDate(dia.getDate() + 1)
+      fimMs = Math.max(fimMs, dia.getTime())
+    }
+    const fim = new Date(fimMs).toISOString()
     // `presenca_anulada` fica de fora já na consulta: a revisão da
     // organização vence qualquer regra automática (migração 026).
     // Em lotes de ids (a lista viaja na URL) e página a página dentro
@@ -2442,7 +2485,79 @@ export class SupabaseApi implements ForroApi {
     return ((data as { nivel: NivelTrilha } | null)?.nivel) ?? null
   }
 
-  async listAcessosTrilha(): Promise<Record<string, NivelTrilha>> {
+  // ---- Desafio de ingresso (migração 043) ----
+
+  async gerarSegredoIngresso(desafioId: string): Promise<string> {
+    const { data, error } = await this.sb.rpc('gerar_segredo_ingresso', {
+      p_desafio: desafioId,
+    })
+    if (error) throw new Error(traduz(error.message))
+    return data as string
+  }
+
+  async statusSincronizacao(desafioId: string): Promise<StatusSincronizacao | null> {
+    const { data, error } = await this.sb
+      .from('ingresso_sincronizacoes')
+      .select('em, resumo')
+      .eq('challenge_id', desafioId)
+      .maybeSingle()
+    // Sem a migração 043 a tabela não existe: nunca sincronizou
+    if (error || !data) return null
+    const r = (data.resumo ?? {}) as Record<string, unknown>
+    return {
+      em: data.em as string,
+      status: (r.status as StatusSincronizacao['status']) ?? 'ok',
+      dentro: Number(r.dentro ?? 0),
+      aguardando: Number(r.aguardando ?? 0),
+      invalidos: (r.invalidos as StatusSincronizacao['invalidos']) ?? [],
+      ambiguos: (r.ambiguos as StatusSincronizacao['ambiguos']) ?? [],
+      removidos: Number(r.removidos ?? 0),
+      remocoes_travadas: Number(r.remocoes_travadas ?? 0),
+    }
+  }
+
+  async confirmarRemocoesIngresso(desafioId: string, esperado: number): Promise<number> {
+    const { data, error } = await this.sb.rpc('confirmar_remocoes_ingresso', {
+      p_desafio: desafioId,
+      p_esperado: esperado,
+    })
+    if (error) throw new Error(traduz(error.message))
+    return Number(data ?? 0)
+  }
+
+  async ingressosDoPerfil(userId: string): Promise<IngressoPerfil[]> {
+    // Sem a migração 043 a função não existe: nenhum distintivo de ingresso
+    const { data, error } = await this.sb
+      .rpc('ingressos_do_perfil', { p_user: userId })
+      .then(
+        (r) => r,
+        () => ({ data: null, error: { message: 'indisponível' } }),
+      )
+    if (error || !data) return []
+    return (data as Array<Record<string, unknown>>).map((l) => ({
+      desafio_id: l.desafio_id as string,
+      titulo: l.titulo as string,
+      estado: l.estado === 'presenca' ? 'presenca' : 'garantido',
+      emoji: l.emoji as string,
+      titulo_distintivo: l.titulo_distintivo as string,
+      desde: (l.desde as string | null) ?? null,
+    }))
+  }
+
+  async marcarPresencaIngresso(
+    desafioId: string,
+    userId: string,
+    esteve: boolean | null,
+  ): Promise<void> {
+    const { error } = await this.sb.rpc('marcar_presenca_ingresso', {
+      p_desafio: desafioId,
+      p_user: userId,
+      p_esteve: esteve,
+    })
+    if (error) throw new Error(traduz(error.message))
+  }
+
+  async listAcessosTrilha():Promise<Record<string, NivelTrilha>> {
     const data = await todasAsLinhas<{ user_id: string; nivel: NivelTrilha }>((de, ate) =>
       this.sb.from('trilha_acesso').select('user_id, nivel').order('user_id').range(de, ate),
     ).catch(() => [])

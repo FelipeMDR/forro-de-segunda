@@ -3,6 +3,7 @@ import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { ForroApi } from './api'
 import { cacaParaCongelar } from './caca'
 import { MAX_DESTAQUES } from './destaques'
+import { aplicarNoitesExtras, textosPadraoIngresso } from './ingresso'
 import {
   addDays,
   diaDaNoite,
@@ -86,6 +87,9 @@ import type {
   AulaSemVideoInput,
   PerfilResumo,
   RegrasTrilha,
+  StatusSincronizacao,
+  IngressoPerfil,
+  IngressoConfig,
 } from './types'
 
 /**
@@ -121,6 +125,8 @@ interface ChallengeRow {
   modalidades?: Modalidade[]
   /** Opcional: banco demo anterior à Forródex presa a desafio. */
   forrodex?: boolean
+  /** Desafio de ingresso (mig. 043). Opcional: banco demo anterior. */
+  ingresso?: IngressoConfig | null
   criado_por: string | null
 }
 
@@ -148,6 +154,8 @@ interface DB {
   }[]
   challenges: ChallengeRow[]
   members: { challenge_id: string; user_id: string; entrou_em: string }[]
+  /** Correções da organização sobre a presença na festa (mig. 043). */
+  presencasIngresso?: { challenge_id: string; user_id: string; esteve: boolean }[]
   /** Convidados por telefone que ainda não criaram conta. */
   convidados: {
     challenge_id: string
@@ -1189,8 +1197,8 @@ export class DemoApi implements ForroApi {
       // que é como o desafio funcionava.
       modalidades: c.modalidades?.length ? c.modalidades : ['checkin'],
       forrodex: c.forrodex === true,
-      // Task 4 preenche de verdade (vem da API)
-      ingresso: null,
+      ingresso: c.ingresso ?? null,
+      // Derivada de `ingresso` em `desafiosComNoites`
       noites_extras: [],
       participantes: this.db.members.filter((m) => m.challenge_id === c.id)
         .length,
@@ -1200,15 +1208,19 @@ export class DemoApi implements ForroApi {
     }
   }
 
+  /** Todos os desafios já com as noites extras espalhadas (como na produção). */
+  private desafiosComNoites(): Challenge[] {
+    return aplicarNoitesExtras(this.db.challenges.map((c) => this.toChallenge(c)))
+  }
+
   async listChallenges(): Promise<Challenge[]> {
-    return [...this.db.challenges]
-      .sort((a, b) => b.data_inicio.localeCompare(a.data_inicio))
-      .map((c) => this.toChallenge(c))
+    return this.desafiosComNoites().sort((a, b) =>
+      b.data_inicio.localeCompare(a.data_inicio),
+    )
   }
 
   async getChallenge(id: string) {
-    const c = this.db.challenges.find((x) => x.id === id)
-    return c ? this.toChallenge(c) : null
+    return this.desafiosComNoites().find((x) => x.id === id) ?? null
   }
 
   async saveChallenge(data: ChallengeInput): Promise<string> {
@@ -1224,6 +1236,7 @@ export class DemoApi implements ForroApi {
         janelas: data.janelas,
         entrada_restrita: data.entrada_restrita,
         modalidades: data.modalidades,
+        ingresso: data.ingresso,
         // Espelha o trigger marca_local_desde (migração 009): o marco
         // nasce quando a trava é ligada e é preservado depois.
         local: data.local && {
@@ -1242,6 +1255,7 @@ export class DemoApi implements ForroApi {
         janelas: data.janelas,
         entrada_restrita: data.entrada_restrita,
         modalidades: data.modalidades,
+        ingresso: data.ingresso,
         local: data.local && {
           ...data.local,
           desde: new Date().toISOString(),
@@ -1436,7 +1450,10 @@ export class DemoApi implements ForroApi {
   ): Promise<ParceiroDanca[]> {
     const c = this.db.challenges.find((x) => x.id === challengeId)
     if (!c) return []
-    const validas = this.noitesValidas(this.toChallenge(c), userId)
+    const validas = this.noitesValidas(
+      (await this.getChallenge(challengeId)) ?? this.toChallenge(c),
+      userId,
+    )
     // Mesmo filtro das Parcerias: só noite que valeu. O nome e a foto
     // vêm de `parceirosDe`, que já agrupa por pessoa.
     const duplas = (this.db.duplas ?? []).filter(
@@ -1506,6 +1523,83 @@ export class DemoApi implements ForroApi {
 
   async pontosNoDesafioDe(challenge: Challenge, userId: string) {
     return this.pontosDe(challenge, userId)
+  }
+
+  // ---- Desafio de ingresso (mig. 043) ----
+
+  async gerarSegredoIngresso(desafioId: string): Promise<string> {
+    return `demo-${desafioId}`
+  }
+
+  async statusSincronizacao(): Promise<StatusSincronizacao | null> {
+    return null
+  }
+
+  async confirmarRemocoesIngresso(): Promise<number> {
+    return 0
+  }
+
+  /** Espelha `ingressos_do_perfil` (migração 043), no fuso local do demo. */
+  async ingressosDoPerfil(userId: string): Promise<IngressoPerfil[]> {
+    const checkins = this.db.checkins.filter(
+      (c) => c.user_id === userId && c.presenca_anulada !== true,
+    )
+    const linhas: Array<{ abre: number; item: IngressoPerfil }> = []
+    for (const c of this.db.challenges) {
+      const cfg = c.ingresso
+      const membro = this.db.members.find(
+        (m) => m.challenge_id === c.id && m.user_id === userId,
+      )
+      if (!cfg || !membro) continue
+      const abre = new Date(`${cfg.evento_data}T${cfg.evento_inicio}:00`)
+      const fecha = new Date(`${cfg.evento_data}T${cfg.evento_fim}:00`)
+      if (cfg.evento_fim < cfg.evento_inicio) fecha.setDate(fecha.getDate() + 1)
+      const primeiro = checkins
+        .map((k) => k.criado_em)
+        .filter((t) => {
+          const ms = new Date(t).getTime()
+          return ms >= abre.getTime() && ms <= fecha.getTime()
+        })
+        .sort()[0]
+      const correcao = (this.db.presencasIngresso ?? []).find(
+        (p) => p.challenge_id === c.id && p.user_id === userId,
+      )?.esteve
+      const esteve = correcao ?? primeiro !== undefined
+      const textos = textosPadraoIngresso(c.titulo)
+      const texto = esteve ? cfg.presenca : cfg.garantido
+      const padrao = esteve ? textos.presenca : textos.garantido
+      linhas.push({
+        abre: abre.getTime(),
+        item: {
+          desafio_id: c.id,
+          titulo: c.titulo,
+          estado: esteve ? 'presenca' : 'garantido',
+          emoji: texto.emoji || padrao.emoji,
+          titulo_distintivo: texto.titulo || padrao.titulo,
+          // Presença corrigida à mão sem check-in cai na entrada no desafio
+          desde: esteve ? (primeiro ?? membro.entrou_em) : membro.entrou_em,
+        },
+      })
+    }
+    return linhas.sort((a, b) => a.abre - b.abre).map((l) => l.item)
+  }
+
+  async marcarPresencaIngresso(
+    desafioId: string,
+    userId: string,
+    esteve: boolean | null,
+  ): Promise<void> {
+    if (this.db.roles[this.uid()] !== 'organizador') {
+      throw new Error('Só a organização corrige a presença')
+    }
+    const resto = (this.db.presencasIngresso ?? []).filter(
+      (p) => !(p.challenge_id === desafioId && p.user_id === userId),
+    )
+    this.db.presencasIngresso =
+      esteve === null
+        ? resto
+        : [...resto, { challenge_id: desafioId, user_id: userId, esteve }]
+    this.persist()
   }
 
   async contarDesafios(userId: string) {

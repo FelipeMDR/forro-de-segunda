@@ -315,6 +315,18 @@ export interface IngressoPerfil {
   desde: string | null
 }
 
+/** Última sincronização da planilha de ingressos (só a organização lê). */
+export interface StatusSincronizacao {
+  em: string
+  status: 'ok' | 'congelado' | 'sem_cabecalho'
+  dentro: number
+  aguardando: number
+  invalidos: { linha: number; nome: string }[]
+  ambiguos: { linha: number; nome: string }[]
+  removidos: number
+  remocoes_travadas: number
+}
+
 export interface ChallengeInput {
   id?: string
   titulo: string
