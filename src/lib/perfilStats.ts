@@ -14,6 +14,7 @@ import type {
   CacaCongelada,
   Challenge,
   Feriado,
+  IngressoPerfil,
   PapelDanca,
   ParceiroDanca,
   PerfilPublico,
@@ -81,6 +82,7 @@ export async function carregarPerfilStats(
     cacaSemestre,
     cacasCongeladas,
     destaques,
+    ingressos,
   ] = await Promise.all([
     api.checkinsDe(userId),
     api.contarDesafios(userId),
@@ -102,6 +104,8 @@ export async function carregarPerfilStats(
     api.cacaCongeladaDe(userId).catch(() => [] as CacaCongelada[]),
     // Sem a migração 042: destaques automáticos
     api.destaquesDe(userId).catch(() => undefined),
+    // Sem a migração 043 não há desafio de ingresso: o perfil vale sem isso
+    api.ingressosDoPerfil(userId).catch(() => [] as IngressoPerfil[]),
   ])
 
   // Uma noite só entra na conta se a foto marcou ponto em algum desafio
@@ -142,6 +146,7 @@ export async function carregarPerfilStats(
         funcaoDisponivel,
       ),
       cacasCongeladas,
+      ingressos,
     }),
     destaques,
   }

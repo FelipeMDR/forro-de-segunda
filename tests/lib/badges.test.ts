@@ -237,3 +237,44 @@ describe('distintivo da caça aos professores', () => {
     expect(tipo('2026-07-20T22:00:00Z')).toContain('1º semestre de 2026')
   })
 })
+
+describe('distintivos de ingresso', () => {
+  const garantido = {
+    desafio_id: 'd-2026-2',
+    titulo: 'Forró na Rep 2026/2',
+    estado: 'garantido' as const,
+    emoji: '🎟️',
+    titulo_distintivo: 'Ingresso garantido',
+    desde: '2026-10-05',
+  }
+  const presenca = {
+    desafio_id: 'd-2027-1',
+    titulo: 'Forró na Rep 2027/1',
+    estado: 'presenca' as const,
+    emoji: '🎉',
+    titulo_distintivo: 'Marquei presença',
+    desde: '2027-03-20',
+  }
+
+  it('gera um por edição, logo depois dos personalizados, com os títulos das linhas', () => {
+    const out = computeBadges({
+      userId: 'u',
+      turmas: [{ turma: 'Avançada', papel_danca: 'Condutor(a)' }],
+      cargos: ['DJ'],
+      distintivosCustom: [{ id: 'custom-a', emoji: '🏆', titulo: 'Especial', descricao: '' }],
+      checkinDates: [],
+      ingressos: [garantido, presenca],
+    })
+    const ids = out.map((b) => b.id)
+    expect(ids.slice(0, 4)).toEqual(['cargo-DJ', 'custom-a', 'ingresso-d-2026-2', 'ingresso-d-2027-1'])
+    expect(out.filter((b) => b.id.startsWith('ingresso-')).map((b) => b.titulo)).toEqual([
+      'Ingresso garantido',
+      'Marquei presença',
+    ])
+  })
+
+  it('sem ingressos não muda nada', () => {
+    const base = { userId: 'u', turmas: [], checkinDates: [] }
+    expect(computeBadges({ ...base, ingressos: [] })).toEqual(computeBadges(base))
+  })
+})

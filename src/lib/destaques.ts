@@ -33,11 +33,13 @@ export function conquistado(b: Badge): boolean {
 
 /**
  * Raridade, para os destaques automáticos: o especial (dado à mão pela
- * organização) vale mais que a caça, que vale mais que um marco; entre
+ * organização) vale mais que o ingresso da festa, que vale mais que a
+ * caça, que vale mais que um marco; entre
  * marcos, o de nível mais alto na trilha.
  */
 function raridade(b: Badge): number {
   if (b.id.startsWith('custom-')) return 3
+  if (b.id.startsWith('ingresso-')) return 2.5
   if (b.id.startsWith('caca-')) return 2
   const t = b.trilha
   if (!t) return 1

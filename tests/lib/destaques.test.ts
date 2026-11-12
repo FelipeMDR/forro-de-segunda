@@ -67,3 +67,35 @@ describe('destaques do perfil', () => {
     expect(escolherDestaques([pendente], ['caca-atual'])).toEqual([])
   })
 })
+
+describe('destaques com distintivo de ingresso', () => {
+  const linha = (estado: 'garantido' | 'presenca') => ({
+    desafio_id: 'X',
+    titulo: 'Forró na Rep',
+    estado,
+    emoji: estado === 'garantido' ? '🎟️' : '🎉',
+    titulo_distintivo: estado === 'garantido' ? 'Ingresso garantido' : 'Marquei presença',
+    desde: null,
+  })
+  const com = (estado: 'garantido' | 'presenca') =>
+    computeBadges({
+      userId: 'u',
+      turmas: [],
+      checkinDates: dias(30),
+      parceiros: 59,
+      distintivosCustom: [especial('a', 'Espaço Livre')],
+      ingressos: [linha(estado)],
+    })
+
+  it('o salvo continua escolhido quando a linha passa de garantido para presenca', () => {
+    expect(escolherDestaques(com('garantido'), ['ingresso-X']).map((b) => b.id)).toEqual(['ingresso-X'])
+    const depois = escolherDestaques(com('presenca'), ['ingresso-X'])
+    expect(depois.map((b) => b.id)).toEqual(['ingresso-X'])
+    expect(depois[0].emoji).toBe('🎉')
+  })
+
+  it('sem escolha: depois do especial e antes dos marcos', () => {
+    const d = escolherDestaques(com('garantido'), null).map((b) => b.id)
+    expect(d.slice(0, 2)).toEqual(['custom-a', 'ingresso-X'])
+  })
+})

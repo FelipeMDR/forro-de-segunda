@@ -82,15 +82,22 @@ export function ProfilePage() {
         console.error('[perfil] falha ao carregar estatísticas', e)
         // Sem estatísticas, mostra ao menos os distintivos de turma
         setStats({ streak: 0, presencas: 0, desafios: 0, parceiros: 0 })
-        setBadges(
-          computeBadges({
-            userId,
-            turmas: profile.turmas,
-            cargos: profile.cargos,
-            checkinDates: [],
-            papelPrincipal: profile.papel_principal,
-          }),
-        )
+        const base = {
+          userId,
+          turmas: profile.turmas,
+          cargos: profile.cargos,
+          checkinDates: [],
+          papelPrincipal: profile.papel_principal,
+        }
+        setBadges(computeBadges(base))
+        // O ingresso não depende das estatísticas que falharam; se também
+        // falhar (ou faltar a migração 043), ficam só os de turma
+        void api
+          .ingressosDoPerfil(userId)
+          .then((ingressos) => {
+            if (!cancelado) setBadges(computeBadges({ ...base, ingressos }))
+          })
+          .catch(() => {})
       })
     void api
       .favoritosDe(userId)

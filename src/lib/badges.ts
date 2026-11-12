@@ -3,7 +3,8 @@ import { marcosDaCaca } from './caca'
 import type { MarcoCaca, ProgressoCaca } from './caca'
 import { rotuloDoPeriodo, rotuloDoSemestre } from './retrospectiva'
 import { emojiCargo } from './types'
-import type { Badge, CacaCongelada, PapelDanca, TurmaMembro } from './types'
+import { badgeDeIngresso } from './ingresso'
+import type { Badge, CacaCongelada, IngressoPerfil, PapelDanca, TurmaMembro } from './types'
 
 const REGRA_CACA =
   'Conta professores diferentes do papel oposto ao seu, com dupla confirmada pelos dois lados. Vale o semestre todo.'
@@ -149,6 +150,8 @@ export function computeBadges(input: {
   }
   /** Caças de semestres já encerrados. */
   cacasCongeladas?: CacaCongelada[]
+  /** Desafios de ingresso em que a pessoa entrou: um distintivo por edição. */
+  ingressos?: IngressoPerfil[]
 }): Badge[] {
   const badges: Badge[] = []
 
@@ -173,6 +176,9 @@ export function computeBadges(input: {
       ...b,
     })
   }
+
+  // 0.6 Ingresso do Forró na Rep — um por edição, acumula entre semestres
+  for (const i of input.ingressos ?? []) badges.push(badgeDeIngresso(i))
 
   // 1. Turma e função na dança (ex.: "Condutor(a) · Avançado")
   for (const m of input.turmas) {
