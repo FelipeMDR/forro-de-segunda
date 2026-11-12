@@ -2583,6 +2583,19 @@ export class SupabaseApi implements ForroApi {
     if (error) throw new Error(traduz(error.message))
   }
 
+  async correcoesPresencaIngresso(desafioId: string): Promise<Map<string, boolean>> {
+    // Sem a migração 043 a tabela não existe: nenhuma correção
+    const linhas = await todasAsLinhas<{ user_id: string; esteve: boolean }>((de, ate) =>
+      this.sb
+        .from('ingresso_presencas')
+        .select('user_id, esteve')
+        .eq('challenge_id', desafioId)
+        .order('user_id')
+        .range(de, ate),
+    ).catch(() => [])
+    return new Map(linhas.map((l) => [l.user_id, l.esteve]))
+  }
+
   async listAcessosTrilha(): Promise<Record<string, NivelTrilha>> {
     const data = await todasAsLinhas<{ user_id: string; nivel: NivelTrilha }>((de, ate) =>
       this.sb.from('trilha_acesso').select('user_id, nivel').order('user_id').range(de, ate),

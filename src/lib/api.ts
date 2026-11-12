@@ -342,6 +342,8 @@ export interface ForroApi {
     userId: string,
     esteve: boolean | null,
   ): Promise<void>
+  /** Correções manuais de presença do desafio: user_id -> esteve (organizador). */
+  correcoesPresencaIngresso(desafioId: string): Promise<Map<string, boolean>>
   /** Em quantos desafios um aluno entrou (estatística do perfil). */
   contarDesafios(userId: string): Promise<number>
 

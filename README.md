@@ -339,6 +339,26 @@ supabase/
 - **Streak:** semanas-calendário consecutivas (seg–dom) com pelo menos um
   check-in; a semana atual em andamento não quebra a sequência.
 
+## Forró na Rep: ligar a planilha
+
+A cada semestre, para o desafio de ingresso da festa:
+
+1. **Migração 043:** rode `supabase/migracoes/043-desafio-de-ingresso.sql` no SQL Editor do
+   Supabase e clique em "Reload schema cache" (só na primeira vez).
+2. **Crie o desafio de ingresso** (entrada restrita): data e horário da
+   festa, a noite extra que também pontua no Espaço Livre e os textos dos
+   distintivos "Ingresso garantido" e "Marquei presença".
+3. No desafio, abra o painel **Sincronização com a planilha** e gere o
+   script.
+4. Em [script.google.com](https://script.google.com), crie um projeto, cole
+   o script, rode a função `instalar` e autorize o acesso à planilha.
+5. O painel mostra o status da última sincronização. Depois da festa a
+   sincronização congela e o gatilho pode ser desligado.
+
+Quem fez check-in no horário da festa vira "Marquei presença" sozinho; na
+lista de participantes do desafio, a organização corrige caso a caso
+("Esteve lá", "Não esteve" ou volta ao "Automático").
+
 ## Scripts
 
 | Comando | O quê |

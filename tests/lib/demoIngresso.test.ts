@@ -139,6 +139,17 @@ describe('DemoApi — desafio de ingresso', () => {
     expect((await api.ingressosDoPerfil(uid))[0].estado).toBe('presenca')
   })
 
+  it('correcoesPresencaIngresso devolve o que foi gravado e null remove', async () => {
+    const { api, uid, rep } = await montar()
+    expect((await api.correcoesPresencaIngresso(rep)).size).toBe(0)
+    await api.marcarPresencaIngresso(rep, uid, false)
+    expect((await api.correcoesPresencaIngresso(rep)).get(uid)).toBe(false)
+    await api.marcarPresencaIngresso(rep, uid, true)
+    expect((await api.correcoesPresencaIngresso(rep)).get(uid)).toBe(true)
+    await api.marcarPresencaIngresso(rep, uid, null)
+    expect((await api.correcoesPresencaIngresso(rep)).has(uid)).toBe(false)
+  })
+
   it('check-in fora do horário da festa não vira presença', async () => {
     const { api, banco, uid } = await montar()
     checkin(banco, uid, '2026-12-06T04:30:00')

@@ -33,16 +33,46 @@ export function ParticipantesDesafio({
   const [busca, setBusca] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [avisos, setAvisos] = useState<string[]>([])
+  // Desafio de ingresso: quem tem check-in na festa (presença automática)
+  // e as correções manuais da organização (user_id -> esteve)
+  const [comCheckin, setComCheckin] = useState<Set<string>>(new Set())
+  const [correcoes, setCorrecoes] = useState<Map<string, boolean>>(new Map())
+  const [salvando, setSalvando] = useState<string | null>(null)
+  const ehIngresso = desafio.ingresso != null
 
   const carregar = async () => {
-    const [todos, ranking, convites] = await Promise.all([
+    const [todos, ranking, convites, corrigidos] = await Promise.all([
       api.listProfiles(),
-      api.getRanking(desafio),
+      api.getRanking(desafio, 'checkin'),
       api.listConvidados(desafio.id),
+      ehIngresso
+        ? api.correcoesPresencaIngresso(desafio.id)
+        : Promise.resolve(new Map<string, boolean>()),
     ])
     setPerfis(todos)
     setMembros(new Set(ranking.map((r) => r.user_id)))
+    setComCheckin(new Set(ranking.filter((r) => r.pontos > 0).map((r) => r.user_id)))
+    setCorrecoes(corrigidos)
     setConvidados(convites)
+  }
+
+  // Grava só a linha mexida: sem recarregar a lista inteira
+  const corrigirPresenca = async (userId: string, esteve: boolean | null) => {
+    setSalvando(userId)
+    try {
+      await api.marcarPresencaIngresso(desafio.id, userId, esteve)
+      setCorrecoes((atual) => {
+        const novo = new Map(atual)
+        if (esteve === null) novo.delete(userId)
+        else novo.set(userId, esteve)
+        return novo
+      })
+      onMudou()
+    } catch (e) {
+      toast((e as Error).message, 'erro')
+    } finally {
+      setSalvando(null)
+    }
   }
 
   useEffect(() => {
@@ -185,10 +215,25 @@ export function ParticipantesDesafio({
 
       {participantes.length > 0 && (
         <ul className="divide-y divide-linha rounded-xl bg-chip">
-          {participantes.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 px-3 py-2">
+          {participantes.map((p) => {
+            const correcao = correcoes.get(p.id)
+            const esteve = correcao ?? comCheckin.has(p.id)
+            const estado =
+              correcao === undefined ? 'auto' : correcao ? 'esteve' : 'nao'
+            return (
+            <li key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
               <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
-              <span className="min-w-0 flex-1 truncate text-sm">{p.nome}</span>
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {ehIngresso && (
+                  <span
+                    className="mr-1"
+                    title={esteve ? 'Marquei presença' : 'Ingresso garantido'}
+                  >
+                    {esteve ? '🎉' : '🎟️'}
+                  </span>
+                )}
+                {p.nome}
+              </span>
               <button
                 className="shrink-0 px-2 text-xs font-bold text-or-t"
                 disabled={ocupado}
@@ -201,8 +246,38 @@ export function ParticipantesDesafio({
               >
                 Remover
               </button>
+              {ehIngresso && (
+                <div
+                  role="group"
+                  aria-label={`Presença de ${p.nome}`}
+                  className="flex w-full gap-1 text-[11px]"
+                >
+                  {(
+                    [
+                      ['auto', 'Automático', null],
+                      ['esteve', 'Esteve lá', true],
+                      ['nao', 'Não esteve', false],
+                    ] as const
+                  ).map(([chave, rotulo, valor]) => (
+                    <button
+                      key={chave}
+                      aria-pressed={estado === chave}
+                      disabled={salvando === p.id || estado === chave}
+                      onClick={() => void corrigirPresenca(p.id, valor)}
+                      className={`flex-1 rounded-lg px-2 py-1 font-bold ${
+                        estado === chave
+                          ? 'bg-brasa-500/20 text-or-t'
+                          : 'bg-fundo text-tinta-500'
+                      }`}
+                    >
+                      {rotulo}
+                    </button>
+                  ))}
+                </div>
+              )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
 

@@ -1602,6 +1602,14 @@ export class DemoApi implements ForroApi {
     this.persist()
   }
 
+  async correcoesPresencaIngresso(desafioId: string): Promise<Map<string, boolean>> {
+    return new Map(
+      (this.db.presencasIngresso ?? [])
+        .filter((p) => p.challenge_id === desafioId)
+        .map((p) => [p.user_id, p.esteve]),
+    )
+  }
+
   async contarDesafios(userId: string) {
     return this.db.members.filter((m) => m.user_id === userId).length
   }
