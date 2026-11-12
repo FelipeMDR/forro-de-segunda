@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { NoiteProvider, useNoite } from '../context/NoiteContext'
+import { jaVisto, marcarVisto, proximaComemoracao } from '../lib/ingressoVisto'
+import type { IngressoPerfil } from '../lib/types'
+import { FolhaIngresso } from './FolhaIngresso'
 import { Icone, type NomeIcone } from './Icone'
 
 /**
@@ -73,13 +76,16 @@ function abaDe(pathname: string): 'hoje' | 'feed' | 'avisos' | 'eu' {
 }
 
 function Casca() {
-  const { api } = useAuth()
+  const { api, userId } = useAuth()
   const { pathname } = useLocation()
   const { situacao } = useNoite()
   const [naoLidas, setNaoLidas] = useState(0)
   /** Quando a bolinha foi recontada pela última vez — ver o efeito abaixo. */
   const ultimaContagem = useRef(0)
   const telaAnterior = useRef(pathname)
+  const [comemorar, setComemorar] = useState<IngressoPerfil | null>(null)
+  const ultimaChecagemIngresso = useRef(0)
+  const navigate = useNavigate()
 
   // Recontagem ao trocar de tela, com freio.
   //
@@ -110,6 +116,26 @@ function Casca() {
       cancelado = true
     }
   }, [api, pathname])
+
+  // Comemoração do ingresso: ao abrir o app e a cada troca de tela, com o
+  // mesmo freio de um minuto (são consultas ao banco, não ao navegador).
+  useEffect(() => {
+    if (!userId) return
+    const agora = Date.now()
+    if (agora - ultimaChecagemIngresso.current < ESPERA_CONTAGEM_MS) return
+    ultimaChecagemIngresso.current = agora
+    // Sem cancelar na troca de tela: a checagem já gastou a vez do minuto
+    void api
+      .ingressosDoPerfil(userId)
+      .then((lista) => setComemorar((atual) => atual ?? proximaComemoracao(lista, jaVisto)))
+      // Sem a migração 043 não há ingressos: segue sem comemorar
+      .catch(() => {})
+  }, [api, userId, pathname])
+
+  const fecharComemoracao = () => {
+    if (comemorar) marcarVisto(comemorar)
+    setComemorar(null)
+  }
 
   // Cada tela nova começa do topo, como num app nativo
   useEffect(() => {
@@ -155,6 +181,17 @@ function Casca() {
             <Aba to="/perfil" icone="pessoa" rotulo="Eu" ativa={aba === 'eu'} />
           </div>
         </nav>
+      )}
+
+      {!imersiva && (
+        <FolhaIngresso
+          ingresso={comemorar}
+          onFechar={fecharComemoracao}
+          onVerPerfil={() => {
+            fecharComemoracao()
+            navigate('/perfil')
+          }}
+        />
       )}
     </div>
   )
