@@ -35,6 +35,7 @@ export function ChallengeForm({
     local: desafio?.local ?? null,
     entrada_restrita: desafio?.entrada_restrita ?? false,
     modalidades: desafio?.modalidades ?? ['checkin'],
+    ingresso: desafio?.ingresso ?? null,
   })
   // Fora do ChallengeInput: só vai ao banco se mudar, então editar um
   // desafio continua funcionando antes de a migração 035 rodar

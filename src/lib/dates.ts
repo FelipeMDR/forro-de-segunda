@@ -170,6 +170,22 @@ export function janelaDoCheckin(
     return abertura !== undefined && abertura < inicio ? abertura : inicio
   }
 
+  // Noite extra (ex.: Forró na Rep): festa avulsa, fora da grade semanal.
+  // Vale só na própria data, não depende do período do desafio e vale
+  // mesmo com o dia suspenso — a organização marcou o evento de propósito.
+  // Se atravessa a meia-noite, a madrugada seguinte ainda é da noite.
+  for (const n of c.noites_extras ?? []) {
+    const inicio = parseTime(n.hora_inicio)
+    const fim = parseTime(n.hora_fim)
+    const hoje = toISODate(d)
+    if (fim < inicio) {
+      if (hoje === n.data && minutos >= inicio) return n.data
+      if (minutos <= fim && toISODate(addDays(d, -1)) === n.data) return n.data
+    } else if (hoje === n.data && minutos >= inicio && minutos <= fim) {
+      return n.data
+    }
+  }
+
   for (const j of c.janelas) {
     const inicio = parseTime(j.hora_inicio)
     const fim = parseTime(j.hora_fim)

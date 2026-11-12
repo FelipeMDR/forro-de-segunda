@@ -1394,6 +1394,9 @@ export class SupabaseApi implements ForroApi {
       modalidades: modalidadesValidas(c.modalidades),
       // Sem a migração 035 a coluna não existe: Forródex do semestre
       forrodex: c.forrodex === true,
+      // Task 4 preenche de verdade (vem da API)
+      ingresso: null,
+      noites_extras: [],
       // Ausente enquanto a migração 008 não roda — sem trava de local
       local:
         c.local_lat != null && c.local_lng != null

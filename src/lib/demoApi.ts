@@ -1189,6 +1189,9 @@ export class DemoApi implements ForroApi {
       // que é como o desafio funcionava.
       modalidades: c.modalidades?.length ? c.modalidades : ['checkin'],
       forrodex: c.forrodex === true,
+      // Task 4 preenche de verdade (vem da API)
+      ingresso: null,
+      noites_extras: [],
       participantes: this.db.members.filter((m) => m.challenge_id === c.id)
         .length,
       sou_membro: this.db.members.some(

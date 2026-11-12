@@ -268,9 +268,51 @@ export interface Challenge {
    * enxerga — para os alunos é só a Forródex de sempre.
    */
   forrodex: boolean
+  /**
+   * Desafio de ingresso (ex.: Forró na Rep): o evento, os ids de desafios
+   * que ganham a noite extra e os textos dos distintivos. null nos demais.
+   */
+  ingresso: IngressoConfig | null
+  /**
+   * Noites fora da janela semanal que também contam neste desafio. Não vem
+   * do banco: é derivada de `ingresso` por `aplicarNoitesExtras`.
+   */
+  noites_extras: NoiteExtra[]
   criado_por: string | null
   participantes: number
   sou_membro: boolean
+}
+
+/** Uma noite avulsa que conta como janela do desafio. */
+export interface NoiteExtra {
+  data: string // "AAAA-MM-DD"
+  hora_inicio: string // "HH:MM"
+  hora_fim: string // "HH:MM"; menor que o início = atravessa a meia-noite
+}
+
+export interface TextoDistintivo {
+  emoji: string
+  titulo: string
+}
+
+export interface IngressoConfig {
+  evento_data: string
+  evento_inicio: string
+  evento_fim: string
+  /** Ids de desafios que também ganham a noite do evento. */
+  noite_extra_para: string[]
+  garantido: TextoDistintivo
+  presenca: TextoDistintivo
+}
+
+/** Linha de `ingressos_do_perfil`: o distintivo de ingresso de um perfil. */
+export interface IngressoPerfil {
+  desafio_id: string
+  titulo: string
+  estado: 'garantido' | 'presenca'
+  emoji: string
+  titulo_distintivo: string
+  desde: string | null
 }
 
 export interface ChallengeInput {
@@ -283,6 +325,7 @@ export interface ChallengeInput {
   local: ChallengeLocal | null
   entrada_restrita: boolean
   modalidades: Modalidade[]
+  ingresso: IngressoConfig | null
 }
 
 /**
