@@ -144,7 +144,9 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
                 <ul className="flex flex-col gap-0.5 text-ink2">
                   {status.invalidos.map((l) => (
                     <li key={`i${l.linha}`}>
-                      Linha {l.linha} — {l.nome}: telefone sem DDD
+                      {/* O resumo não diz o motivo: vazio, curto e sem DDD
+                          caem todos aqui */}
+                      Linha {l.linha} — {l.nome}: telefone inválido (sem DDD ou incompleto)
                     </li>
                   ))}
                 </ul>
