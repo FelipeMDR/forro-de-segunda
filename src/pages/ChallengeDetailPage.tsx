@@ -5,6 +5,7 @@ import { ChallengeForm } from '../components/ChallengeForm'
 import { ErrorState } from '../components/ErrorState'
 import { Icone } from '../components/Icone'
 import { ParticipantesDesafio } from '../components/ParticipantesDesafio'
+import { SincronizacaoPlanilha } from '../components/SincronizacaoPlanilha'
 import { Spinner } from '../components/Spinner'
 import {
   BotaoAcao,
@@ -491,6 +492,10 @@ export function ChallengeDetailPage() {
           <section className="rounded-[20px] border border-linha bg-sf p-4">
             <ParticipantesDesafio desafio={desafio} onMudou={() => void carregar()} />
           </section>
+        )}
+
+        {papel === 'organizador' && desafio.ingresso && (
+          <SincronizacaoPlanilha desafio={desafio} />
         )}
 
         {papel === 'organizador' && (
