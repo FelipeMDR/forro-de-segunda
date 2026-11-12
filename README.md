@@ -345,10 +345,10 @@ A cada semestre, para o desafio de ingresso da festa:
 
 1. **Migração 043:** rode `supabase/migracoes/043-desafio-de-ingresso.sql` no SQL Editor do
    Supabase e clique em "Reload schema cache" (só na primeira vez).
-2. **Crie o desafio de ingresso** (entrada restrita): data e horário da
+2. **Crie o desafio de ingresso** (opção "Desafio de ingresso" do formulário): data e horário da
    festa, a noite extra que também pontua no Espaço Livre e os textos dos
    distintivos "Ingresso garantido" e "Marquei presença".
-3. No desafio, abra o painel **Sincronização com a planilha** e gere o
+3. No desafio, abra o painel **Planilha de ingressos** e gere o
    script.
 4. Em [script.google.com](https://script.google.com), crie um projeto, cole
    o script, rode a função `instalar` e autorize o acesso à planilha.
