@@ -1482,21 +1482,47 @@ export class SupabaseApi implements ForroApi {
       // Nunca vazio: o banco recusa (constraint da migração 024), e o
       // formulário também não deixa desmarcar tudo.
       modalidades: data.modalidades.length > 0 ? data.modalidades : ['checkin'],
-      // Desafio de ingresso (migração 043); os demais gravam tudo nulo
-      evento_data: data.ingresso?.evento_data ?? null,
-      evento_inicio: data.ingresso?.evento_inicio ?? null,
-      evento_fim: data.ingresso?.evento_fim ?? null,
-      noite_extra_para: data.ingresso?.noite_extra_para ?? [],
-      ingresso_emoji: data.ingresso?.garantido.emoji ?? null,
-      ingresso_titulo: data.ingresso?.garantido.titulo ?? null,
-      presenca_emoji: data.ingresso?.presenca.emoji ?? null,
-      presenca_titulo: data.ingresso?.presenca.titulo ?? null,
+      // Colunas da migração 043 só vão no envio quando é desafio de
+      // ingresso: sem a migração, salvar qualquer outro desafio não pode falhar
+      ...(data.ingresso
+        ? {
+            evento_data: data.ingresso.evento_data,
+            evento_inicio: data.ingresso.evento_inicio,
+            evento_fim: data.ingresso.evento_fim,
+            noite_extra_para: data.ingresso.noite_extra_para,
+            ingresso_emoji: data.ingresso.garantido.emoji,
+            ingresso_titulo: data.ingresso.garantido.titulo,
+            presenca_emoji: data.ingresso.presenca.emoji,
+            presenca_titulo: data.ingresso.presenca.titulo,
+          }
+        : {}),
     }
     let challengeId = data.id
     if (challengeId) {
       ok(
         await this.sb.from('challenges').update(valores).eq('id', challengeId),
       )
+      if (!data.ingresso) {
+        // Desafio que deixou de ser de ingresso: limpa as colunas da 043 à
+        // parte e sem exigir sucesso, para não quebrar sem a migração
+        await this.sb
+          .from('challenges')
+          .update({
+            evento_data: null,
+            evento_inicio: null,
+            evento_fim: null,
+            noite_extra_para: [],
+            ingresso_emoji: null,
+            ingresso_titulo: null,
+            presenca_emoji: null,
+            presenca_titulo: null,
+          })
+          .eq('id', challengeId)
+          .then(
+            () => undefined,
+            () => undefined,
+          )
+      }
     } else {
       const uid = await this.requireUid()
       const criado = ok(
@@ -2557,7 +2583,7 @@ export class SupabaseApi implements ForroApi {
     if (error) throw new Error(traduz(error.message))
   }
 
-  async listAcessosTrilha():Promise<Record<string, NivelTrilha>> {
+  async listAcessosTrilha(): Promise<Record<string, NivelTrilha>> {
     const data = await todasAsLinhas<{ user_id: string; nivel: NivelTrilha }>((de, ate) =>
       this.sb.from('trilha_acesso').select('user_id, nivel').order('user_id').range(de, ate),
     ).catch(() => [])
