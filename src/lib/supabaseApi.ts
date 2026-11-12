@@ -1499,12 +1499,12 @@ export class SupabaseApi implements ForroApi {
     }
     let challengeId = data.id
     if (challengeId) {
-      ok(
-        await this.sb.from('challenges').update(valores).eq('id', challengeId),
-      )
       if (!data.ingresso) {
         // Desafio que deixou de ser de ingresso: limpa as colunas da 043 à
-        // parte e sem exigir sucesso, para não quebrar sem a migração
+        // parte e sem exigir sucesso, para não quebrar sem a migração.
+        // ANTES da atualização principal: ela pode desligar a entrada
+        // restrita, e com `evento_data` ainda preenchido o banco recusaria
+        // (constraint `challenges_ingresso_completo`).
         await this.sb
           .from('challenges')
           .update({
@@ -1523,6 +1523,9 @@ export class SupabaseApi implements ForroApi {
             () => undefined,
           )
       }
+      ok(
+        await this.sb.from('challenges').update(valores).eq('id', challengeId),
+      )
     } else {
       const uid = await this.requireUid()
       const criado = ok(
