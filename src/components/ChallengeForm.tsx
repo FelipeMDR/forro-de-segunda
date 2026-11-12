@@ -1,15 +1,17 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { toISODate } from '../lib/dates'
 import { mensagemForrodexOcupada } from '../lib/forrodex'
 import { obterPosicao } from '../lib/geo'
+import { alvosDaNoiteExtra, textosPadraoIngresso } from '../lib/ingresso'
 import {
   DIAS_ABREV,
   MODALIDADES,
   RAIO_LOCAL_PADRAO_M,
   type Challenge,
   type ChallengeInput,
+  type IngressoConfig,
   type Modalidade,
 } from '../lib/types'
 
@@ -44,6 +46,110 @@ export function ChallengeForm({
   const [salvando, setSalvando] = useState(false)
   const [buscandoLocal, setBuscandoLocal] = useState(false)
   const [precisao, setPrecisao] = useState<number | null>(null)
+
+  // Desafio de ingresso (clube): os textos dos distintivos acompanham o
+  // título até o organizador mexer neles; a lista de desafios que ganham
+  // a noite da festa vem pré-marcada até ele mexer nela.
+  const ingresso = form.ingresso
+  const [textosEditados, setTextosEditados] = useState(() => {
+    const cfg = desafio?.ingresso
+    if (!cfg) return false
+    const padrao = textosPadraoIngresso(desafio.titulo)
+    return (
+      cfg.garantido.emoji !== padrao.garantido.emoji ||
+      cfg.garantido.titulo !== padrao.garantido.titulo ||
+      cfg.presenca.emoji !== padrao.presenca.emoji ||
+      cfg.presenca.titulo !== padrao.presenca.titulo
+    )
+  })
+  const [alvosEditados, setAlvosEditados] = useState(!!desafio?.ingresso)
+  const [outrosDesafios, setOutrosDesafios] = useState<Challenge[]>([])
+  const alvos = ingresso
+    ? alvosDaNoiteExtra(outrosDesafios, ingresso.evento_data, desafio?.id)
+    : []
+  const idsAlvos = alvos.map((c) => c.id).join(',')
+
+  useEffect(() => {
+    if (!ingresso || outrosDesafios.length > 0) return
+    let cancelado = false
+    void api
+      .listChallenges()
+      .then((l) => {
+        if (!cancelado) setOutrosDesafios(l)
+      })
+      .catch((e) => toast((e as Error).message, 'erro'))
+    return () => {
+      cancelado = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, ingresso !== null])
+
+  useEffect(() => {
+    if (alvosEditados) return
+    setForm((f) =>
+      f.ingresso
+        ? {
+            ...f,
+            ingresso: { ...f.ingresso, noite_extra_para: idsAlvos ? idsAlvos.split(',') : [] },
+          }
+        : f,
+    )
+  }, [idsAlvos, alvosEditados])
+
+  const mudarIngresso = (patch: Partial<IngressoConfig>) =>
+    setForm((f) => (f.ingresso ? { ...f, ingresso: { ...f.ingresso, ...patch } } : f))
+
+  const mudarTitulo = (titulo: string) =>
+    setForm((f) => ({
+      ...f,
+      titulo,
+      ingresso:
+        f.ingresso && !textosEditados
+          ? { ...f.ingresso, ...textosPadraoIngresso(titulo) }
+          : f.ingresso,
+    }))
+
+  const alternarIngresso = (ligar: boolean) =>
+    setForm((f) => {
+      if (!ligar) {
+        return {
+          ...f,
+          ingresso: null,
+          entrada_restrita: desafio && !desafio.ingresso ? desafio.entrada_restrita : false,
+        }
+      }
+      return {
+        ...f,
+        ingresso: desafio?.ingresso ?? {
+          evento_data: f.data_inicio,
+          evento_inicio: '18:00',
+          evento_fim: '04:00',
+          noite_extra_para: [],
+          ...textosPadraoIngresso(f.titulo),
+        },
+        entrada_restrita: true,
+        janelas: [],
+        local: null,
+        modalidades: ['checkin'],
+      }
+    })
+
+  const alternarAlvo = (id: string) => {
+    setAlvosEditados(true)
+    setForm((f) => {
+      if (!f.ingresso) return f
+      const lista = f.ingresso.noite_extra_para
+      return {
+        ...f,
+        ingresso: {
+          ...f.ingresso,
+          noite_extra_para: lista.includes(id)
+            ? lista.filter((x) => x !== id)
+            : [...lista, id],
+        },
+      }
+    })
+  }
 
   // O organizador marca o ponto estando no lugar — bem mais simples do
   // que pedir coordenada, e é o que ele já vai fazer numa aula.
@@ -157,24 +263,54 @@ export function ChallengeForm({
       toast('A data final precisa ser depois da inicial', 'erro')
       return
     }
-    if (form.janelas.length === 0) {
+    if (ingresso) {
+      if (ingresso.evento_data < form.data_inicio || ingresso.evento_data > form.data_fim) {
+        toast('A data da festa precisa estar dentro do período do desafio', 'erro')
+        return
+      }
+      if (!ingresso.evento_inicio || !ingresso.evento_fim || ingresso.evento_inicio === ingresso.evento_fim) {
+        toast('Informe o horário da festa (início e fim diferentes)', 'erro')
+        return
+      }
+      if (!ingresso.garantido.titulo.trim() || !ingresso.presenca.titulo.trim()) {
+        toast('Os dois distintivos precisam de título', 'erro')
+        return
+      }
+    } else if (form.janelas.length === 0) {
       toast(
         'Configure pelo menos um dia com horário de check-in',
         'erro',
       )
       return
     }
-    if (form.local && form.local.lat === 0 && form.local.lng === 0) {
+    if (!ingresso && form.local && form.local.lat === 0 && form.local.lng === 0) {
       toast('Marque o local no botão "Marcar onde estou agora"', 'erro')
       return
     }
-    if (form.local && form.local.raio_m < 50) {
+    if (!ingresso && form.local && form.local.raio_m < 50) {
       toast('O raio precisa ser de pelo menos 50 metros', 'erro')
       return
     }
     setSalvando(true)
     try {
-      const id = await api.saveChallenge(form)
+      const entrada: ChallengeInput = ingresso
+        ? {
+            ...form,
+            entrada_restrita: true,
+            janelas: [],
+            local: null,
+            modalidades: ['checkin'],
+            ingresso: {
+              ...ingresso,
+              // só os que ainda cobrem a data (se a lista chegou)
+              noite_extra_para:
+                outrosDesafios.length > 0
+                  ? ingresso.noite_extra_para.filter((id) => idsAlvos.split(',').includes(id))
+                  : ingresso.noite_extra_para,
+            },
+          }
+        : form
+      const id = await api.saveChallenge(entrada)
       if (forrodex !== (desafio?.forrodex ?? false)) {
         await api.definirForrodex(id, forrodex)
       }
@@ -217,7 +353,7 @@ export function ChallengeForm({
             className="input"
             placeholder='Ex.: "Copa de agosto"'
             value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            onChange={(e) => mudarTitulo(e.target.value)}
             required
           />
         </div>
@@ -263,9 +399,148 @@ export function ChallengeForm({
           </div>
         </div>
 
+        {/* Clube de ingresso: sem ranking, sem janelas. Quem está na lista
+            ganha o distintivo, que evolui com o check-in na noite da festa. */}
+        <div className="space-y-3 rounded-2xl bg-chip p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">
+                🎟️ Desafio de ingresso (clube, sem ranking)
+              </p>
+              <p className="text-[11px] text-tinta-500">
+                Quem está na lista de ingressos ganha um distintivo, que
+                evolui quando a pessoa marca presença na noite da festa.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
+              aria-label="Desafio de ingresso"
+              checked={ingresso !== null}
+              onChange={(e) => alternarIngresso(e.target.checked)}
+            />
+          </div>
+
+          {ingresso && (
+            <>
+              <div>
+                <label className="label" htmlFor="evento-data">
+                  Data da festa
+                </label>
+                <input
+                  id="evento-data"
+                  type="date"
+                  className="input"
+                  value={ingresso.evento_data}
+                  min={form.data_inicio}
+                  max={form.data_fim}
+                  onChange={(e) => mudarIngresso({ evento_data: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="evento-inicio">
+                    Começa às
+                  </label>
+                  <input
+                    id="evento-inicio"
+                    type="time"
+                    className="input"
+                    value={ingresso.evento_inicio}
+                    onChange={(e) => mudarIngresso({ evento_inicio: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="evento-fim">
+                    Termina às
+                  </label>
+                  <input
+                    id="evento-fim"
+                    type="time"
+                    className="input"
+                    value={ingresso.evento_fim}
+                    onChange={(e) => mudarIngresso({ evento_fim: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              {ingresso.evento_fim < ingresso.evento_inicio && (
+                <p className="text-xs text-bl-t">
+                  🌙 Vira a noite: termina às {ingresso.evento_fim} da madrugada
+                  seguinte.
+                </p>
+              )}
+
+              {(['garantido', 'presenca'] as const).map((estado) => (
+                <div key={estado} className="space-y-1">
+                  <span className="label">
+                    {estado === 'garantido'
+                      ? 'Distintivo de quem está na lista'
+                      : 'Distintivo de quem marcou presença'}
+                  </span>
+                  <div className="grid grid-cols-[64px_1fr] gap-2">
+                    <input
+                      className="input text-center"
+                      aria-label="Emoji do distintivo"
+                      maxLength={8}
+                      value={ingresso[estado].emoji}
+                      onChange={(e) => {
+                        setTextosEditados(true)
+                        mudarIngresso({
+                          [estado]: { ...ingresso[estado], emoji: e.target.value },
+                        })
+                      }}
+                    />
+                    <input
+                      className="input"
+                      aria-label="Título do distintivo"
+                      value={ingresso[estado].titulo}
+                      onChange={(e) => {
+                        setTextosEditados(true)
+                        mudarIngresso({
+                          [estado]: { ...ingresso[estado], titulo: e.target.value },
+                        })
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <div className="space-y-1">
+                <span className="label">A noite da festa também vale em:</span>
+                {alvos.length === 0 ? (
+                  <p className="text-[11px] text-tinta-500">
+                    Nenhum outro desafio cobre essa data.
+                  </p>
+                ) : (
+                  alvos.map((c) => (
+                    <label key={c.id} className="flex cursor-pointer items-center gap-3 py-1">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 accent-brasa-500"
+                        checked={ingresso.noite_extra_para.includes(c.id)}
+                        onChange={() => alternarAlvo(c.id)}
+                      />
+                      <span className="text-sm font-bold">{c.titulo}</span>
+                    </label>
+                  ))
+                )}
+                <p className="text-[11px] text-tinta-500">
+                  Check-in na festa, no horário acima, conta como presença nesses
+                  desafios também.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Quais disputas rodam neste desafio. Duas ou mais convivem no
             mesmo período, com a mesma inscrição — o aluno compete em
             todas sem fazer nada a mais. */}
+        {!ingresso && (
+        <>
         <div className="space-y-2 rounded-2xl bg-chip p-3">
           <span className="label">Disputas deste desafio</span>
           {MODALIDADES.map((m) => {
@@ -405,6 +680,8 @@ export function ChallengeForm({
             novo substitui.
           </p>
         </div>
+        </>
+        )}
 
         <div className="space-y-3 rounded-2xl bg-chip p-4">
           <div className="flex items-start justify-between gap-3">
@@ -421,6 +698,7 @@ export function ChallengeForm({
               className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
               aria-label="Entrada só pela organização"
               checked={form.entrada_restrita}
+              disabled={ingresso !== null}
               onChange={(e) =>
                 setForm((f) => ({ ...f, entrada_restrita: e.target.checked }))
               }
@@ -449,6 +727,7 @@ export function ChallengeForm({
           </div>
         </div>
 
+        {!ingresso && (
         <div className="space-y-3 rounded-2xl bg-chip p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -556,6 +835,7 @@ export function ChallengeForm({
             </>
           )}
         </div>
+        )}
 
         <div className="flex gap-2">
           <button type="button" className="btn-ghost flex-1" onClick={onClose}>

@@ -55,6 +55,30 @@ export function aplicarNoitesExtras(desafios: Challenge[]): Challenge[] {
   return r
 }
 
+/**
+ * Desafios que podem receber a noite da festa: os outros desafios comuns
+ * cujo período inclui a data do evento (os de ingresso trazem a própria noite).
+ */
+export function alvosDaNoiteExtra(
+  desafios: Challenge[],
+  eventoData: string,
+  idProprio?: string,
+): Challenge[] {
+  return desafios.filter(
+    (c) =>
+      c.id !== idProprio &&
+      !c.ingresso &&
+      c.data_inicio <= eventoData &&
+      eventoData <= c.data_fim,
+  )
+}
+
+/** "Festa em 05/12, das 18:00 às 04:00" */
+export function rotuloFesta(cfg: IngressoConfig): string {
+  const [, mes, dia] = cfg.evento_data.split('-')
+  return `Festa em ${dia}/${mes}, das ${cfg.evento_inicio} às ${cfg.evento_fim}`
+}
+
 /** Distintivo de ingresso do perfil; o id não muda entre os estados. */
 export function badgeDeIngresso(i: IngressoPerfil): Badge {
   return {

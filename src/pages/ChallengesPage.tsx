@@ -58,7 +58,7 @@ function CartaoDesafio({ c }: { c: Challenge }) {
         {c.sou_membro && <Etiqueta cor="verde" className="shrink-0 text-xs">Participando</Etiqueta>}
       </div>
       <span className="text-sm text-ink3">
-        {periodoCurto(c.data_inicio, c.data_fim)} · {nomesModalidades(c)} ·{' '}
+        {periodoCurto(c.data_inicio, c.data_fim)} · {c.ingresso ? '🎟️ Clube' : nomesModalidades(c)} ·{' '}
         {c.participantes} {c.participantes === 1 ? 'pessoa' : 'pessoas'}
       </span>
       {c.janelas.length > 0 && (

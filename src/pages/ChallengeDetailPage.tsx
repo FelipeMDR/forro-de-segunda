@@ -24,6 +24,7 @@ import {
   suspensoesDoDesafio,
 } from '../lib/dates'
 import { diaCurto, faixasDeHorario, periodoCurto } from '../lib/horarios'
+import { rotuloFesta } from '../lib/ingresso'
 import { colocacoes } from '../lib/ranking'
 import {
   defModalidade,
@@ -31,6 +32,7 @@ import {
   type AberturaAntecipada,
   type Challenge,
   type Feriado,
+  type IngressoPerfil,
   type Modalidade,
   type RankingEntry,
 } from '../lib/types'
@@ -148,6 +150,23 @@ export function ChallengeDetailPage() {
     void carregar()
   }, [carregar])
 
+  // Desafio de ingresso: o distintivo da própria pessoa (garantido/presença)
+  const [meuDistintivo, setMeuDistintivo] = useState<IngressoPerfil | null>(null)
+  const ehClube = !!desafio?.ingresso
+  useEffect(() => {
+    if (!ehClube || !userId || !id) return
+    let cancelado = false
+    void api
+      .ingressosDoPerfil(userId)
+      .then((l) => {
+        if (!cancelado) setMeuDistintivo(l.find((i) => i.desafio_id === id) ?? null)
+      })
+      .catch((e) => console.error('[desafio] falha ao carregar distintivo', e))
+    return () => {
+      cancelado = true
+    }
+  }, [api, userId, id, ehClube, ranking])
+
   // O ranking recarrega sozinho ao trocar de aba, sem rebuscar o resto
   useEffect(() => {
     if (!desafio || !modalidade) return
@@ -187,6 +206,7 @@ export function ChallengeDetailPage() {
   const status = statusDoDesafio(desafio)
   const suspensoes = suspensoesDoDesafio(desafio, feriados)
   const aberturas = aberturasDoDesafio(desafio, aberturasAntecipadas)
+  const cfg = desafio.ingresso
   const modalidadeAtual = modalidade ?? desafio.modalidades[0]
   const def = defModalidade(modalidadeAtual)
   const classificacao = colocacoes(ranking)
@@ -274,7 +294,9 @@ export function ChallengeDetailPage() {
         <div className="flex flex-col gap-3 rounded-[20px] border border-linha bg-sf p-4">
           <span className="text-[15px] leading-relaxed text-ink2 [text-wrap:pretty]">
             {desafio.descricao ||
-              'Vale uma presença por janela com check-in dentro dos horários — várias fotos na mesma janela contam uma vez.'}
+              (cfg
+                ? 'Clube de quem tem ingresso: o distintivo evolui quando você marca presença na festa.'
+                : 'Vale uma presença por janela com check-in dentro dos horários — várias fotos na mesma janela contam uma vez.')}
           </span>
           {desafio.janelas.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -342,6 +364,72 @@ export function ChallengeDetailPage() {
           )
         )}
 
+        {cfg ? (
+          <>
+            <div className="flex flex-col gap-1.5 rounded-[20px] border border-linha bg-sf p-4">
+              <span className="text-[15px] font-extrabold">{rotuloFesta(cfg)}</span>
+              {meuDistintivo ? (
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-[34px] leading-none">{meuDistintivo.emoji}</span>
+                  <span className="flex flex-col">
+                    <span className="text-base font-extrabold">{meuDistintivo.titulo_distintivo}</span>
+                    <span className="text-[13px] text-ink3">
+                      {meuDistintivo.estado === 'presenca'
+                        ? 'Presença marcada na festa'
+                        : 'Seu ingresso está garantido. Faça check-in na festa para marcar presença.'}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[13px] leading-snug text-ink3">
+                  {desafio.sou_membro
+                    ? 'Seu distintivo aparece aqui em instantes.'
+                    : 'Você não está na lista deste clube.'}
+                </span>
+              )}
+            </div>
+
+            <RotuloSecao>
+              {ranking.length} no clube · {ranking.filter((r) => r.pontos > 0).length} marcaram presença
+            </RotuloSecao>
+            {ranking.length === 0 ? (
+              <p className="rounded-2xl border border-linha bg-sf px-4 py-6 text-center text-[15px] text-ink3">
+                Ninguém no clube ainda.
+              </p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {ranking.map((r) => {
+                  const eu = r.user_id === userId
+                  const marcou = r.pontos > 0
+                  return (
+                    <li key={r.user_id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(eu ? '/perfil' : `/perfil/${r.user_id}`)}
+                        className="flex w-full items-center gap-3 rounded-2xl border-[1.5px] px-3.5 py-2.5 text-left"
+                        style={{
+                          background: eu ? 'rgba(222,83,0,.12)' : 'var(--sf)',
+                          borderColor: eu ? '#DE5300' : 'var(--line)',
+                        }}
+                      >
+                        <Avatar nome={r.nome} url={r.avatar_url} tamanho={32} borda={false} />
+                        <span className={`min-w-0 flex-1 truncate text-base ${eu ? 'font-extrabold' : 'font-semibold'}`}>
+                          {eu ? `Você · ${meuNome ?? r.nome}` : r.nome}
+                        </span>
+                        {marcou && (
+                          <span className="shrink-0 text-lg font-extrabold text-or-t" aria-label="Marcou presença">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </>
+        ) : (
+        <>
         {desafio.modalidades.length > 1 && (
           <Segmentado
             valor={modalidadeAtual}
@@ -396,6 +484,8 @@ export function ChallengeDetailPage() {
             })}
           </ol>
         )}
+        </>
+        )}
 
         {papel === 'organizador' && desafio.entrada_restrita && (
           <section className="rounded-[20px] border border-linha bg-sf p-4">
@@ -410,7 +500,7 @@ export function ChallengeDetailPage() {
               <BotaoSuave className="flex-1" onClick={() => setEditando(true)}>
                 Editar
               </BotaoSuave>
-              {ranking.length > 0 && (
+              {ranking.length > 0 && !cfg && (
                 <BotaoSuave className="flex-1" onClick={exportarCSV}>
                   Resultado CSV
                 </BotaoSuave>

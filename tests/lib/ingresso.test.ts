@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { janelaDoCheckin } from '../../src/lib/dates'
 import {
+  alvosDaNoiteExtra,
   aplicarNoitesExtras,
   badgeDeIngresso,
   noiteDoEvento,
+  rotuloFesta,
   textosPadraoIngresso,
 } from '../../src/lib/ingresso'
 import type { Challenge, IngressoConfig, IngressoPerfil } from '../../src/lib/types'
@@ -141,5 +143,23 @@ describe('badgeDeIngresso', () => {
     expect(a.descricao).toBe('Garantiu o ingresso')
     expect(b.descricao).toBe('Marcou presença na festa')
     expect(a.alcancadoEm).toBe('2026-11-10')
+  })
+})
+
+describe('alvosDaNoiteExtra', () => {
+  it('lista só os outros desafios comuns que cobrem a data', () => {
+    const fora = desafio({ id: 'fora', data_inicio: '2026-01-01', data_fim: '2026-02-01' })
+    const alvos = alvosDaNoiteExtra([espacoLivre, ingresso, fora], '2026-12-05', 'novo')
+    expect(alvos.map((c) => c.id)).toEqual(['livre'])
+  })
+
+  it('nunca oferece o próprio desafio', () => {
+    expect(alvosDaNoiteExtra([espacoLivre], '2026-12-05', 'livre')).toEqual([])
+  })
+})
+
+describe('rotuloFesta', () => {
+  it('descreve data e horário', () => {
+    expect(rotuloFesta(cfg([]))).toBe('Festa em 05/12, das 18:00 às 04:00')
   })
 })
