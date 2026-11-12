@@ -1270,6 +1270,357 @@ $$;
 
 grant execute on function public.marcar_presenca_ingresso(uuid, uuid, boolean) to authenticated;
 
+-- ---------- Sincronização da planilha ----------
+
+-- O "agora" da sincronização. Em produção é só now(); existe para os
+-- testes simularem o dia seguinte à festa com `create or replace`.
+create or replace function public.ingresso_agora()
+returns timestamptz
+language sql stable
+as $$ select now() $$;
+
+-- Dígitos do telefone como veio da planilha. Quem copia do formulário
+-- traz o +55 (12 ou 13 dígitos), e com ele `telefone_ddd` não acha o DDD;
+-- por isso o 55 sai antes de validar.
+create or replace function public.telefone_da_planilha(t text)
+returns text
+language sql immutable
+as $$
+  select case
+    when length(d) in (12, 13) and left(d, 2) = '55' then substr(d, 3)
+    else d
+  end
+  from (select regexp_replace(coalesce(t, ''), '\D', '', 'g') as d) x;
+$$;
+
+-- Quem a planilha trouxe e não está mais nela: `origem 'planilha'` cujo
+-- telefone não bate com nenhuma das chaves (DDD + linha) da grade. A
+-- sincronização e a confirmação da organização usam esta mesma
+-- definição. Com `p_apagar = false` só conta.
+-- Sair do desafio tira o distintivo derivado (é de quem é membro), mas
+-- `ingresso_presencas` fica: se a pessoa voltar, a correção volta junto.
+create or replace function public.remover_fora_da_planilha(
+  p_desafio uuid, p_chaves text[], p_apagar boolean
+)
+returns int
+language sql
+set search_path = public
+as $$
+  with fora_membros as (
+    select m.user_id from challenge_members m
+    where m.challenge_id = p_desafio
+      and m.origem = 'planilha'
+      and not exists (
+        select 1 from profiles p, unnest(p_chaves) k
+        where p.id = m.user_id and public.telefones_batem(p.telefone, k)
+      )
+  ),
+  fora_convidados as (
+    select v.telefone from challenge_convidados v
+    where v.challenge_id = p_desafio
+      and v.origem = 'planilha'
+      and not exists (
+        select 1 from unnest(p_chaves) k where public.telefones_batem(v.telefone, k)
+      )
+  ),
+  apaga_membros as (
+    delete from challenge_members m
+    using fora_membros f
+    where p_apagar and m.challenge_id = p_desafio and m.user_id = f.user_id
+  ),
+  apaga_convidados as (
+    delete from challenge_convidados v
+    using fora_convidados f
+    where p_apagar and v.challenge_id = p_desafio and v.telefone = f.telefone
+  )
+  select ((select count(*) from fora_membros) + (select count(*) from fora_convidados))::int;
+$$;
+
+-- Interna: por API, apagaria gente sem segredo nem organização.
+revoke execute on function public.remover_fora_da_planilha(uuid, text[], boolean)
+  from public, anon, authenticated;
+
+-- Chamada pelo Apps Script com a chave anon. Quem protege é o segredo do
+-- desafio. A resposta só tem índice e situação de cada linha e contagens:
+-- nome e linha dos avisos vão para `ingresso_sincronizacoes`, que só a
+-- organização lê.
+create or replace function public.sincronizar_planilha_ingresso(p_segredo text, p_grade jsonb)
+returns jsonb
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_desafio uuid;
+  v_congelado boolean;
+  v_grade jsonb := case when jsonb_typeof(p_grade) = 'array' then p_grade else '[]' end;
+  v_total int;
+  v_cab int;
+  c_nome int;
+  c_tel int;
+  c_marcar int;
+  a_nome int;
+  a_tel int;
+  a_marcar int;
+  v_linha jsonb;
+  v_nome text;
+  v_cel text;
+  v_tel text;
+  v_chave text;
+  v_perfis uuid[];
+  v_sit text;
+  v_status text;
+  v_chaves text[] := '{}';
+  v_linhas jsonb := '[]';
+  v_invalidos jsonb := '[]';
+  v_ambiguos jsonb := '[]';
+  n_dentro int := 0;
+  n_aguardando int := 0;
+  n_da_planilha int;
+  n_fora int := 0;
+  n_removidos int := 0;
+  n_travadas int := 0;
+begin
+  -- `for update`: duas sincronizações do mesmo desafio esperam uma a outra
+  select s.challenge_id,
+         -- Congelamento (spec, "Congelamento depois do evento"): do dia
+         -- seguinte à festa em diante, nada entra nem sai. Se a planilha
+         -- for limpa ou reaproveitada, a edição que passou não perde os
+         -- distintivos. `noite_do_checkin` vira o dia às 05:00, então a
+         -- madrugada da festa ainda conta como dia da festa.
+         coalesce(public.noite_do_checkin(public.ingresso_agora()) > c.evento_data, false)
+    into v_desafio, v_congelado
+  from ingresso_segredos s
+  join challenges c on c.id = s.challenge_id
+  where c.evento_data is not null
+    and s.segredo_hash = encode(sha256(convert_to(coalesce(p_segredo, ''), 'UTF8')), 'hex')
+  for update of s;
+
+  if v_desafio is null then
+    raise exception 'Segredo inválido';
+  end if;
+
+  -- A base da trava é quem já vinha da planilha antes deste envio
+  select (select count(*) from challenge_members
+           where challenge_id = v_desafio and origem = 'planilha')
+       + (select count(*) from challenge_convidados
+           where challenge_id = v_desafio and origem = 'planilha')
+    into n_da_planilha;
+
+  -- Cabeçalho: a primeira linha com uma célula NOME e outra CELULAR ou
+  -- TELEFONE (sem diferenciar maiúsculas e acentos). A coluna de marcar
+  -- é a que começa com ADICIONADO, e é opcional.
+  v_total := jsonb_array_length(v_grade);
+  for i in 0 .. v_total - 1 loop
+    select
+      min(e.k - 1) filter (where e.t = 'NOME'),
+      min(e.k - 1) filter (where e.t in ('CELULAR', 'TELEFONE')),
+      min(e.k - 1) filter (where e.t like 'ADICIONADO%')
+      into a_nome, a_tel, a_marcar
+    from (
+      select k, upper(translate(trim(v),
+        'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+        'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')) as t
+      from jsonb_array_elements_text(
+        case when jsonb_typeof(v_grade -> i) = 'array' then v_grade -> i else '[]' end
+      ) with ordinality as x(v, k)
+    ) e;
+
+    if a_nome is not null and a_tel is not null then
+      v_cab := i;
+      c_nome := a_nome;
+      c_tel := a_tel;
+      c_marcar := a_marcar;
+      exit;
+    end if;
+  end loop;
+
+  if v_cab is not null then
+    for i in v_cab + 1 .. v_total - 1 loop
+      v_linha := case when jsonb_typeof(v_grade -> i) = 'array' then v_grade -> i else '[]' end;
+      v_nome := trim(coalesce(v_linha ->> c_nome, ''));
+      v_cel := trim(coalesce(v_linha ->> c_tel, ''));
+      -- Linhas numeradas (QT.) sem nome nem telefone, no fim da lista
+      continue when v_nome = '' and v_cel = '';
+
+      v_tel := public.telefone_da_planilha(v_cel);
+      v_sit := null;
+
+      if public.telefone_ddd(v_tel) is null or length(public.telefone_linha(v_tel)) <> 8 then
+        v_sit := 'telefone_invalido';
+        v_invalidos := v_invalidos || jsonb_build_array(
+          jsonb_build_object('linha', i + 1, 'nome', v_nome));
+      else
+        v_chave := public.telefone_ddd(v_tel) || public.telefone_linha(v_tel);
+
+        if v_chave = any(v_chaves) then
+          v_sit := 'repetido';
+        else
+          v_chaves := v_chaves || v_chave;
+          select array_agg(p.id) into v_perfis
+          from profiles p
+          where public.telefones_batem(p.telefone, v_chave);
+
+          if coalesce(cardinality(v_perfis), 0) > 1 then
+            -- Contas antigas sem DDD casam só pela linha: ninguém entra
+            -- por aqui, e a organização resolve à mão
+            v_sit := 'ambiguo';
+            v_ambiguos := v_ambiguos || jsonb_build_array(
+              jsonb_build_object('linha', i + 1, 'nome', v_nome));
+          elsif cardinality(v_perfis) = 1 then
+            if v_congelado then
+              -- Só lê: fora do desafio, a linha não entra na resposta e o
+              -- script não mexe na caixa dela
+              if exists (select 1 from challenge_members
+                          where challenge_id = v_desafio and user_id = v_perfis[1]) then
+                v_sit := 'dentro';
+              end if;
+            else
+              -- Membro manual que está na planilha passa a ser da planilha
+              insert into challenge_members (challenge_id, user_id, origem)
+              values (v_desafio, v_perfis[1], 'planilha')
+              on conflict (challenge_id, user_id) do update set origem = 'planilha';
+              v_sit := 'dentro';
+            end if;
+          else
+            if v_congelado then
+              if exists (select 1 from challenge_convidados
+                          where challenge_id = v_desafio
+                            and public.telefones_batem(telefone, v_chave)) then
+                v_sit := 'aguardando_conta';
+              end if;
+            else
+              update challenge_convidados
+                set origem = 'planilha',
+                    nome = coalesce(nullif(v_nome, ''), nome),
+                    telefone_exibicao = v_cel
+              where challenge_id = v_desafio
+                and public.telefones_batem(telefone, v_chave);
+              if not found then
+                -- Guarda a chave (DDD + linha), não os dígitos crus:
+                -- `normalizar_telefone` de um celular de 11 dígitos fica com
+                -- os 10 últimos e perde o primeiro dígito do DDD, e aí o
+                -- convite nunca bateria com o cadastro (`membro_por_convite`)
+                insert into challenge_convidados
+                  (challenge_id, telefone, telefone_exibicao, nome, origem)
+                values
+                  (v_desafio, public.normalizar_telefone(v_chave), v_cel,
+                   nullif(v_nome, ''), 'planilha')
+                on conflict (challenge_id, telefone) do nothing;
+              end if;
+              v_sit := 'aguardando_conta';
+            end if;
+          end if;
+        end if;
+      end if;
+
+      if v_sit is not null then
+        v_linhas := v_linhas || jsonb_build_array(
+          jsonb_build_object('indice', i, 'situacao', v_sit));
+        n_dentro := n_dentro + (v_sit = 'dentro')::int;
+        n_aguardando := n_aguardando + (v_sit = 'aguardando_conta')::int;
+      end if;
+    end loop;
+  end if;
+
+  v_status := case
+    when v_congelado then 'congelado'
+    when v_cab is null then 'sem_cabecalho'
+    else 'ok'
+  end;
+
+  if v_status = 'ok' then
+    n_fora := public.remover_fora_da_planilha(v_desafio, v_chaves, false);
+    -- Trava contra remoção em massa (spec, "Trava de segurança"): uma
+    -- planilha esvaziada, uma aba trocada ou uma falha do Google não
+    -- podem tirar o ingresso de ninguém. Lista válida vazia, ou mais de
+    -- 20% de quem veio da planilha E mais de 3 pessoas: ninguém sai, as
+    -- entradas valem, e a organização confirma pelo painel se for de
+    -- propósito.
+    if n_fora > 0 and (
+      cardinality(v_chaves) = 0
+      or (n_fora > 0.2 * n_da_planilha and n_fora > 3)
+    ) then
+      n_travadas := n_fora;
+    elsif n_fora > 0 then
+      n_removidos := public.remover_fora_da_planilha(v_desafio, v_chaves, true);
+    end if;
+  end if;
+
+  insert into ingresso_sincronizacoes (challenge_id, em, resumo)
+  values (v_desafio, now(), jsonb_build_object(
+    'status', v_status,
+    'dentro', n_dentro,
+    'aguardando', n_aguardando,
+    'invalidos', v_invalidos,
+    'ambiguos', v_ambiguos,
+    'removidos', n_removidos,
+    'remocoes_travadas', n_travadas,
+    'chaves', to_jsonb(v_chaves)
+  ))
+  on conflict (challenge_id) do update
+    set em = excluded.em, resumo = excluded.resumo;
+
+  return jsonb_build_object(
+    'status', v_status,
+    'coluna_marcar', c_marcar,
+    'linhas', v_linhas,
+    'removidos', n_removidos,
+    'remocoes_travadas', n_travadas
+  );
+end;
+$$;
+
+grant execute on function public.sincronizar_planilha_ingresso(text, jsonb) to anon, authenticated;
+
+-- A organização confirma a remoção que a trava segurou. Mesma definição
+-- de "fora da planilha" da sincronização, com as chaves da última.
+create or replace function public.confirmar_remocoes_ingresso(p_desafio uuid)
+returns int
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_resumo jsonb;
+  v_congelado boolean;
+  n int;
+begin
+  if not public.is_organizador() then
+    raise exception 'Só a organização confirma a remoção';
+  end if;
+
+  -- Mesma fila da sincronização (o segredo do desafio)
+  perform 1 from ingresso_segredos where challenge_id = p_desafio for update;
+
+  select s.resumo,
+         coalesce(public.noite_do_checkin(public.ingresso_agora()) > c.evento_data, false)
+    into v_resumo, v_congelado
+  from ingresso_sincronizacoes s
+  join challenges c on c.id = s.challenge_id
+  where s.challenge_id = p_desafio;
+
+  -- Só sobre uma leitura boa da planilha: sem cabeçalho as chaves vêm
+  -- vazias e tirariam todo mundo; depois da festa ninguém sai mais.
+  if v_resumo is null or v_resumo ->> 'status' <> 'ok' or v_congelado then
+    return 0;
+  end if;
+
+  n := public.remover_fora_da_planilha(
+    p_desafio,
+    array(select jsonb_array_elements_text(v_resumo -> 'chaves')),
+    true
+  );
+
+  update ingresso_sincronizacoes
+    set resumo = jsonb_set(resumo, '{remocoes_travadas}', '0')
+  where challenge_id = p_desafio;
+
+  return n;
+end;
+$$;
+
+revoke execute on function public.confirmar_remocoes_ingresso(uuid) from public, anon;
+grant execute on function public.confirmar_remocoes_ingresso(uuid) to authenticated;
+
 -- ============================================================
 -- PASSOS PÓS-INSTALAÇÃO
 --
