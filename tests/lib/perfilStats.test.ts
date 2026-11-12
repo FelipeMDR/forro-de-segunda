@@ -46,6 +46,7 @@ describe('carregarPerfilStats — ingresso', () => {
     emoji: '🎟️',
     titulo_distintivo: 'Ingresso garantido',
     desde: null,
+    evento_data: '2026-12-05',
   }
 
   it('traz o distintivo de ingresso', async () => {

@@ -127,6 +127,7 @@ describe('badgeDeIngresso', () => {
     emoji: '🎟️',
     titulo_distintivo: 'Ingresso garantido',
     desde: '2026-11-10',
+    evento_data: '2026-12-05',
   }
   it('mantém o id entre os estados e troca o texto', () => {
     const a = badgeDeIngresso(base)

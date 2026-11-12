@@ -342,6 +342,12 @@ export interface ForroApi {
     userId: string,
     esteve: boolean | null,
   ): Promise<void>
+  /**
+   * Quem do clube (desafio de ingresso) marcou presença, já com as
+   * correções da organização. Qualquer pessoa logada lê. null quando o
+   * banco ainda não tem a função: a tela cai no ranking.
+   */
+  presencasDoClube(desafioId: string): Promise<Set<string> | null>
   /** Correções manuais de presença do desafio: user_id -> esteve (organizador). */
   correcoesPresencaIngresso(desafioId: string): Promise<Map<string, boolean>>
   /** Em quantos desafios um aluno entrou (estatística do perfil). */

@@ -1539,11 +1539,35 @@ export class DemoApi implements ForroApi {
     return 0
   }
 
+  /**
+   * A regra de presença de `ingressos_do_perfil` e `presencas_do_clube`
+   * (migração 043): a correção vence; sem ela, um check-in não anulado
+   * no horário da festa. `primeiro` é o primeiro check-in que valeu.
+   */
+  private presencaNaFesta(
+    desafioId: string,
+    cfg: IngressoConfig,
+    userId: string,
+  ): { abre: number; esteve: boolean; primeiro: string | undefined } {
+    const abre = new Date(`${cfg.evento_data}T${cfg.evento_inicio}:00`)
+    const fecha = new Date(`${cfg.evento_data}T${cfg.evento_fim}:00`)
+    if (cfg.evento_fim < cfg.evento_inicio) fecha.setDate(fecha.getDate() + 1)
+    const primeiro = this.db.checkins
+      .filter((k) => k.user_id === userId && k.presenca_anulada !== true)
+      .map((k) => k.criado_em)
+      .filter((t) => {
+        const ms = new Date(t).getTime()
+        return ms >= abre.getTime() && ms <= fecha.getTime()
+      })
+      .sort()[0]
+    const correcao = (this.db.presencasIngresso ?? []).find(
+      (p) => p.challenge_id === desafioId && p.user_id === userId,
+    )?.esteve
+    return { abre: abre.getTime(), esteve: correcao ?? primeiro !== undefined, primeiro }
+  }
+
   /** Espelha `ingressos_do_perfil` (migração 043), no fuso local do demo. */
   async ingressosDoPerfil(userId: string): Promise<IngressoPerfil[]> {
-    const checkins = this.db.checkins.filter(
-      (c) => c.user_id === userId && c.presenca_anulada !== true,
-    )
     const linhas: Array<{ abre: number; item: IngressoPerfil }> = []
     for (const c of this.db.challenges) {
       const cfg = c.ingresso
@@ -1551,25 +1575,12 @@ export class DemoApi implements ForroApi {
         (m) => m.challenge_id === c.id && m.user_id === userId,
       )
       if (!cfg || !membro) continue
-      const abre = new Date(`${cfg.evento_data}T${cfg.evento_inicio}:00`)
-      const fecha = new Date(`${cfg.evento_data}T${cfg.evento_fim}:00`)
-      if (cfg.evento_fim < cfg.evento_inicio) fecha.setDate(fecha.getDate() + 1)
-      const primeiro = checkins
-        .map((k) => k.criado_em)
-        .filter((t) => {
-          const ms = new Date(t).getTime()
-          return ms >= abre.getTime() && ms <= fecha.getTime()
-        })
-        .sort()[0]
-      const correcao = (this.db.presencasIngresso ?? []).find(
-        (p) => p.challenge_id === c.id && p.user_id === userId,
-      )?.esteve
-      const esteve = correcao ?? primeiro !== undefined
+      const { abre, esteve, primeiro } = this.presencaNaFesta(c.id, cfg, userId)
       const textos = textosPadraoIngresso(c.titulo)
       const texto = esteve ? cfg.presenca : cfg.garantido
       const padrao = esteve ? textos.presenca : textos.garantido
       linhas.push({
-        abre: abre.getTime(),
+        abre,
         item: {
           desafio_id: c.id,
           titulo: c.titulo,
@@ -1578,10 +1589,23 @@ export class DemoApi implements ForroApi {
           titulo_distintivo: texto.titulo || padrao.titulo,
           // Presença corrigida à mão sem check-in cai na entrada no desafio
           desde: esteve ? (primeiro ?? membro.entrou_em) : membro.entrou_em,
+          evento_data: cfg.evento_data,
         },
       })
     }
     return linhas.sort((a, b) => a.abre - b.abre).map((l) => l.item)
+  }
+
+  /** Espelha `presencas_do_clube` (migração 043). */
+  async presencasDoClube(desafioId: string): Promise<Set<string> | null> {
+    const cfg = this.db.challenges.find((c) => c.id === desafioId)?.ingresso
+    if (!cfg) return new Set()
+    return new Set(
+      this.db.members
+        .filter((m) => m.challenge_id === desafioId)
+        .map((m) => m.user_id)
+        .filter((uid) => this.presencaNaFesta(desafioId, cfg, uid).esteve),
+    )
   }
 
   async marcarPresencaIngresso(

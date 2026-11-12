@@ -313,6 +313,8 @@ export interface IngressoPerfil {
   emoji: string
   titulo_distintivo: string
   desde: string | null
+  /** Data da festa (YYYY-MM-DD): só edições recentes comemoram. */
+  evento_data: string
 }
 
 /** Última sincronização da planilha de ingressos (só a organização lê). */

@@ -246,6 +246,7 @@ describe('distintivos de ingresso', () => {
     emoji: '🎟️',
     titulo_distintivo: 'Ingresso garantido',
     desde: '2026-10-05',
+    evento_data: '2026-11-28',
   }
   const presenca = {
     desafio_id: 'd-2027-1',
@@ -254,6 +255,7 @@ describe('distintivos de ingresso', () => {
     emoji: '🎉',
     titulo_distintivo: 'Marquei presença',
     desde: '2027-03-20',
+    evento_data: '2027-05-15',
   }
 
   it('gera um por edição, logo depois dos personalizados, com os títulos das linhas', () => {

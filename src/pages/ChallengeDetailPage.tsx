@@ -168,6 +168,28 @@ export function ChallengeDetailPage() {
     }
   }, [api, userId, id, ehClube, ranking])
 
+  // Quem do clube marcou presença, já com as correções da organização
+  // (o ranking só enxerga check-in). null = banco sem a função: conta
+  // pelo ranking.
+  const [presentes, setPresentes] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    if (!ehClube || !id) return
+    let cancelado = false
+    void api
+      .presencasDoClube(id)
+      .then((s) => {
+        if (!cancelado) setPresentes(s)
+      })
+      .catch(() => {
+        if (!cancelado) setPresentes(null)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [api, id, ehClube, ranking])
+  const marcouPresenca = (r: RankingEntry) =>
+    presentes ? presentes.has(r.user_id) : r.pontos > 0
+
   // O ranking recarrega sozinho ao trocar de aba, sem rebuscar o resto
   useEffect(() => {
     if (!desafio || !modalidade) return
@@ -391,7 +413,7 @@ export function ChallengeDetailPage() {
             </div>
 
             <RotuloSecao>
-              {ranking.length} no clube · {ranking.filter((r) => r.pontos > 0).length} marcaram presença
+              {ranking.length} no clube · {ranking.filter(marcouPresenca).length} marcaram presença
             </RotuloSecao>
             {ranking.length === 0 ? (
               <p className="rounded-2xl border border-linha bg-sf px-4 py-6 text-center text-[15px] text-ink3">
@@ -401,7 +423,7 @@ export function ChallengeDetailPage() {
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {ranking.map((r) => {
                   const eu = r.user_id === userId
-                  const marcou = r.pontos > 0
+                  const marcou = marcouPresenca(r)
                   return (
                     <li key={r.user_id}>
                       <button

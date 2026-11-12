@@ -164,6 +164,28 @@ describe('DemoApi — desafio de ingresso', () => {
     expect(ranking.find((r) => r.user_id === uid)?.pontos).toBe(1)
   })
 
+  it('ingressosDoPerfil traz a data da festa', async () => {
+    const { api, uid } = await montar()
+    expect((await api.ingressosDoPerfil(uid))[0].evento_data).toBe('2026-12-05')
+  })
+
+  it('presencasDoClube: check-in no horário, correção vence, só membros', async () => {
+    const { api, banco, uid, rep, livre } = await montar()
+    const outro = 'outro-membro'
+    banco.db.members.push({ challenge_id: rep, user_id: outro, entrou_em: new Date().toISOString() })
+    expect(await api.presencasDoClube(rep)).toEqual(new Set())
+
+    checkin(banco, uid, '2026-12-06T01:30:00')
+    expect(await api.presencasDoClube(rep)).toEqual(new Set([uid]))
+
+    await api.marcarPresencaIngresso(rep, uid, false)
+    await api.marcarPresencaIngresso(rep, outro, true)
+    expect(await api.presencasDoClube(rep)).toEqual(new Set([outro]))
+
+    // Desafio comum não é clube
+    expect(await api.presencasDoClube(livre)).toEqual(new Set())
+  })
+
   it('statusSincronizacao e gerarSegredoIngresso no demo', async () => {
     const { api, rep } = await montar()
     expect(await api.statusSincronizacao(rep)).toBeNull()

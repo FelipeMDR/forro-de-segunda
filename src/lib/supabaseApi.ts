@@ -2567,7 +2567,22 @@ export class SupabaseApi implements ForroApi {
       emoji: l.emoji as string,
       titulo_distintivo: l.titulo_distintivo as string,
       desde: (l.desde as string | null) ?? null,
+      evento_data: String(l.evento_data ?? ''),
     }))
+  }
+
+  async presencasDoClube(desafioId: string): Promise<Set<string> | null> {
+    // Página a página (o PostgREST corta em mil linhas sem avisar). Sem
+    // a migração 043 (ou com a versão antiga dela) a função não existe:
+    // null, e a tela conta pelo ranking.
+    const linhas = await todasAsLinhas<{ user_id: string; presente: boolean }>((de, ate) =>
+      this.sb
+        .rpc('presencas_do_clube', { p_desafio: desafioId })
+        .order('user_id')
+        .range(de, ate),
+    ).catch(() => null)
+    if (!linhas) return null
+    return new Set(linhas.filter((l) => l.presente).map((l) => l.user_id))
   }
 
   async marcarPresencaIngresso(

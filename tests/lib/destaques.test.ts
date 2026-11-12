@@ -76,6 +76,7 @@ describe('destaques com distintivo de ingresso', () => {
     emoji: estado === 'garantido' ? '🎟️' : '🎉',
     titulo_distintivo: estado === 'garantido' ? 'Ingresso garantido' : 'Marquei presença',
     desde: null,
+    evento_data: '2026-12-05',
   })
   const com = (estado: 'garantido' | 'presenca') =>
     computeBadges({
