@@ -15,7 +15,7 @@ import type { Coordenada } from './geo'
 import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
 import { noitesNaoAnuladas } from './presenca'
-import { ehEmail, normalizeTelefone, synthEmail, telefonesIguais } from './phone'
+import { chaveDoConvite, ehEmail, synthEmail, telefonesIguais } from './phone'
 import { VERSAO_TERMOS } from './termos'
 import { REGRAS_PADRAO, videoDoYoutube } from './trilha'
 import { NOME_PADRAO } from './nome'
@@ -1285,7 +1285,7 @@ export class SupabaseApi implements ForroApi {
         .from('challenge_convidados')
         .delete()
         .eq('challenge_id', challengeId)
-        .eq('telefone', normalizeTelefone(telefone)),
+        .eq('telefone', chaveDoConvite(telefone)),
     )
   }
 
@@ -1324,7 +1324,7 @@ export class SupabaseApi implements ForroApi {
       if (!perfil) {
         pendentes.push({
           challenge_id: challengeId,
-          telefone: normalizeTelefone(linha.telefone),
+          telefone: chaveDoConvite(linha.telefone),
           telefone_exibicao: linha.telefone,
           nome: linha.nome || null,
         })

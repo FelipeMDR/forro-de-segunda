@@ -181,6 +181,19 @@ from (values
         and table_name = 'challenges'
         and column_name = 'evento_data'
     )
+  ),
+  (
+    -- Migração só de dados: "aplicada" = nenhum convite com valor
+    -- original de DDD + linha guardado com outra chave
+    '044 — convites com o DDD certo',
+    not exists (
+      select 1 from public.challenge_convidados v
+      where v.telefone_exibicao is not null
+        and public.telefone_ddd(v.telefone_exibicao) is not null
+        and length(public.telefone_linha(v.telefone_exibicao)) = 8
+        and v.telefone <> public.telefone_ddd(v.telefone_exibicao)
+                          || public.telefone_linha(v.telefone_exibicao)
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

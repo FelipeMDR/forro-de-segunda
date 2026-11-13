@@ -76,6 +76,27 @@ export function telefonesIguais(a: string, b: string): boolean {
 }
 
 /**
+ * Chave com que um convite de desafio é gravado em
+ * `challenge_convidados.telefone`: DDD + linha (10 dígitos).
+ *
+ * NÃO use `normalizeTelefone` aqui. Ela guarda os 10 ÚLTIMOS dígitos, e
+ * num celular de 11 isso come o primeiro dígito do DDD: "35988887777"
+ * vira "5988887777", que é lido como DDD 59. Como `telefonesIguais`
+ * exige DDD igual quando os dois lados têm DDD, o convite nunca casava
+ * com a conta criada depois — a pessoa ficava fora do desafio para
+ * sempre. É a mesma chave que a sincronização da planilha usa (migração
+ * 043) e que a migração 044 aplica aos convites antigos.
+ *
+ * Uma chave já gravada passa por aqui sem mudar (10 dígitos = DDD +
+ * linha). Sem DDD não há como montar a chave; cai na regra antiga — o
+ * CSV de convidados já recusa esses números (`telefoneValido`).
+ */
+export function chaveDoConvite(t: string): string {
+  const { ddd, linha } = nucleoTelefone(t)
+  return ddd && linha.length === 8 ? `${ddd}${linha}` : normalizeTelefone(t)
+}
+
+/**
  * Telefone válido para CADASTRAR (lista de chamada, conta nova): exige
  * DDD. Um número sem DDD hoje pode ser de qualquer cidade, e o projeto
  * não é mais de gente só de Itajubá — sem o DDD não dá para saber se

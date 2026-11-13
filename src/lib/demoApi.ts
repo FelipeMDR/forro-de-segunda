@@ -25,7 +25,7 @@ import { ordenarPassos, REGRAS_PADRAO, somaDias, videoDoYoutube } from './trilha
 import { compactarNotificacoes } from './notificacoes'
 import { noitesNaoAnuladas } from './presenca'
 import type { MusicaTocada } from './retrospectiva'
-import { ehEmail, normalizeTelefone, telefonesIguais } from './phone'
+import { chaveDoConvite, ehEmail, normalizeTelefone, telefonesIguais } from './phone'
 import {
   CARGOS_PADRAO,
   LIMITE_FAVORITOS,
@@ -1366,7 +1366,7 @@ export class DemoApi implements ForroApi {
   }
 
   async removeConvidado(challengeId: string, telefone: string) {
-    const alvo = normalizeTelefone(telefone)
+    const alvo = chaveDoConvite(telefone)
     this.db.convidados = this.db.convidados.filter(
       (c) => !(c.challenge_id === challengeId && c.telefone === alvo),
     )
@@ -1385,7 +1385,7 @@ export class DemoApi implements ForroApi {
         (p) => p.telefone && telefonesIguais(p.telefone, linha.telefone),
       )
       if (!perfil) {
-        const tel = normalizeTelefone(linha.telefone)
+        const tel = chaveDoConvite(linha.telefone)
         const existente = this.db.convidados.find(
           (c) => c.challenge_id === challengeId && c.telefone === tel,
         )
