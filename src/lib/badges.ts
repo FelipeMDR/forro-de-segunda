@@ -111,20 +111,6 @@ const MARCOS_DJ: Marco[] = [
   [50, '🔊', '50 músicas tocadas'],
 ]
 
-/**
- * Título para o detalhe do distintivo, que mostra o tipo logo acima
- * (em laranja). Se o título começa repetindo o tipo — o do ingresso é
- * "Forró na Rep 2026.2 · Ingresso garantido", e o tipo é "Forró na Rep
- * 2026.2" —, o detalhe mostra só o resto. Na grade do perfil o título
- * fica inteiro: lá não há tipo, e é o nome que separa uma edição da outra.
- */
-export function tituloSemTipo(b: Badge): string {
-  const prefixo = b.tipo ? `${b.tipo} · ` : ''
-  return prefixo && b.titulo.startsWith(prefixo) && b.titulo.length > prefixo.length
-    ? b.titulo.slice(prefixo.length)
-    : b.titulo
-}
-
 export function computeBadges(input: {
   userId: string
   turmas: TurmaMembro[]

@@ -5,7 +5,6 @@ import { Icone } from './Icone'
 import { Spinner } from './Spinner'
 import { BotaoIcone, Folha } from './ui'
 import { EMOJI_CACA, type ProfessorCaca } from '../lib/caca'
-import { tituloSemTipo } from '../lib/badges'
 import { formatRelative } from '../lib/dates'
 import type { PerfilStats } from '../lib/perfilStats'
 import { colecao, conquistado, escolherDestaques } from '../lib/destaques'
@@ -421,7 +420,7 @@ function DetalheDistintivo({ b, onFechar }: { b: Badge; onFechar: () => void }) 
           className="distintivo-entra text-[28px] font-extrabold leading-[1.1] tracking-[-0.015em] [hyphens:auto]"
           style={atraso(0.26)}
         >
-          {tituloSemTipo(b)}
+          {b.titulo}
         </h2>
         <p className="distintivo-entra text-[15px] text-ink2" style={atraso(0.3)}>
           {b.descricao}

@@ -98,16 +98,28 @@ export function diaDaFesta(cfg: IngressoConfig): string {
   return `${dia}/${mes}`
 }
 
-/** Distintivo de ingresso do perfil; o id não muda entre os estados. */
+/**
+ * Distintivo de ingresso do perfil; o id não muda entre os estados.
+ *
+ * Mesmo formato dos distintivos especiais (Forrólloween): o título é o
+ * evento ("Forró na Rep 2026.2") e a frase do estado vai na descrição
+ * ("Ingresso garantido" → "Marquei presença"). O texto configurado no
+ * desafio pode vir com o nome do evento na frente (o padrão antigo era
+ * "Forró na Rep 2026.2 · Ingresso garantido"): esse prefixo sai, para o
+ * nome não aparecer duas vezes.
+ */
 export function badgeDeIngresso(i: IngressoPerfil): Badge {
+  const prefixo = `${i.titulo} · `
+  const frase =
+    i.titulo_distintivo.startsWith(prefixo) && i.titulo_distintivo.length > prefixo.length
+      ? i.titulo_distintivo.slice(prefixo.length)
+      : i.titulo_distintivo
   return {
     id: `ingresso-${i.desafio_id}`,
     emoji: i.emoji,
-    titulo: i.titulo_distintivo,
-    descricao:
-      // Não repete o título ("Ingresso garantido"): diz o próximo passo
-      i.estado === 'garantido' ? 'Faça check-in na festa para marcar presença' : 'Esteve na festa',
-    tipo: i.titulo,
+    titulo: i.titulo,
+    descricao: frase,
+    tipo: 'Distintivo especial',
     regra:
       'Entra quem está na lista de ingressos. Evolui com check-in no horário da festa.',
     alcancadoEm: i.desde ?? undefined,

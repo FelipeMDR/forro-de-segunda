@@ -129,7 +129,7 @@ describe('badgeDeIngresso', () => {
     desde: '2026-11-10',
     evento_data: '2026-12-05',
   }
-  it('mantém o id entre os estados e troca o texto', () => {
+  it('igual aos especiais: título é o evento, a frase do estado vai na descrição', () => {
     const a = badgeDeIngresso(base)
     const b = badgeDeIngresso({
       ...base,
@@ -140,11 +140,20 @@ describe('badgeDeIngresso', () => {
     expect(a.id).toBe('ingresso-rep')
     expect(b.id).toBe(a.id)
     expect(a.emoji).not.toBe(b.emoji)
-    expect(a.titulo).not.toBe(b.titulo)
-    expect(a.tipo).toBe('Forró na Rep 2026.2')
-    expect(a.descricao).toBe('Faça check-in na festa para marcar presença')
-    expect(b.descricao).toBe('Esteve na festa')
+    expect(a.titulo).toBe('Forró na Rep 2026.2')
+    expect(b.titulo).toBe('Forró na Rep 2026.2')
+    expect(a.tipo).toBe('Distintivo especial')
+    expect(a.descricao).toBe('Ingresso garantido')
+    expect(b.descricao).toBe('Marquei presença')
     expect(a.alcancadoEm).toBe('2026-11-10')
+  })
+
+  it('texto salvo com o nome do evento na frente não repete o nome na descrição', () => {
+    const a = badgeDeIngresso({
+      ...base,
+      titulo_distintivo: 'Forró na Rep 2026.2 · Ingresso garantido',
+    })
+    expect(a.descricao).toBe('Ingresso garantido')
   })
 })
 
