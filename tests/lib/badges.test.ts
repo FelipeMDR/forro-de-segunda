@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeBadges } from '../../src/lib/badges'
+import { computeBadges, tituloSemTipo } from '../../src/lib/badges'
 
 const dj = (musicasTocadas?: number) =>
   computeBadges({ userId: 'u', turmas: [], checkinDates: [], musicasTocadas }).filter((b) =>
@@ -278,5 +278,30 @@ describe('distintivos de ingresso', () => {
   it('sem ingressos não muda nada', () => {
     const base = { userId: 'u', turmas: [], checkinDates: [] }
     expect(computeBadges({ ...base, ingressos: [] })).toEqual(computeBadges(base))
+  })
+})
+
+describe('tituloSemTipo (detalhe do distintivo)', () => {
+  const base = { id: 'ingresso-x', emoji: '🎟️', descricao: '' }
+
+  it('tira o nome do evento do título quando ele já aparece como tipo, acima', () => {
+    expect(
+      tituloSemTipo({
+        ...base,
+        tipo: 'Forró na Rep 2026.2',
+        titulo: 'Forró na Rep 2026.2 · Ingresso garantido',
+      }),
+    ).toBe('Ingresso garantido')
+  })
+
+  it('título sem o prefixo do tipo fica como está', () => {
+    expect(tituloSemTipo({ ...base, tipo: 'Forró na Rep 2026.2', titulo: 'Ingresso VIP' })).toBe(
+      'Ingresso VIP',
+    )
+    expect(tituloSemTipo({ ...base, titulo: '25 presenças' })).toBe('25 presenças')
+  })
+
+  it('título igual ao tipo não some', () => {
+    expect(tituloSemTipo({ ...base, tipo: 'Cargo', titulo: 'Cargo' })).toBe('Cargo')
   })
 })

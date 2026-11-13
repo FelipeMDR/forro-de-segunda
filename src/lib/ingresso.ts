@@ -105,7 +105,8 @@ export function badgeDeIngresso(i: IngressoPerfil): Badge {
     emoji: i.emoji,
     titulo: i.titulo_distintivo,
     descricao:
-      i.estado === 'garantido' ? 'Garantiu o ingresso' : 'Marcou presença na festa',
+      // Não repete o título ("Ingresso garantido"): diz o próximo passo
+      i.estado === 'garantido' ? 'Faça check-in na festa para marcar presença' : 'Esteve na festa',
     tipo: i.titulo,
     regra:
       'Entra quem está na lista de ingressos. Evolui com check-in no horário da festa.',
