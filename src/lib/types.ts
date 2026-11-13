@@ -325,6 +325,10 @@ export interface StatusSincronizacao {
   aguardando: number
   invalidos: { linha: number; nome: string }[]
   ambiguos: { linha: number; nome: string }[]
+  /** Mesmo telefone de uma linha anterior (`igual_a`). Vazio antes da 045. */
+  repetidos: { linha: number; nome: string; igual_a: number }[]
+  /** Linhas com nome ou telefone; null quando a sincronização é anterior à 045. */
+  linhas_planilha: number | null
   removidos: number
   remocoes_travadas: number
 }

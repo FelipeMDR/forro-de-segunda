@@ -2540,6 +2540,8 @@ export class SupabaseApi implements ForroApi {
       aguardando: Number(r.aguardando ?? 0),
       invalidos: (r.invalidos as StatusSincronizacao['invalidos']) ?? [],
       ambiguos: (r.ambiguos as StatusSincronizacao['ambiguos']) ?? [],
+      repetidos: (r.repetidos as StatusSincronizacao['repetidos']) ?? [],
+      linhas_planilha: r.linhas_planilha == null ? null : Number(r.linhas_planilha),
       removidos: Number(r.removidos ?? 0),
       remocoes_travadas: Number(r.remocoes_travadas ?? 0),
     }

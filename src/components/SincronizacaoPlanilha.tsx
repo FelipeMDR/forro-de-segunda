@@ -136,8 +136,26 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
                   Não achei o cabeçalho na planilha (colunas de nome e telefone).
                 </p>
               )}
+              {/* A conta tem que fechar com a planilha: cada linha cai em
+                  exatamente um destes grupos */}
               <p className="text-ink2">
-                {status.dentro} dentro · {status.aguardando} aguardando conta
+                {status.linhas_planilha !== null && (
+                  <>
+                    <strong>{status.linhas_planilha} na planilha:</strong>{' '}
+                  </>
+                )}
+                {[
+                  `${status.dentro} dentro`,
+                  `${status.aguardando} aguardando conta`,
+                  status.invalidos.length > 0 &&
+                    `${status.invalidos.length} ${status.invalidos.length === 1 ? 'inválido' : 'inválidos'}`,
+                  status.ambiguos.length > 0 &&
+                    `${status.ambiguos.length} ${status.ambiguos.length === 1 ? 'ambíguo' : 'ambíguos'}`,
+                  status.repetidos.length > 0 &&
+                    `${status.repetidos.length} ${status.repetidos.length === 1 ? 'repetido' : 'repetidos'}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
 
               {status.invalidos.length > 0 && (
@@ -156,6 +174,15 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
                   {status.ambiguos.map((l) => (
                     <li key={`a${l.linha}`}>
                       Linha {l.linha} — {l.nome}: telefone bate com mais de uma conta, adicione à mão
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {status.repetidos.length > 0 && (
+                <ul className="flex flex-col gap-0.5 text-ink2">
+                  {status.repetidos.map((l) => (
+                    <li key={`r${l.linha}`}>
+                      Linha {l.linha} — {l.nome || 'sem nome'}: mesmo telefone da linha {l.igual_a}
                     </li>
                   ))}
                 </ul>

@@ -194,6 +194,14 @@ from (values
         and v.telefone <> public.telefone_ddd(v.telefone_exibicao)
                           || public.telefone_linha(v.telefone_exibicao)
     )
+  ),
+  (
+    '045 — resumo da sincronização com repetidos',
+    exists (
+      select 1 from pg_proc
+      where proname = 'sincronizar_planilha_ingresso'
+        and prosrc like '%linhas_planilha%'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

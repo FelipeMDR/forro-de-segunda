@@ -440,6 +440,8 @@ describe('desafio de ingresso — sincronização da planilha', () => {
         { linha: 10, nome: 'Edu Teste' },
       ],
       ambiguos: [],
+      repetidos: [],
+      linhas_planilha: 3,
       removidos: 0,
       remocoes_travadas: 0,
       chaves: ['3588887777'],
@@ -459,6 +461,31 @@ describe('desafio de ingresso — sincronização da planilha', () => {
     expect(situacao(r, 7)).toBe('aguardando_conta')
     expect(situacao(r, 8)).toBe('repetido')
     expect(await convidados(db, desafio)).toHaveLength(1)
+  })
+
+  it('o resumo conta as linhas da planilha e lista as repetidas com a linha original', async () => {
+    const { db, desafio, segredo } = await comPlanilha()
+    await sincronizar(
+      db,
+      segredo,
+      grade([
+        ['Cida Teste', '35 98888-7777'],
+        ['Davi Teste', '99999-8888'],
+        ['Cida de Novo', '+55 (35) 98888-7777'],
+      ]),
+    )
+    const r = (await resumo(db, desafio)) as Record<string, unknown>
+    // 3 linhas com conteúdo (as numeradas vazias do fim não contam)
+    expect(r.linhas_planilha).toBe(3)
+    expect(r.repetidos).toEqual([{ linha: 10, nome: 'Cida de Novo', igual_a: 8 }])
+    // dentro + aguardando + inválidos + repetidos = linhas da planilha
+    expect(
+      (r.dentro as number) +
+        (r.aguardando as number) +
+        (r.invalidos as unknown[]).length +
+        (r.ambiguos as unknown[]).length +
+        (r.repetidos as unknown[]).length,
+    ).toBe(3)
   })
 
   it('telefone que bate com duas contas antigas sem DDD é ambíguo e ninguém entra', async () => {
