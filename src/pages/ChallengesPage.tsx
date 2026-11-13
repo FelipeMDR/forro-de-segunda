@@ -7,6 +7,7 @@ import { Cabecalho, Etiqueta, RotuloSecao } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft } from '../lib/dates'
 import { faixasDeHorario, periodoCurto } from '../lib/horarios'
+import { diaDaFesta } from '../lib/ingresso'
 import { defModalidade, type Challenge } from '../lib/types'
 import { useLembrado } from '../lib/memoriaTelas'
 
@@ -58,8 +59,16 @@ function CartaoDesafio({ c }: { c: Challenge }) {
         {c.sou_membro && <Etiqueta cor="verde" className="shrink-0 text-xs">Participando</Etiqueta>}
       </div>
       <span className="text-sm text-ink3">
-        {periodoCurto(c.data_inicio, c.data_fim)} · {c.ingresso ? '🎟️ Clube' : nomesModalidades(c)} ·{' '}
-        {c.participantes} {c.participantes === 1 ? 'pessoa' : 'pessoas'}
+        {c.ingresso ? (
+          <>
+            🎟️ Festa em {diaDaFesta(c.ingresso)} · {c.participantes} com ingresso
+          </>
+        ) : (
+          <>
+            {periodoCurto(c.data_inicio, c.data_fim)} · {nomesModalidades(c)} · {c.participantes}{' '}
+            {c.participantes === 1 ? 'pessoa' : 'pessoas'}
+          </>
+        )}
       </span>
       {c.janelas.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

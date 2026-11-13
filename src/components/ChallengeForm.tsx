@@ -431,7 +431,7 @@ export function ChallengeForm({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-bold">
-                🎟️ Desafio de ingresso (clube, sem ranking)
+                🎟️ Desafio de ingresso (sem ranking)
               </p>
               <p className="text-[11px] text-tinta-500">
                 Quem está na lista de ingressos ganha um distintivo, que

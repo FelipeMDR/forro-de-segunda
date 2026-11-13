@@ -308,8 +308,15 @@ export function ChallengeDetailPage() {
           {desafio.titulo}
         </h1>
         <span className="text-[15px] text-ink2">
-          {periodoCurto(desafio.data_inicio, desafio.data_fim)} · {desafio.participantes}{' '}
-          {desafio.participantes === 1 ? 'pessoa' : 'pessoas'}
+          {/* Desafio de ingresso: o que importa é a noite da festa, não o
+              período (que passa um dia da festa para cobrir a madrugada) */}
+          {cfg ? rotuloFesta(cfg) : periodoCurto(desafio.data_inicio, desafio.data_fim)} ·{' '}
+          {desafio.participantes}{' '}
+          {cfg
+            ? 'com ingresso'
+            : desafio.participantes === 1
+              ? 'pessoa'
+              : 'pessoas'}
         </span>
       </div>
 
@@ -318,9 +325,34 @@ export function ChallengeDetailPage() {
           <span className="text-[15px] leading-relaxed text-ink2 [text-wrap:pretty]">
             {desafio.descricao ||
               (cfg
-                ? 'Clube de quem tem ingresso: o distintivo evolui quando você marca presença na festa.'
+                ? 'Quem garantiu o ingresso entra aqui sozinho e ganha o distintivo. Check-in na festa faz o distintivo evoluir.'
                 : 'Vale uma presença por janela com check-in dentro dos horários — várias fotos na mesma janela contam uma vez.')}
           </span>
+          {/* Desafio de ingresso: a situação da pessoa mora no mesmo cartão
+              da regra, em vez de um cartão para cada coisa */}
+          {cfg && (
+            <div className="border-t border-linha pt-3">
+              {meuDistintivo ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-[34px] leading-none">{meuDistintivo.emoji}</span>
+                  <span className="flex flex-col">
+                    <span className="text-base font-extrabold">{meuDistintivo.titulo_distintivo}</span>
+                    <span className="text-[13px] text-ink3">
+                      {meuDistintivo.estado === 'presenca'
+                        ? 'Presença marcada na festa'
+                        : 'Faça check-in na festa para marcar presença.'}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[13px] leading-snug text-ink3">
+                  {desafio.sou_membro
+                    ? 'Seu distintivo aparece aqui em instantes.'
+                    : 'Comprou o ingresso? Você aparece aqui quando a compra for confirmada. Use no app o mesmo celular da compra.'}
+                </span>
+              )}
+            </div>
+          )}
           {desafio.janelas.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {faixasDeHorario(desafio.janelas).map((h) => (
@@ -360,7 +392,7 @@ export function ChallengeDetailPage() {
             tela. Sair fica no fim da página, longe do caminho. Entrada
             restrita: quem entra é a organização, então nem o botão de entrar
             nem o de sair fazem sentido para o aluno */}
-        {desafio.entrada_restrita ? (
+        {cfg ? null : desafio.entrada_restrita ? (
           <p className="rounded-2xl border border-linha bg-sf px-4 py-3 text-sm leading-snug text-ink2">
             {desafio.sou_membro
               ? 'Você está na lista deste desafio restrito. A organização é quem gerencia quem participa.'
@@ -388,38 +420,13 @@ export function ChallengeDetailPage() {
         )}
 
         {cfg ? (
+          ranking.length > 0 && (
           <>
-            <div className="flex flex-col gap-1.5 rounded-[20px] border border-linha bg-sf p-4">
-              <span className="text-[15px] font-extrabold">{rotuloFesta(cfg)}</span>
-              {meuDistintivo ? (
-                <div className="flex items-center gap-3 pt-1">
-                  <span className="text-[34px] leading-none">{meuDistintivo.emoji}</span>
-                  <span className="flex flex-col">
-                    <span className="text-base font-extrabold">{meuDistintivo.titulo_distintivo}</span>
-                    <span className="text-[13px] text-ink3">
-                      {meuDistintivo.estado === 'presenca'
-                        ? 'Presença marcada na festa'
-                        : 'Seu ingresso está garantido. Faça check-in na festa para marcar presença.'}
-                    </span>
-                  </span>
-                </div>
-              ) : (
-                <span className="text-[13px] leading-snug text-ink3">
-                  {desafio.sou_membro
-                    ? 'Seu distintivo aparece aqui em instantes.'
-                    : 'Você não está na lista deste clube.'}
-                </span>
-              )}
-            </div>
-
             <RotuloSecao>
-              {ranking.length} no clube · {ranking.filter(marcouPresenca).length} marcaram presença
+              {ranking.length} com ingresso
+              {ranking.some(marcouPresenca) &&
+                ` · ${ranking.filter(marcouPresenca).length} marcaram presença`}
             </RotuloSecao>
-            {ranking.length === 0 ? (
-              <p className="rounded-2xl border border-linha bg-sf px-4 py-6 text-center text-[15px] text-ink3">
-                Ninguém no clube ainda.
-              </p>
-            ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {ranking.map((r) => {
                   const eu = r.user_id === userId
@@ -449,8 +456,8 @@ export function ChallengeDetailPage() {
                   )
                 })}
               </ul>
-            )}
           </>
+          )
         ) : (
         <>
         {desafio.modalidades.length > 1 && (

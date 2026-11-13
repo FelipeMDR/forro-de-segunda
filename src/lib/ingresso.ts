@@ -89,8 +89,13 @@ export function fimQueCobreAFesta(dataFim: string, cfg: IngressoConfig): string 
 
 /** "Festa em 05/12, das 18:00 às 04:00" */
 export function rotuloFesta(cfg: IngressoConfig): string {
+  return `Festa em ${diaDaFesta(cfg)}, das ${cfg.evento_inicio} às ${cfg.evento_fim}`
+}
+
+/** "05/12": a data da festa, curta, para o cartão da lista de desafios. */
+export function diaDaFesta(cfg: IngressoConfig): string {
   const [, mes, dia] = cfg.evento_data.split('-')
-  return `Festa em ${dia}/${mes}, das ${cfg.evento_inicio} às ${cfg.evento_fim}`
+  return `${dia}/${mes}`
 }
 
 /** Distintivo de ingresso do perfil; o id não muda entre os estados. */
