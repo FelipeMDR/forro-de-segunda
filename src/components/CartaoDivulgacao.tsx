@@ -10,8 +10,8 @@ const CORES: Record<Divulgacao['cor'], string> = {
 
 /**
  * Vendas da organização (festa, workshop) na tela Hoje. Cada oferta é
- * um mini-cartaz: a foto do cartaz com o selo da data, o essencial em
- * texto e o botão que leva ao formulário de compra.
+ * um ingresso em miniatura: o bloco da data na cor do cartaz, o
+ * essencial em texto e o botão que leva ao formulário de compra.
  */
 export function CartaoDivulgacao() {
   const { agora } = useNoite()
@@ -33,67 +33,62 @@ export function CartaoDivulgacao() {
         </h2>
       </div>
 
-      {/* Um ao lado do outro, com o próximo aparecendo na borda: o card
-          ocupa a altura de uma oferta só e não empurra o resto da tela. */}
-      <div className="sem-barra -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1.5">
-        {itens.map((d) => (
-          <Oferta key={d.id} d={d} sozinha={itens.length === 1} />
-        ))}
-      </div>
+      {itens.map((d) => (
+        <Oferta key={d.id} d={d} />
+      ))}
     </section>
   )
 }
 
-function Oferta({ d, sozinha }: { d: Divulgacao; sozinha: boolean }) {
+function Oferta({ d }: { d: Divulgacao }) {
   return (
-    <article
-      className={`flex shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border-2 border-preto bg-sf shadow-[0_4px_0_#000507] ${
-        sozinha ? 'w-full' : 'w-[84%] max-w-[340px]'
-      }`}
-    >
-      <div className="relative aspect-[16/10] bg-sf2">
-        <img
-          src={d.imagem}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-        <span
-          className={`absolute left-3 top-3 rounded-full border-2 border-preto px-2.5 py-1 text-xs font-extrabold text-preto ${CORES[d.cor]}`}
+    <article className="flex flex-col gap-3.5 rounded-[18px] border-2 border-preto bg-sf p-3.5 shadow-[0_4px_0_#000507]">
+      <div className="flex gap-3.5">
+        <div
+          className={`flex w-[80px] shrink-0 flex-col items-center justify-center self-start rounded-[14px] border-2 border-preto px-1 py-2 text-preto ${CORES[d.cor]}`}
         >
-          {d.selo}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-extrabold uppercase tracking-[.06em] text-ink3">
-            {d.tipo}
+          <span className="text-[11px] font-extrabold uppercase leading-tight">
+            {d.data.semana}
           </span>
-          <h3 className="text-[22px] font-extrabold leading-[1.05] tracking-[-.01em]">
-            {d.titulo}
-          </h3>
-          <span className="text-[15px] font-semibold leading-snug text-ink2">{d.destaque}</span>
+          <span className="whitespace-nowrap text-[22px] font-extrabold leading-none tracking-[-.02em]">
+            {d.data.dia}
+          </span>
+          <span className="text-xs font-extrabold uppercase leading-tight">{d.data.mes}</span>
         </div>
 
-        <ul className="flex flex-col gap-1.5 text-[14px] leading-snug text-ink2">
-          <Linha icone="agenda">{d.quando}</Linha>
-          {d.onde && <Linha icone="local">{d.onde}</Linha>}
-          {d.extra && <Linha icone="estrela">{d.extra}</Linha>}
-        </ul>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-col">
+            <span className="text-xs font-extrabold uppercase tracking-[.06em] text-ink3">
+              {d.tipo}
+            </span>
+            <h3 className="text-[20px] font-extrabold leading-[1.1] tracking-[-.01em]">
+              {d.titulo}
+            </h3>
+            <span className="text-[14px] font-semibold leading-snug text-ink2">
+              {d.destaque}
+            </span>
+          </div>
 
-        <a
-          href={d.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`mt-auto flex h-[52px] items-center justify-center gap-2 rounded-2xl border-2 border-preto text-base font-extrabold text-preto active:scale-[.98] ${CORES[d.cor]}`}
-        >
-          {d.botao}
-          <Icone nome="avancar" tamanho={18} traco={2.6} />
-          <span className="sr-only">(abre o formulário em outra aba)</span>
-        </a>
+          {(d.quando || d.onde || d.extra) && (
+            <ul className="flex flex-col gap-1 text-[13px] leading-snug text-ink2">
+              {d.quando && <Linha icone="agenda">{d.quando}</Linha>}
+              {d.onde && <Linha icone="local">{d.onde}</Linha>}
+              {d.extra && <Linha icone="estrela">{d.extra}</Linha>}
+            </ul>
+          )}
+        </div>
       </div>
+
+      <a
+        href={d.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-preto text-[15px] font-extrabold text-preto active:scale-[.98] ${CORES[d.cor]}`}
+      >
+        {d.botao}
+        <Icone nome="avancar" tamanho={18} traco={2.6} />
+        <span className="sr-only">(abre o formulário em outra aba)</span>
+      </a>
     </article>
   )
 }
@@ -106,8 +101,8 @@ function Linha({
   children: string
 }) {
   return (
-    <li className="flex items-start gap-2">
-      <Icone nome={icone} tamanho={16} traco={2.2} className="mt-[2px] shrink-0 text-ink3" />
+    <li className="flex items-start gap-1.5">
+      <Icone nome={icone} tamanho={14} traco={2.2} className="mt-[2px] shrink-0 text-ink3" />
       <span>{children}</span>
     </li>
   )
