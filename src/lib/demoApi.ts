@@ -16,6 +16,7 @@ import {
 import { CATALOGO_DEMO, DURACAO_DEMO_MS, PLAYLIST_DEMO } from './catalogoDemo'
 import { CARGO_DJ, LIMITE_DJS, podeSerDJ } from './dj'
 import { distanciaMetros, type Coordenada } from './geo'
+import type { EventoDivulgacao, TipoEventoDivulgacao } from './metricasDivulgacao'
 import { blobToDataURL } from './image'
 import { limiteCheckin, LIMITE_POR_JANELA } from './limites'
 import type { PessoaMatricula } from './matricula'
@@ -163,6 +164,8 @@ interface DB {
     telefone_exibicao: string | null
     nome: string | null
   }[]
+  /** Ausente nos bancos demo antigos: o construtor preenche. */
+  divulgacaoEventos: EventoDivulgacao[]
   reports: {
     id: string
     checkin_id: string
@@ -597,6 +600,7 @@ function seed(): DB {
     })),
     convidados: [],
     reports: [],
+    divulgacaoEventos: [],
     events: eventos,
     feriados,
     confirmacoes,
@@ -636,6 +640,8 @@ export class DemoApi implements ForroApi {
         // Campo da migração 041: banco demo antigo não tem a função
         if (p.papel_principal === undefined) p.papel_principal = null
       }
+      // Campo da migração 046
+      this.db.divulgacaoEventos ??= []
     } else {
       // Versões antigas do banco demo são descartadas
       for (const k of [
@@ -1119,6 +1125,16 @@ export class DemoApi implements ForroApi {
       motivo: motivo.trim() || null,
       criado_em: new Date().toISOString(),
       resolvido: false,
+    })
+    this.persist()
+  }
+
+  async registrarEventoDivulgacao(divulgacao: string, evento: TipoEventoDivulgacao) {
+    this.db.divulgacaoEventos.push({
+      divulgacao,
+      user_id: this.uid(),
+      evento,
+      criado_em: new Date().toISOString(),
     })
     this.persist()
   }
@@ -2032,6 +2048,10 @@ export class DemoApi implements ForroApi {
     c.presenca_anulada = anulada
     this.persist()
     this.notifyFeed()
+  }
+
+  async eventosDivulgacao(): Promise<EventoDivulgacao[]> {
+    return [...this.db.divulgacaoEventos]
   }
 
   async listReports(): Promise<Report[]> {

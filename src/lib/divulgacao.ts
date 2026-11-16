@@ -95,3 +95,23 @@ export function guardarOcultos(ids: string[]): void {
     // Sem armazenamento (aba anônima): fecha só nesta visita
   }
 }
+
+/**
+ * O "visto" vai para o banco uma vez por pessoa, oferta e dia: voltar à
+ * Home dez vezes na mesma noite não vira dez visualizações.
+ */
+export function vistoHojePendente(id: string, dia: string): boolean {
+  try {
+    return localStorage.getItem(`divulgacao:visto:${id}`) !== dia
+  } catch {
+    return true
+  }
+}
+
+export function marcarVistoHoje(id: string, dia: string): void {
+  try {
+    localStorage.setItem(`divulgacao:visto:${id}`, dia)
+  } catch {
+    // Sem armazenamento: no pior caso conta de novo na próxima visita
+  }
+}

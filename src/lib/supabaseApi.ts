@@ -12,6 +12,7 @@ import { mensagemForrodexOcupada, pontosDeParcerias } from './forrodex'
 import type { PessoaMatricula } from './matricula'
 import { extensionFor } from './image'
 import type { Coordenada } from './geo'
+import type { EventoDivulgacao, TipoEventoDivulgacao } from './metricasDivulgacao'
 import type { MusicaTocada } from './retrospectiva'
 import { compactarNotificacoes } from './notificacoes'
 import { noitesNaoAnuladas } from './presenca'
@@ -1164,6 +1165,11 @@ export class SupabaseApi implements ForroApi {
         motivo: motivo.trim() || null,
       }),
     )
+  }
+
+  async registrarEventoDivulgacao(divulgacao: string, evento: TipoEventoDivulgacao) {
+    // user_id vem do default auth.uid() e o RLS confere
+    ok(await this.sb.from('divulgacao_eventos').insert({ divulgacao, evento }))
   }
 
   async checkinsDe(userId: string) {
@@ -2754,6 +2760,16 @@ export class SupabaseApi implements ForroApi {
       p_valor: anulada,
     })
     if (error) throw new Error(traduz(error.message))
+  }
+
+  async eventosDivulgacao(): Promise<EventoDivulgacao[]> {
+    return todasAsLinhas<EventoDivulgacao>((de, ate) =>
+      this.sb
+        .from('divulgacao_eventos')
+        .select('divulgacao, user_id, evento, criado_em')
+        .order('id')
+        .range(de, ate),
+    )
   }
 
   async listReports(): Promise<Report[]> {

@@ -1,4 +1,5 @@
 import type { Coordenada } from './geo'
+import type { EventoDivulgacao, TipoEventoDivulgacao } from './metricasDivulgacao'
 import type { MusicaTocada } from './retrospectiva'
 import type { PessoaMatricula } from './matricula'
 import type {
@@ -226,6 +227,11 @@ export interface ForroApi {
   addComment(checkinId: string, texto: string): Promise<void>
   deleteComment(id: string): Promise<void>
   reportCheckin(checkinId: string, motivo: string): Promise<void>
+  /**
+   * Anota o que a pessoa fez com uma oferta do card de divulgação
+   * (migração 046). Sempre em nome de quem está logado.
+   */
+  registrarEventoDivulgacao(divulgacao: string, evento: TipoEventoDivulgacao): Promise<void>
   /**
    * Check-ins de qualquer aluno (usado no próprio perfil e no público).
    *
@@ -526,6 +532,8 @@ export interface ForroApi {
    */
   anularPresenca(checkinId: string, anulada: boolean): Promise<void>
   listReports(): Promise<Report[]>
+  /** Tudo o que foi anotado no card de divulgação (organizador). */
+  eventosDivulgacao(): Promise<EventoDivulgacao[]>
   resolveReport(id: string, removerPost: boolean): Promise<void>
   listAlunosCadastrados(): Promise<AlunoCadastrado[]>
   saveAlunoCadastrado(a: {

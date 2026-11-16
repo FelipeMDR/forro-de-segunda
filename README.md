@@ -339,6 +339,25 @@ supabase/
 - **Streak:** semanas-calendário consecutivas (seg–dom) com pelo menos um
   check-in; a semana atual em andamento não quebra a sequência.
 
+## Anúncios de ingresso na tela Hoje
+
+O card "Ingressos à venda" mostra as ofertas de `src/lib/divulgacao.ts`
+(foto em `public/divulgacao/`, link do formulário de compra e a data em
+que sai do ar). Para anunciar outra festa ou workshop, acrescente um item
+lá.
+
+O card anota o que cada pessoa faz com cada oferta — viu, abriu os
+detalhes, tocou em Comprar, fechou — e a organização acompanha em
+**Painel → Divulgação**: o funil de cada oferta, o recorte por turma, os
+cliques por dia e o CSV com todos os eventos.
+
+1. **Migração 046:** rode `supabase/migracoes/046-metricas-da-divulgacao.sql`
+   (ou `npm run migrar`) e clique em "Reload schema cache". Sem ela o card
+   funciona normalmente, só não registra nada.
+
+A compra acontece no formulário do Google, fora do app: o painel mostra
+quem foi até o formulário, não quem pagou.
+
 ## Forró na Rep: ligar a planilha
 
 A cada semestre, para o desafio de ingresso da festa:

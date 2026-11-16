@@ -39,6 +39,7 @@ import { AgendaPainelPage, NovoEventoPage } from './pages/painel/AgendaPainelPag
 import { AlunoPage, AlunosPage, NovoAlunoPage } from './pages/painel/AlunosPage'
 import { PainelLayout } from './pages/painel/contexto'
 import { DenunciasPage } from './pages/painel/DenunciasPage'
+import { DivulgacaoPage } from './pages/painel/DivulgacaoPage'
 import { DistintivosPage, NovoDistintivoPage } from './pages/painel/DistintivosPage'
 import { FrequenciaPage } from './pages/painel/FrequenciaPage'
 import { AgendaHub, PainelHome, PessoasHub } from './pages/painel/HubPage'
@@ -119,6 +120,7 @@ export default function App() {
                 <Route path="distintivos/novo" element={<NovoDistintivoPage />} />
                 <Route path="frequencia" element={<FrequenciaPage />} />
                 <Route path="denuncias" element={<DenunciasPage />} />
+                <Route path="divulgacao" element={<DivulgacaoPage />} />
                 <Route path="videoaulas" element={<GerenciarTrilhaPage />} />
                 <Route path="videoaulas/passo/:id" element={<EditarPassoPage />} />
                 {/* O cronograma morava em Vídeo-aulas; links antigos caem no lugar novo */}

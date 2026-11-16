@@ -83,6 +83,13 @@ export function PrivacidadePage() {
             de presença ("Eu vou") e a data e hora de cada check-in.
           </p>
           <p>
+            <strong>Anúncios de ingresso.</strong> Quando o app mostra um
+            anúncio de festa ou workshop, anotamos se você viu, abriu os
+            detalhes, tocou em Comprar ou fechou o anúncio, com data e hora.
+            Serve para a organização saber se a divulgação está chegando nas
+            turmas. A compra em si acontece fora do app.
+          </p>
+          <p>
             <strong>Localização, só quando o desafio exige.</strong> Alguns
             desafios só contam ponto se a foto for tirada no local. Nesse
             caso o app pede sua posição e{' '}
@@ -115,8 +122,9 @@ export function PrivacidadePage() {
             reações, comentários, distintivos e as duplas confirmadas.
           </p>
           <p>
-            <strong>Só a organização</strong> vê seu telefone, seu e-mail e
-            os relatórios de frequência.
+            <strong>Só a organização</strong> vê seu telefone, seu e-mail,
+            os relatórios de frequência e o que você fez com os anúncios de
+            ingresso.
           </p>
           <p>
             <strong>Ninguém de fora.</strong> O app inteiro exige conta, e a

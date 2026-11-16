@@ -202,6 +202,13 @@ from (values
       where proname = 'sincronizar_planilha_ingresso'
         and prosrc like '%linhas_planilha%'
     )
+  ),
+  (
+    '046 — métricas do card de divulgação',
+    exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'divulgacao_eventos'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

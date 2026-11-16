@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { useNoite } from '../context/NoiteContext'
+import { toISODate } from '../lib/dates'
 import {
   cardOculto,
   divulgacoesNoAr,
   guardarOcultos,
   lerOcultos,
+  marcarVistoHoje,
+  vistoHojePendente,
   type Divulgacao,
 } from '../lib/divulgacao'
+import type { TipoEventoDivulgacao } from '../lib/metricasDivulgacao'
 import { Icone } from './Icone'
 
 const CORES: Record<Divulgacao['cor'], string> = {
@@ -20,15 +25,50 @@ const CORES: Record<Divulgacao['cor'], string> = {
  * tela: uma linha por oferta, com a foto em miniatura e o botão de
  * comprar. Os detalhes abrem ao tocar, e o × esconde o card até
  * aparecer uma oferta nova.
+ *
+ * Cada passo vira métrica para a organização (migração 046): viu,
+ * abriu os detalhes, tocou em Comprar, fechou.
  */
 export function CartaoDivulgacao() {
+  const { api } = useAuth()
   const { agora } = useNoite()
   const [ocultos, setOcultos] = useState(lerOcultos)
   const [aberta, setAberta] = useState<string | null>(null)
+  const ref = useRef<HTMLElement>(null)
   const itens = divulgacoesNoAr(agora)
-  if (itens.length === 0 || cardOculto(itens, ocultos)) return null
+  const oculto = itens.length === 0 || cardOculto(itens, ocultos)
+  const idsNoAr = itens.map((d) => d.id).join(' ')
+
+  // Sem a migração 046 o insert falha: a métrica some, o card não
+  const anotar = (id: string, evento: TipoEventoDivulgacao) =>
+    void api.registrarEventoDivulgacao(id, evento).catch(() => {})
+
+  // "Viu" só quando o card entra mesmo na tela, uma vez por dia
+  useEffect(() => {
+    const el = ref.current
+    if (oculto || !el || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (!entradas.some((e) => e.isIntersecting)) return
+        obs.disconnect()
+        const dia = toISODate(new Date())
+        for (const id of idsNoAr.split(' ')) {
+          if (!vistoHojePendente(id, dia)) continue
+          marcarVistoHoje(id, dia)
+          anotar(id, 'visto')
+        }
+      },
+      { threshold: 0.5 },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oculto, idsNoAr, api])
+
+  if (oculto) return null
 
   function fechar() {
+    for (const d of itens) if (!ocultos.includes(d.id)) anotar(d.id, 'fechou')
     const ids = [...new Set([...ocultos, ...itens.map((d) => d.id)])]
     guardarOcultos(ids)
     setOcultos(ids)
@@ -36,6 +76,7 @@ export function CartaoDivulgacao() {
 
   return (
     <section
+      ref={ref}
       aria-label="Ingressos à venda"
       className="flex flex-col gap-1 rounded-[22px] border border-linha bg-sf px-4 pb-2 pt-3 text-ink"
     >
@@ -60,7 +101,11 @@ export function CartaoDivulgacao() {
             key={d.id}
             d={d}
             aberta={aberta === d.id}
-            alternar={() => setAberta((a) => (a === d.id ? null : d.id))}
+            alternar={() => {
+              if (aberta !== d.id) anotar(d.id, 'detalhes')
+              setAberta((a) => (a === d.id ? null : d.id))
+            }}
+            comprar={() => anotar(d.id, 'clique')}
           />
         ))}
       </ul>
@@ -72,10 +117,12 @@ function Oferta({
   d,
   aberta,
   alternar,
+  comprar,
 }: {
   d: Divulgacao
   aberta: boolean
   alternar: () => void
+  comprar: () => void
 }) {
   const idDetalhes = `divulgacao-${d.id}`
   return (
@@ -114,6 +161,7 @@ function Oferta({
           href={d.link}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={comprar}
           className={`flex h-10 w-[98px] shrink-0 items-center justify-center rounded-full border-2 border-preto text-sm font-extrabold text-preto active:scale-[.97] ${CORES[d.cor]}`}
         >
           {d.botao}

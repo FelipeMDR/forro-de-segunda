@@ -50,6 +50,13 @@ export function PainelHome() {
           onClick={() => navigate('/organizador/frequencia')}
         />
         <CartaoAtalho
+          icone="sino"
+          cor="#FFB98C"
+          titulo="Divulgação"
+          descricao="Card de ingressos · quem viu, foi ao formulário ou fechou · por turma"
+          onClick={() => navigate('/organizador/divulgacao')}
+        />
+        <CartaoAtalho
           icone="bandeira"
           cor="#DE5300"
           titulo="Denúncias"
