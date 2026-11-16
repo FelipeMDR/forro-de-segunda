@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { DIVULGACOES, cardOculto, divulgacoesNoAr } from '../../src/lib/divulgacao'
+import {
+  DIVULGACOES,
+  cardOculto,
+  criarOcultosDaSessao,
+  divulgacoesNoAr,
+} from '../../src/lib/divulgacao'
 
 const ids = (agora: string) => divulgacoesNoAr(new Date(agora)).map((d) => d.id)
 
@@ -35,5 +40,43 @@ describe('cardOculto', () => {
 
   it('some quando todas as ofertas no ar foram fechadas', () => {
     expect(cardOculto(noAr, ['forro-na-rep-2026-12', 'workshop-2026-12'])).toBe(true)
+  })
+})
+
+describe('ocultos da sessão (o × vale até abrir o app de novo)', () => {
+  const MIN = 60 * 1000
+
+  it('fechar esconde e avisa quem está ouvindo', () => {
+    const s = criarOcultosDaSessao(10 * MIN)
+    let avisos = 0
+    s.assinar(() => avisos++)
+    s.fechar(['a', 'b'])
+    s.fechar(['a'])
+    expect(s.ler()).toEqual(['a', 'b'])
+    expect(avisos).toBe(2)
+  })
+
+  it('olhar outro app e voltar logo não traz o card de volta', () => {
+    const s = criarOcultosDaSessao(10 * MIN)
+    s.fechar(['a'])
+    s.foiParaOFundo(0)
+    s.voltou(9 * MIN)
+    expect(s.ler()).toEqual(['a'])
+  })
+
+  it('voltar depois de muito tempo no fundo conta como abrir o app de novo', () => {
+    const s = criarOcultosDaSessao(10 * MIN)
+    let avisos = 0
+    s.fechar(['a'])
+    s.assinar(() => avisos++)
+    s.foiParaOFundo(0)
+    s.voltou(10 * MIN)
+    expect(s.ler()).toEqual([])
+    expect(avisos).toBe(1)
+  })
+
+  it('cada sessão começa com tudo visível', () => {
+    criarOcultosDaSessao().fechar(['a'])
+    expect(criarOcultosDaSessao().ler()).toEqual([])
   })
 })

@@ -69,8 +69,6 @@ export function divulgacoesNoAr(
   return lista.filter((d) => agora.getTime() < new Date(d.ate).getTime())
 }
 
-const CHAVE_OCULTOS = 'divulgacao:ocultos'
-
 /**
  * O card some quando a pessoa já fechou todas as ofertas no ar. Uma
  * oferta nova (id que ela não fechou) traz o card de volta.
@@ -79,20 +77,64 @@ export function cardOculto(noAr: Divulgacao[], ocultos: string[]): boolean {
   return noAr.every((d) => ocultos.includes(d.id))
 }
 
-export function lerOcultos(): string[] {
-  try {
-    const v: unknown = JSON.parse(localStorage.getItem(CHAVE_OCULTOS) ?? '[]')
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
+/**
+ * Quanto tempo em segundo plano conta como "abriu o app de novo". No
+ * celular o app quase nunca é fechado de verdade, só vai para o fundo:
+ * sem isso, quem fechou o card não o veria mais até reiniciar o
+ * aparelho. Abaixo disso (olhou o WhatsApp e voltou), segue fechado.
+ */
+export const REABRIR_APOS_MS = 10 * 60 * 1000
+
+/**
+ * O × vale só enquanto o app está aberto: fica em memória, nunca no
+ * aparelho. Abrir o app de novo (ou voltar depois de REABRIR_APOS_MS
+ * no fundo) mostra o anúncio outra vez.
+ */
+export function criarOcultosDaSessao(reabrirAposMs = REABRIR_APOS_MS) {
+  let ocultos: string[] = []
+  let noFundoDesde: number | null = null
+  const ouvintes = new Set<() => void>()
+  const avisar = () => ouvintes.forEach((cb) => cb())
+
+  return {
+    ler: () => ocultos,
+    fechar(ids: string[]) {
+      ocultos = [...new Set([...ocultos, ...ids])]
+      avisar()
+    },
+    foiParaOFundo(agora: number) {
+      noFundoDesde = agora
+    },
+    voltou(agora: number) {
+      const longe = noFundoDesde !== null && agora - noFundoDesde >= reabrirAposMs
+      noFundoDesde = null
+      if (longe && ocultos.length > 0) {
+        ocultos = []
+        avisar()
+      }
+    },
+    assinar(cb: () => void) {
+      ouvintes.add(cb)
+      return () => {
+        ouvintes.delete(cb)
+      }
+    },
   }
 }
 
-export function guardarOcultos(ids: string[]): void {
+/** A sessão do app: uma só, ligada à visibilidade da página. */
+export const ocultosDaSessao = criarOcultosDaSessao()
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') ocultosDaSessao.foiParaOFundo(Date.now())
+    else ocultosDaSessao.voltou(Date.now())
+  })
+  // A primeira versão guardava o × no aparelho para sempre: limpa
   try {
-    localStorage.setItem(CHAVE_OCULTOS, JSON.stringify(ids))
+    localStorage.removeItem('divulgacao:ocultos')
   } catch {
-    // Sem armazenamento (aba anônima): fecha só nesta visita
+    // sem armazenamento, nada a limpar
   }
 }
 

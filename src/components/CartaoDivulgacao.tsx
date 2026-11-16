@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNoite } from '../context/NoiteContext'
 import { toISODate } from '../lib/dates'
 import {
   cardOculto,
   divulgacoesNoAr,
-  guardarOcultos,
-  lerOcultos,
   marcarVistoHoje,
+  ocultosDaSessao,
   vistoHojePendente,
   type Divulgacao,
 } from '../lib/divulgacao'
@@ -23,8 +22,8 @@ const CORES: Record<Divulgacao['cor'], string> = {
 /**
  * Vendas da organização (festa, workshop) na tela Hoje, sem roubar a
  * tela: uma linha por oferta, com a foto em miniatura e o botão de
- * comprar. Os detalhes abrem ao tocar, e o × esconde o card até
- * aparecer uma oferta nova.
+ * comprar. Os detalhes abrem ao tocar, e o × esconde o card só até a
+ * pessoa abrir o app de novo (lib/divulgacao.ts, ocultosDaSessao).
  *
  * Cada passo vira métrica para a organização (migração 046): viu,
  * abriu os detalhes, tocou em Comprar, fechou.
@@ -32,7 +31,7 @@ const CORES: Record<Divulgacao['cor'], string> = {
 export function CartaoDivulgacao() {
   const { api } = useAuth()
   const { agora } = useNoite()
-  const [ocultos, setOcultos] = useState(lerOcultos)
+  const ocultos = useSyncExternalStore(ocultosDaSessao.assinar, ocultosDaSessao.ler)
   const [aberta, setAberta] = useState<string | null>(null)
   const ref = useRef<HTMLElement>(null)
   const itens = divulgacoesNoAr(agora)
@@ -69,9 +68,7 @@ export function CartaoDivulgacao() {
 
   function fechar() {
     for (const d of itens) if (!ocultos.includes(d.id)) anotar(d.id, 'fechou')
-    const ids = [...new Set([...ocultos, ...itens.map((d) => d.id)])]
-    guardarOcultos(ids)
-    setOcultos(ids)
+    ocultosDaSessao.fechar(itens.map((d) => d.id))
   }
 
   return (
