@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DIVULGACOES, divulgacoesNoAr } from '../../src/lib/divulgacao'
+import { DIVULGACOES, cardOculto, divulgacoesNoAr } from '../../src/lib/divulgacao'
 
 const ids = (agora: string) => divulgacoesNoAr(new Date(agora)).map((d) => d.id)
 
@@ -22,5 +22,18 @@ describe('divulgacoesNoAr', () => {
       expect(d.link).toMatch(/^https:\/\/docs\.google\.com\/forms\//)
       expect(Number.isNaN(new Date(d.ate).getTime())).toBe(false)
     }
+  })
+})
+
+describe('cardOculto', () => {
+  const noAr = divulgacoesNoAr(new Date('2026-11-16T12:00:00-03:00'))
+
+  it('aparece enquanto houver oferta que a pessoa não fechou', () => {
+    expect(cardOculto(noAr, [])).toBe(false)
+    expect(cardOculto(noAr, ['forro-na-rep-2026-12'])).toBe(false)
+  })
+
+  it('some quando todas as ofertas no ar foram fechadas', () => {
+    expect(cardOculto(noAr, ['forro-na-rep-2026-12', 'workshop-2026-12'])).toBe(true)
   })
 })
