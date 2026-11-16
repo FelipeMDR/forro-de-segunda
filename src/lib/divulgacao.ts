@@ -55,7 +55,7 @@ export const DIVULGACOES: Divulgacao[] = [
     ],
     imagem: '/divulgacao/workshop.webp',
     link: 'https://docs.google.com/forms/d/e/1FAIpQLSep6lxCfunHQxrr1sJD3IxsBUU_p-jTNv3Oe-ThqmF-TvY06Q/viewform',
-    botao: 'Inscrever',
+    botao: 'Comprar',
     cor: 'verde',
     ate: '2026-12-07T00:00:00-03:00',
   },
