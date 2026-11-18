@@ -4,7 +4,9 @@ import {
   cardOculto,
   criarOcultosDaSessao,
   divulgacoesNoAr,
+  jaTemIngresso,
 } from '../../src/lib/divulgacao'
+import type { IngressoPerfil } from '../../src/lib/types'
 
 const ids = (agora: string) => divulgacoesNoAr(new Date(agora)).map((d) => d.id)
 
@@ -78,5 +80,47 @@ describe('ocultos da sessão (o × vale até abrir o app de novo)', () => {
   it('cada sessão começa com tudo visível', () => {
     criarOcultosDaSessao().fechar(['a'])
     expect(criarOcultosDaSessao().ler()).toEqual([])
+  })
+})
+
+describe('jaTemIngresso (quem comprou não vê a oferta)', () => {
+  const [rep, workshop] = DIVULGACOES
+  const HOJE = '2026-11-18'
+  const ingresso = (titulo: string, evento_data = '2026-12-05'): IngressoPerfil => ({
+    desafio_id: titulo,
+    titulo,
+    estado: 'garantido',
+    emoji: '🎟️',
+    titulo_distintivo: `${titulo} · Ingresso garantido`,
+    desde: null,
+    evento_data,
+  })
+
+  it('sem ingresso nenhum, vê as duas ofertas', () => {
+    expect(jaTemIngresso(rep, [], HOJE)).toBe(false)
+    expect(jaTemIngresso(workshop, [], HOJE)).toBe(false)
+  })
+
+  it('o ingresso de uma venda esconde só ela', () => {
+    const comRep = [ingresso('Forró na Rep')]
+    expect(jaTemIngresso(rep, comRep, HOJE)).toBe(true)
+    expect(jaTemIngresso(workshop, comRep, HOJE)).toBe(false)
+
+    const comWorkshop = [ingresso('Workshop de Forró', '2026-12-06')]
+    expect(jaTemIngresso(workshop, comWorkshop, HOJE)).toBe(true)
+    expect(jaTemIngresso(rep, comWorkshop, HOJE)).toBe(false)
+  })
+
+  it('casa o título sem acento, sem maiúscula e com texto em volta', () => {
+    expect(jaTemIngresso(rep, [ingresso('FORRO NA REP  · dezembro')], HOJE)).toBe(true)
+    expect(jaTemIngresso(workshop, [ingresso('workshop Mel e Lucas')], HOJE)).toBe(true)
+  })
+
+  it('o ingresso de uma edição que já passou não esconde a venda nova', () => {
+    expect(jaTemIngresso(rep, [ingresso('Forró na Rep', '2026-06-20')], HOJE)).toBe(false)
+  })
+
+  it('no dia do evento o ingresso ainda vale', () => {
+    expect(jaTemIngresso(rep, [ingresso('Forró na Rep')], '2026-12-05')).toBe(true)
   })
 })

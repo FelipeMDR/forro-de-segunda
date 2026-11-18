@@ -346,6 +346,15 @@ O card "Ingressos à venda" mostra as ofertas de `src/lib/divulgacao.ts`
 que sai do ar). Para anunciar outra festa ou workshop, acrescente um item
 lá.
 
+Quem já comprou não vê a oferta: cada item tem o campo `desafio`, um
+trecho do título do desafio de ingresso daquela venda ("Forró na Rep",
+"Workshop"). Quem está nesse desafio — a planilha de ingressos põe lá
+quem comprou — e cujo evento ainda não passou fica sem aquela oferta.
+Ao criar o desafio de ingresso de uma venda nova, use um título que
+contenha esse trecho.
+
+O × esconde o card só até a pessoa abrir o app de novo.
+
 O card anota o que cada pessoa faz com cada oferta — viu, abriu os
 detalhes, tocou em Comprar, fechou — e a organização acompanha em
 **Painel → Divulgação**: o funil de cada oferta, o recorte por turma, os

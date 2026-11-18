@@ -1,3 +1,5 @@
+import type { IngressoPerfil } from './types'
+
 /**
  * Vendas que aparecem no card de divulgação da tela Hoje.
  *
@@ -25,6 +27,12 @@ export interface Divulgacao {
   cor: 'brasa' | 'verde' | 'azul'
   /** Some a partir deste instante (ISO com fuso). */
   ate: string
+  /**
+   * Trecho do título do desafio de ingresso desta venda. Quem já está
+   * nele (a planilha de ingressos põe lá quem comprou) não vê a oferta.
+   * Sem acento e sem maiúscula: "forro na rep" casa "Forró na Rep · Dez".
+   */
+  desafio: string
 }
 
 export const DIVULGACOES: Divulgacao[] = [
@@ -43,6 +51,7 @@ export const DIVULGACOES: Divulgacao[] = [
     botao: 'Comprar',
     cor: 'brasa',
     ate: '2026-12-06T00:00:00-03:00',
+    desafio: 'Forró na Rep',
   },
   {
     id: 'workshop-2026-12',
@@ -58,6 +67,7 @@ export const DIVULGACOES: Divulgacao[] = [
     botao: 'Comprar',
     cor: 'verde',
     ate: '2026-12-07T00:00:00-03:00',
+    desafio: 'Workshop',
   },
 ]
 
@@ -67,6 +77,21 @@ export function divulgacoesNoAr(
   lista: Divulgacao[] = DIVULGACOES,
 ): Divulgacao[] {
   return lista.filter((d) => agora.getTime() < new Date(d.ate).getTime())
+}
+
+const normalizar = (t: string) =>
+  t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+/**
+ * A pessoa já tem ingresso desta venda: está num desafio de ingresso
+ * com o título certo e cujo evento ainda não passou. A data evita que o
+ * ingresso da edição passada do Forró na Rep esconda a venda da nova.
+ */
+export function jaTemIngresso(d: Divulgacao, ingressos: IngressoPerfil[], hoje: string): boolean {
+  const trecho = normalizar(d.desafio)
+  return ingressos.some(
+    (i) => i.evento_data >= hoje && normalizar(i.titulo).includes(trecho),
+  )
 }
 
 /**

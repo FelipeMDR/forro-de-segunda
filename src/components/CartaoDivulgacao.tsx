@@ -5,12 +5,15 @@ import { toISODate } from '../lib/dates'
 import {
   cardOculto,
   divulgacoesNoAr,
+  jaTemIngresso,
   marcarVistoHoje,
   ocultosDaSessao,
   vistoHojePendente,
   type Divulgacao,
 } from '../lib/divulgacao'
+import { useLembrado } from '../lib/memoriaTelas'
 import type { TipoEventoDivulgacao } from '../lib/metricasDivulgacao'
+import type { IngressoPerfil } from '../lib/types'
 import { Icone } from './Icone'
 
 const CORES: Record<Divulgacao['cor'], string> = {
@@ -25,18 +28,44 @@ const CORES: Record<Divulgacao['cor'], string> = {
  * comprar. Os detalhes abrem ao tocar, e o × esconde o card só até a
  * pessoa abrir o app de novo (lib/divulgacao.ts, ocultosDaSessao).
  *
+ * Quem já comprou não vê a oferta: está no desafio de ingresso dela
+ * (a planilha de ingressos põe lá), ver `jaTemIngresso`.
+ *
  * Cada passo vira métrica para a organização (migração 046): viu,
  * abriu os detalhes, tocou em Comprar, fechou.
  */
 export function CartaoDivulgacao() {
-  const { api } = useAuth()
+  const { api, userId } = useAuth()
   const { agora } = useNoite()
   const ocultos = useSyncExternalStore(ocultosDaSessao.assinar, ocultosDaSessao.ler)
   const [aberta, setAberta] = useState<string | null>(null)
+  // null = ainda não sabe: o card espera, para não aparecer e sumir em
+  // seguida para quem já comprou
+  const [ingressos, setIngressos] = useLembrado<IngressoPerfil[] | null>(
+    'divulgacao:ingressos',
+    null,
+  )
   const ref = useRef<HTMLElement>(null)
-  const itens = divulgacoesNoAr(agora)
-  const oculto = itens.length === 0 || cardOculto(itens, ocultos)
+  const hoje = toISODate(agora)
+  const itens = divulgacoesNoAr(agora).filter(
+    (d) => !jaTemIngresso(d, ingressos ?? [], hoje),
+  )
+  const oculto = ingressos === null || itens.length === 0 || cardOculto(itens, ocultos)
   const idsNoAr = itens.map((d) => d.id).join(' ')
+
+  // A cada abertura da Hoje: a planilha pode ter acabado de sincronizar
+  useEffect(() => {
+    if (!userId) return
+    let vivo = true
+    void api
+      .ingressosDoPerfil(userId)
+      .then((l) => vivo && setIngressos(l))
+      // Sem a migração 043 não há desafio de ingresso: mostra tudo
+      .catch(() => vivo && setIngressos((atual) => atual ?? []))
+    return () => {
+      vivo = false
+    }
+  }, [api, userId, setIngressos])
 
   // Sem a migração 046 o insert falha: a métrica some, o card não
   const anotar = (id: string, evento: TipoEventoDivulgacao) =>
