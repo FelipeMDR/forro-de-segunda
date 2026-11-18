@@ -25,7 +25,7 @@ import {
   suspensoesDoDesafio,
 } from '../lib/dates'
 import { diaCurto, faixasDeHorario, periodoCurto } from '../lib/horarios'
-import { rotuloFesta } from '../lib/ingresso'
+import { badgeDeIngresso, rotuloFesta } from '../lib/ingresso'
 import { colocacoes } from '../lib/ranking'
 import {
   defModalidade,
@@ -336,11 +336,16 @@ export function ChallengeDetailPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-[34px] leading-none">{meuDistintivo.emoji}</span>
                   <span className="flex flex-col">
-                    <span className="text-base font-extrabold">{meuDistintivo.titulo_distintivo}</span>
+                    {/* A frase do distintivo, sem o nome do evento (já é o título da tela) */}
+                    <span className="text-base font-extrabold">
+                      {badgeDeIngresso(meuDistintivo).descricao}
+                    </span>
                     <span className="text-[13px] text-ink3">
                       {meuDistintivo.estado === 'presenca'
                         ? 'Presença marcada na festa'
-                        : 'Faça check-in na festa para marcar presença.'}
+                        : cfg.evolui !== false
+                          ? 'Faça check-in na festa para marcar presença.'
+                          : 'Seu ingresso está garantido.'}
                     </span>
                   </span>
                 </div>

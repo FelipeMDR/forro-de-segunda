@@ -1226,7 +1226,13 @@ export class DemoApi implements ForroApi {
 
   /** Todos os desafios já com as noites extras espalhadas (como na produção). */
   private desafiosComNoites(): Challenge[] {
-    return aplicarNoitesExtras(this.db.challenges.map((c) => this.toChallenge(c)))
+    return aplicarNoitesExtras(
+      this.db.challenges.map((c) => {
+        const d = this.toChallenge(c)
+        // Desafio salvo no aparelho antes da opção `evolui`: evoluía
+        return d.ingresso ? { ...d, ingresso: { ...d.ingresso, evolui: d.ingresso.evolui !== false } } : d
+      }),
+    )
   }
 
   async listChallenges(): Promise<Challenge[]> {
@@ -1579,6 +1585,9 @@ export class DemoApi implements ForroApi {
     const correcao = (this.db.presencasIngresso ?? []).find(
       (p) => p.challenge_id === desafioId && p.user_id === userId,
     )?.esteve
+    // Distintivo que não evolui (workshop, migração 047): nunca há presença.
+    // `evolui` ausente = desafio salvo antes dessa opção, que evoluía.
+    if (cfg.evolui === false) return { abre: abre.getTime(), esteve: false, primeiro: undefined }
     return { abre: abre.getTime(), esteve: correcao ?? primeiro !== undefined, primeiro }
   }
 

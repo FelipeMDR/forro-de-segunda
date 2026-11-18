@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { idDaPlanilha, montarScriptPlanilha } from '../lib/scriptPlanilha'
+import { abaDaPlanilha, idDaPlanilha, montarScriptPlanilha } from '../lib/scriptPlanilha'
 import type { Challenge, StatusSincronizacao } from '../lib/types'
 import { BotaoAcao, BotaoSuave, Confirmar, RotuloSecao } from './ui'
 
@@ -66,6 +66,7 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
           anonKey: chave || 'SUA-CHAVE-ANON',
           segredo,
           planilhaId,
+          abaGid: abaDaPlanilha(link),
         }),
       )
     } catch (e) {
@@ -210,7 +211,10 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
 
           <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1 text-[13px] font-bold text-ink3">
-              Link da planilha
+              Link da aba da planilha
+              <span className="font-normal">
+                Abra a aba deste evento e copie o link: ele termina com gid=…, que diz qual aba ler.
+              </span>
               <input
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
@@ -221,6 +225,11 @@ export function SincronizacaoPlanilha({ desafio }: { desafio: Challenge }) {
             </label>
             {link.trim() && !planilhaId && (
               <p className="text-[13px] text-or-t">Esse não parece um link do Google Planilhas.</p>
+            )}
+            {planilhaId && abaDaPlanilha(link) === null && (
+              <p className="text-[13px] text-or-t">
+                O link não diz qual aba: o script vai ler a primeira aba da planilha.
+              </p>
             )}
             {semBanco && (
               <p className="text-[13px] text-ink3">

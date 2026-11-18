@@ -1390,6 +1390,8 @@ export class SupabaseApi implements ForroApi {
       evento_inicio: horaCurta(c.evento_inicio),
       evento_fim: horaCurta(c.evento_fim),
       noite_extra_para: (c.noite_extra_para as string[] | null) ?? [],
+      // Sem a migração 047 a coluna não existe: evolui, como sempre foi
+      evolui: c.ingresso_evolui !== false,
       garantido: {
         emoji: texto(c.ingresso_emoji, padrao.garantido.emoji),
         titulo: texto(c.ingresso_titulo, padrao.garantido.titulo),
@@ -1495,7 +1497,9 @@ export class SupabaseApi implements ForroApi {
             evento_data: data.ingresso.evento_data,
             evento_inicio: data.ingresso.evento_inicio,
             evento_fim: data.ingresso.evento_fim,
-            noite_extra_para: data.ingresso.noite_extra_para,
+            // Sem evolução não há noite extra para ninguém
+            noite_extra_para: data.ingresso.evolui ? data.ingresso.noite_extra_para : [],
+            ingresso_evolui: data.ingresso.evolui,
             ingresso_emoji: data.ingresso.garantido.emoji,
             ingresso_titulo: data.ingresso.garantido.titulo,
             presenca_emoji: data.ingresso.presenca.emoji,

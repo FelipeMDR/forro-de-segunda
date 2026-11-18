@@ -7,7 +7,7 @@ import { Cabecalho, Etiqueta, RotuloSecao } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { challengePhase, daysLeft } from '../lib/dates'
 import { faixasDeHorario, periodoCurto } from '../lib/horarios'
-import { diaDaFesta } from '../lib/ingresso'
+import { rotuloCurtoEvento } from '../lib/ingresso'
 import { defModalidade, type Challenge } from '../lib/types'
 import { useLembrado } from '../lib/memoriaTelas'
 
@@ -61,7 +61,7 @@ function CartaoDesafio({ c }: { c: Challenge }) {
       <span className="text-sm text-ink3">
         {c.ingresso ? (
           <>
-            🎟️ Festa em {diaDaFesta(c.ingresso)} · {c.participantes} com ingresso
+            🎟️ {rotuloCurtoEvento(c.ingresso)} · {c.participantes} com ingresso
           </>
         ) : (
           <>

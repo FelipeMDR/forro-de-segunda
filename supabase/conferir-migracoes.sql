@@ -209,6 +209,15 @@ from (values
       select 1 from information_schema.tables
       where table_schema = 'public' and table_name = 'divulgacao_eventos'
     )
+  ),
+  (
+    '047 — desafio de ingresso sem evolução',
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'challenges'
+        and column_name = 'ingresso_evolui'
+    )
   )
 ) as t(migracao, aplicada)
 order by migracao;

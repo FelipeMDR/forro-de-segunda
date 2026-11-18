@@ -147,6 +147,7 @@ export function ChallengeForm({
           evento_inicio: '18:00',
           evento_fim: '04:00',
           noite_extra_para: [],
+          evolui: true,
           ...textosPadraoIngresso(f.titulo),
         },
         entrada_restrita: true,
@@ -451,7 +452,7 @@ export function ChallengeForm({
             <>
               <div>
                 <label className="label" htmlFor="evento-data">
-                  Data da festa
+                  {ingresso.evolui ? 'Data da festa' : 'Data do evento (último dia)'}
                 </label>
                 <input
                   id="evento-data"
@@ -463,7 +464,51 @@ export function ChallengeForm({
                   onChange={(e) => mudarIngresso({ evento_data: e.target.value })}
                   required
                 />
+                {!ingresso.evolui && (
+                  <p className="mt-1 text-[11px] text-tinta-500">
+                    A sincronização com a planilha para no dia seguinte a essa data.
+                  </p>
+                )}
               </div>
+
+              {/* Workshop: não dá para garantir o check-in de quem vai, então o
+                  distintivo fica em "Ingresso garantido" — sem horário, sem
+                  segundo distintivo e sem noite extra em outros desafios */}
+              <label className="flex cursor-pointer items-start justify-between gap-3">
+                <span>
+                  <span className="block text-sm font-bold">
+                    O distintivo evolui com check-in no evento
+                  </span>
+                  <span className="block text-[11px] text-tinta-500">
+                    Ligado: quem fizer check-in no horário ganha "Marquei presença" (como na
+                    festa). Desligado: o distintivo fica só em "Ingresso garantido" (como no
+                    workshop).
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 shrink-0 accent-brasa-500"
+                  aria-label="O distintivo evolui com check-in no evento"
+                  checked={ingresso.evolui}
+                  onChange={(e) =>
+                    mudarIngresso(
+                      e.target.checked
+                        ? { evolui: true, evento_inicio: '18:00', evento_fim: '04:00' }
+                        : // Sem horário de check-in: o dia inteiro, sem virar a noite
+                          // (senão o fim do desafio iria para o dia seguinte)
+                          {
+                            evolui: false,
+                            evento_inicio: '00:00',
+                            evento_fim: '23:59',
+                            noite_extra_para: [],
+                          },
+                    )
+                  }
+                />
+              </label>
+
+              {ingresso.evolui && (
+              <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label" htmlFor="evento-inicio">
@@ -500,8 +545,10 @@ export function ChallengeForm({
                     ' O fim do desafio passa para o dia seguinte ao salvar, para cobrir a madrugada.'}
                 </p>
               )}
+              </>
+              )}
 
-              {(['garantido', 'presenca'] as const).map((estado) => (
+              {(ingresso.evolui ? (['garantido', 'presenca'] as const) : (['garantido'] as const)).map((estado) => (
                 <div key={estado} className="space-y-1">
                   <span className="label">
                     {estado === 'garantido'
@@ -536,6 +583,7 @@ export function ChallengeForm({
                 </div>
               ))}
 
+              {ingresso.evolui && (
               <div className="space-y-1">
                 <span className="label">A noite da festa também vale em:</span>
                 {alvos.length === 0 ? (
@@ -560,6 +608,7 @@ export function ChallengeForm({
                   desafios também.
                 </p>
               </div>
+              )}
             </>
           )}
         </div>

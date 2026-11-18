@@ -14,6 +14,7 @@ const MIGRACOES = [
   '044-convites-com-ddd.sql',
   '045-resumo-com-repetidos.sql',
   '046-metricas-da-divulgacao.sql',
+  '047-ingresso-sem-evolucao.sql',
 ].map((m) => fileURLToPath(new URL(`../../supabase/migracoes/${m}`, import.meta.url)))
 
 /**

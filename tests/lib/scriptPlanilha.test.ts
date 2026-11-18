@@ -1,5 +1,83 @@
 import { describe, expect, it } from 'vitest'
-import { idDaPlanilha, montarScriptPlanilha } from '../../src/lib/scriptPlanilha'
+import { abaDaPlanilha, idDaPlanilha, montarScriptPlanilha } from '../../src/lib/scriptPlanilha'
+
+describe('abaDaPlanilha', () => {
+  it('lê o gid da aba no link (o Google repete no ?gid= e no #gid=)', () => {
+    expect(
+      abaDaPlanilha(
+        'https://docs.google.com/spreadsheets/d/ABC/edit?gid=1784498487#gid=1784498487',
+      ),
+    ).toBe(1784498487)
+    expect(abaDaPlanilha('https://docs.google.com/spreadsheets/d/ABC/edit#gid=0')).toBe(0)
+  })
+  it('link sem aba: null (o script lê a primeira aba)', () => {
+    expect(abaDaPlanilha('https://docs.google.com/spreadsheets/d/ABC/edit?usp=sharing')).toBeNull()
+  })
+})
+
+describe('script com aba escolhida', () => {
+  // Duas abas: a primeira é a do Forró na Rep, a segunda a do workshop
+  function planilha() {
+    const lidas: number[] = []
+    const aba = (id: number, nome: string) => ({
+      getSheetId: () => id,
+      getDataRange: () => ({
+        getDisplayValues: () => {
+          lidas.push(id)
+          return [['NOME', 'CELULAR'], [nome, '35 99000-0001']]
+        },
+      }),
+    })
+    return { lidas, abas: [aba(0, 'Da festa'), aba(1784498487, 'Do workshop')] }
+  }
+  function rodarCom(abaGid: number | null) {
+    const { lidas, abas } = planilha()
+    let enviado: { p_grade: string[][] } | null = null
+    const script = montarScriptPlanilha({
+      supabaseUrl: 'https://abc.supabase.co',
+      anonKey: 'anon',
+      segredo: 'seg',
+      planilhaId: 'id',
+      abaGid,
+    })
+    const sincronizar = new Function(
+      'SpreadsheetApp',
+      'UrlFetchApp',
+      'ScriptApp',
+      `${script}\nreturn sincronizar;`,
+    )(
+      { openById: () => ({ getSheets: () => abas }) },
+      {
+        fetch(_u: string, op: { payload: string }) {
+          enviado = JSON.parse(op.payload)
+          const r = { status: 'ok', coluna_marcar: null, linhas: [] }
+          return { getResponseCode: () => 200, getContentText: () => JSON.stringify(r) }
+        },
+      },
+      {},
+    ) as () => void
+    return { lidas, rodar: sincronizar, enviado: () => enviado }
+  }
+
+  it('lê a aba do gid, mesmo que ela não seja a primeira', () => {
+    const r = rodarCom(1784498487)
+    r.rodar()
+    expect(r.lidas).toEqual([1784498487])
+    expect(r.enviado()?.p_grade[1][0]).toBe('Do workshop')
+  })
+
+  it('sem gid continua lendo a primeira aba', () => {
+    const r = rodarCom(null)
+    r.rodar()
+    expect(r.lidas).toEqual([0])
+  })
+
+  it('gid que não existe mais: falha com erro, sem mandar outra aba', () => {
+    const r = rodarCom(999)
+    expect(() => r.rodar()).toThrow(/aba/i)
+    expect(r.enviado()).toBeNull()
+  })
+})
 
 describe('idDaPlanilha', () => {
   it('extrai o id do link', () => {

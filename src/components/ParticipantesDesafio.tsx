@@ -54,13 +54,15 @@ export function ParticipantesDesafio({
   const [aberto, setAberto] = useState<Profile | null>(null)
   const [convAberto, setConvAberto] = useState<ConvidadoDesafio | null>(null)
   const ehIngresso = desafio.ingresso != null
+  // Workshop (distintivo que não evolui): sem presença para mostrar nem corrigir
+  const comPresenca = ehIngresso && desafio.ingresso?.evolui !== false
 
   const carregar = async () => {
     const [todos, ranking, convites, corrigidos] = await Promise.all([
       api.listProfiles(),
       api.getRanking(desafio, 'checkin'),
       api.listConvidados(desafio.id),
-      ehIngresso
+      comPresenca
         ? api.correcoesPresencaIngresso(desafio.id)
         : Promise.resolve(new Map<string, boolean>()),
     ])
@@ -165,9 +167,11 @@ export function ParticipantesDesafio({
       <div>
         <h3 className="text-sm font-bold">🎟️ Participantes</h3>
         <p className="text-[11px] text-tinta-500">
-          {ehIngresso
+          {comPresenca
             ? 'A lista vem da planilha de ingressos. Toque numa pessoa para corrigir a presença ou remover.'
-            : 'Desafio de entrada restrita: só quem você adicionar aqui participa.'}
+            : ehIngresso
+              ? 'A lista vem da planilha de ingressos. Toque numa pessoa para remover.'
+              : 'Desafio de entrada restrita: só quem você adicionar aqui participa.'}
         </p>
       </div>
 
@@ -241,7 +245,7 @@ export function ParticipantesDesafio({
                     >
                       <Avatar nome={p.nome} url={p.avatar_url} tamanho={28} />
                       <span className="min-w-0 flex-1 truncate text-sm">{p.nome}</span>
-                      {ehIngresso && (
+                      {comPresenca && (
                         <span
                           className="shrink-0 text-base"
                           title={
@@ -328,7 +332,7 @@ export function ParticipantesDesafio({
       <Folha aberta={aberto !== null} onFechar={() => setAberto(null)} titulo={aberto?.nome}>
         {aberto && (
           <div className="space-y-4 px-5 pb-5">
-            {ehIngresso && (
+            {comPresenca && (
               <div className="space-y-2">
                 <p className="text-sm text-ink2">
                   {presente(aberto.id) ? '🎉 Marcou presença' : '🎟️ Ingresso garantido'}

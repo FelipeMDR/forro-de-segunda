@@ -6,6 +6,7 @@ import {
   badgeDeIngresso,
   fimQueCobreAFesta,
   noiteDoEvento,
+  rotuloCurtoEvento,
   rotuloFesta,
   textosPadraoIngresso,
 } from '../../src/lib/ingresso'
@@ -37,6 +38,7 @@ const cfg = (para: string[]): IngressoConfig => ({
   evento_inicio: '18:00',
   evento_fim: '04:00',
   noite_extra_para: para,
+  evolui: true,
   ...textosPadraoIngresso('Forró na Rep 2026.2'),
 })
 
@@ -71,6 +73,17 @@ describe('noiteDoEvento', () => {
 })
 
 describe('aplicarNoitesExtras', () => {
+  it('desafio de ingresso que não evolui (workshop) não abre noite nenhuma', () => {
+    const workshop = desafio({
+      id: 'workshop',
+      titulo: 'Workshop de Forró',
+      ingresso: { ...cfg(['livre']), evolui: false },
+    })
+    const r = aplicarNoitesExtras([espacoLivre, workshop])
+    expect(r.find((c) => c.id === 'livre')!.noites_extras).toEqual([])
+    expect(r.find((c) => c.id === 'workshop')!.noites_extras).toEqual([])
+  })
+
   it('dá a noite ao desafio de ingresso e aos de noite_extra_para', () => {
     const r = aplicarNoitesExtras([espacoLivre, ingresso])
     expect(r.find((c) => c.id === 'livre')!.noites_extras).toEqual([NOITE])
@@ -219,5 +232,19 @@ describe('fimQueCobreAFesta', () => {
 describe('rotuloFesta', () => {
   it('descreve data e horário', () => {
     expect(rotuloFesta(cfg([]))).toBe('Festa em 05/12, das 18:00 às 04:00')
+  })
+  it('evento sem evolução (workshop): só até quando, sem horário', () => {
+    expect(rotuloFesta({ ...cfg([]), evento_data: '2026-12-06', evolui: false })).toBe(
+      'Até 06/12',
+    )
+  })
+})
+
+describe('rotuloCurtoEvento (cartão da lista)', () => {
+  it('festa: o dia da festa; workshop: até quando', () => {
+    expect(rotuloCurtoEvento(cfg([]))).toBe('Festa em 05/12')
+    expect(rotuloCurtoEvento({ ...cfg([]), evento_data: '2026-12-06', evolui: false })).toBe(
+      'Até 06/12',
+    )
   })
 })

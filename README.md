@@ -378,6 +378,18 @@ Quem fez check-in no horário da festa vira "Marquei presença" sozinho; na
 lista de participantes do desafio, a organização corrige caso a caso
 ("Esteve lá", "Não esteve" ou volta ao "Automático").
 
+**Vários eventos na mesma planilha (festa, workshop…):** cada evento é um
+desafio de ingresso, com a sua aba na planilha.
+- No painel, cole o link **da aba** do evento (abra a aba e copie o
+  endereço: ele termina com `gid=…`). Sem o `gid`, o script lê a primeira
+  aba.
+- Cada evento tem o seu projeto no script.google.com. Não cole dois scripts
+  no mesmo projeto: as funções têm o mesmo nome.
+- Evento em que não dá para garantir o check-in (workshop): desligue "O
+  distintivo evolui com check-in no evento". O distintivo fica em
+  "Ingresso garantido", sem horário, sem noite extra e sem presença
+  (migração 047).
+
 ## Scripts
 
 | Comando | O quê |

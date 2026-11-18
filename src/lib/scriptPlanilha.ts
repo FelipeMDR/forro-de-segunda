@@ -10,6 +10,17 @@ export function idDaPlanilha(link: string): string | null {
   return m ? m[1] : null
 }
 
+/**
+ * A aba do link (`gid`), ou null quando o link não aponta uma aba. A
+ * mesma planilha tem uma aba por evento (Forró na Rep, workshop…): sem
+ * isso o script lia sempre a primeira, e uma aba nova posta na frente
+ * trocaria a lista de um evento pela de outro.
+ */
+export function abaDaPlanilha(link: string): number | null {
+  const m = /[?#&]gid=(\d+)/.exec(link)
+  return m ? Number(m[1]) : null
+}
+
 /** Literal de string JS seguro para embutir no script. */
 const lit = (s: string) => JSON.stringify(s)
 
@@ -18,6 +29,8 @@ export function montarScriptPlanilha(p: {
   anonKey: string
   segredo: string
   planilhaId: string
+  /** Aba (gid) a ler; null = a primeira aba. */
+  abaGid?: number | null
 }): string {
   const url = `${p.supabaseUrl.replace(/\/+$/, '')}/rest/v1/rpc/sincronizar_planilha_ingresso`
   return `// Forro de Segunda: sincroniza a planilha de ingressos com o app.
@@ -27,9 +40,21 @@ var PLANILHA_ID = ${lit(p.planilhaId)};
 var URL_RPC = ${lit(url)};
 var CHAVE = ${lit(p.anonKey)};
 var SEGREDO = ${lit(p.segredo)};
+// Aba da planilha (o numero do gid no link); null = a primeira aba
+var ABA_GID = ${p.abaGid == null ? 'null' : String(Math.trunc(p.abaGid))};
+
+function abaDoEvento() {
+  var abas = SpreadsheetApp.openById(PLANILHA_ID).getSheets();
+  if (ABA_GID === null) return abas[0];
+  for (var i = 0; i < abas.length; i++) {
+    if (abas[i].getSheetId() === ABA_GID) return abas[i];
+  }
+  // Nunca cai para outra aba: mandaria a lista de outro evento
+  throw new Error('Aba da planilha nao encontrada (gid ' + ABA_GID + '). Gere o script de novo com o link da aba.');
+}
 
 function sincronizar() {
-  var aba = SpreadsheetApp.openById(PLANILHA_ID).getSheets()[0];
+  var aba = abaDoEvento();
   var grade = aba.getDataRange().getDisplayValues();
   var resposta = UrlFetchApp.fetch(URL_RPC, {
     method: 'post',

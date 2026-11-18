@@ -48,7 +48,10 @@ export function aplicarNoitesExtras(desafios: Challenge[]): Challenge[] {
   let r = desafios.map((c) => ({ ...c, noites_extras: [...(c.noites_extras ?? [])] }))
   for (const origem of desafios) {
     const cfg = origem.ingresso
-    if (!cfg) continue
+    // Distintivo que não evolui (workshop): o evento não é noite de
+    // check-in, não conta presença nem ponto em lugar nenhum
+    // (`evolui` ausente = salvo antes dessa opção, que evoluía)
+    if (!cfg || cfg.evolui === false) continue
     const noite = noiteDoEvento(cfg)
     const alvos = new Set([origem.id, ...cfg.noite_extra_para])
     r = r.map((c) => (alvos.has(c.id) ? comNoite(c, noite) : c))
@@ -89,7 +92,14 @@ export function fimQueCobreAFesta(dataFim: string, cfg: IngressoConfig): string 
 
 /** "Festa em 05/12, das 18:00 às 04:00" */
 export function rotuloFesta(cfg: IngressoConfig): string {
+  // Sem evolução (workshop) o horário não existe: só até quando vai
+  if (cfg.evolui === false) return `Até ${diaDaFesta(cfg)}`
   return `Festa em ${diaDaFesta(cfg)}, das ${cfg.evento_inicio} às ${cfg.evento_fim}`
+}
+
+/** Versão curta, para o cartão da lista de desafios. */
+export function rotuloCurtoEvento(cfg: IngressoConfig): string {
+  return cfg.evolui === false ? `Até ${diaDaFesta(cfg)}` : `Festa em ${diaDaFesta(cfg)}`
 }
 
 /** "05/12": a data da festa, curta, para o cartão da lista de desafios. */

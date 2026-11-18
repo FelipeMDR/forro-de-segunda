@@ -301,6 +301,12 @@ export interface IngressoConfig {
   evento_fim: string
   /** Ids de desafios que também ganham a noite do evento. */
   noite_extra_para: string[]
+  /**
+   * O distintivo evolui para "Marquei presença" com check-in no horário
+   * (Forró na Rep). Com false (workshop) fica em "Ingresso garantido": sem
+   * noite extra, sem presença. Antes da migração 047, sempre true.
+   */
+  evolui: boolean
   garantido: TextoDistintivo
   presenca: TextoDistintivo
 }
